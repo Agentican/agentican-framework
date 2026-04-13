@@ -9,6 +9,14 @@
     <name>Agentican Framework</name>
     <description>A lightweight framework for building tool-using LLM agents with persistent memory, MCP support, and human-in-the-loop approval gates.</description>
 
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/Agentican/agentican-framework</url>
+        </repository>
+    </distributionManagement>
+
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
         <anthropic.version>2.19.0</anthropic.version>
