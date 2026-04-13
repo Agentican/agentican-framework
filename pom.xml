@@ -5,8 +5,8 @@
 
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-framework</artifactId>
-    <version>1.0-SNAPSHOT</version>
-    <name>Agentican Agent Framework</name>
+    <version>0.1.0-SNAPSHOT</version>
+    <name>Agentican Framework</name>
     <description>A lightweight framework for building tool-using LLM agents with persistent memory, MCP support, and human-in-the-loop approval gates.</description>
 
     <properties>
