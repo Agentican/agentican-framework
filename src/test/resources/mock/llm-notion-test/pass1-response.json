@@ -1,0 +1,44 @@
+{
+  "name": "LLM Research and Documentation",
+  "description": "Research the top {{param.count}} LLMs based on {{param.criteria}}, gather pricing information, and create individual Notion pages for each model.",
+  "paramConfigs": [
+    {"name": "count", "description": "Number of top LLMs to research", "defaultValue": "3", "required": true},
+    {"name": "criteria", "description": "Evaluation criteria for selecting LLMs", "defaultValue": "reasoning and tool use", "required": true}
+  ],
+  "agents": [
+    {"name": "AI Research Specialist", "role": "Expert in AI/ML models, benchmarks, and LLM capabilities with focus on performance metrics and pricing", "skills": []},
+    {"name": "Documentation Specialist", "role": "Expert in creating structured, detailed documentation with clear formatting", "skills": []}
+  ],
+  "stepConfigs": [
+    {
+      "name": "research-llms",
+      "type": "agent",
+      "agent": "AI Research Specialist",
+      "instructions": "# Research Top LLMs\n\nYour task is to identify the top {{param.count}} large language models (LLMs) based on {{param.criteria}}.\n\n## Requirements\n\n1. Search for the latest LLM benchmarks and evaluations focusing on {{param.criteria}}\n2. Consider models from major providers (OpenAI, Anthropic, Google, Meta, etc.)\n3. For each of the top {{param.count}} models, gather model details.\n4. **CRITICAL**: Your ENTIRE response must be valid JSON and nothing else.\n\nReturn a JSON array:\n[\n  {\"model_name\": \"Model Name\", \"provider\": \"Provider\", \"capabilities\": \"...\", \"performance\": \"...\", \"pricing\": \"...\", \"api_access\": \"...\", \"notes\": \"...\"}\n]",
+      "toolkits": []
+    },
+    {
+      "name": "setup-notion",
+      "type": "agent",
+      "agent": "Documentation Specialist",
+      "instructions": "# Setup Notion Workspace\n\nYou will receive a list of LLM models: {{step.research-llms.output}}\n\n1. Browse the Notion workspace to understand the existing structure\n2. Find an appropriate parent page OR create a new one\n3. Add the parent_page_id field to each model object\n4. **CRITICAL**: Your ENTIRE response must be valid JSON and nothing else.",
+      "dependencies": ["research-llms"],
+      "toolkits": ["notion"],
+      "hitl": true
+    },
+    {
+      "name": "create-pages",
+      "type": "loop",
+      "over": "setup-notion",
+      "stepConfigs": [
+        {
+          "name": "create-page",
+          "type": "agent",
+          "agent": "Documentation Specialist",
+          "instructions": "Create a Notion page for {{item.model_name}} by {{item.provider}} under parent {{item.parent_page_id}} with full content.",
+          "toolkits": ["notion"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "setup_step": null,
+  "body_steps": [
+    {
+      "name": "create-page",
+      "instructions": "Use **NOTION_CREATE_NOTION_PAGE** with the `markdown` parameter to create the page with all content in a single API call:\n\n1. Call NOTION_CREATE_NOTION_PAGE with:\n   - `parent_id`: `{{item.parent_page_id}}`\n   - `title`: `{{item.model_name}}`\n   - `markdown`: Full page content as markdown"
+    }
+  ],
+  "loop_over": "setup-notion"
+}

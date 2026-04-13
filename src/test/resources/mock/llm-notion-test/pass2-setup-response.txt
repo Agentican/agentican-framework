@@ -1,0 +1,23 @@
+**Setup Notion Parent Location**
+
+You will receive a list of LLM models from {{step.research-llms.output}}.
+
+Your task is to ensure each model object has a valid `parent_page_id` field by the end of this step.
+
+**Instructions:**
+
+1. **Parse the input**: Extract the JSON array from {{step.research-llms.output}}.
+
+2. **Browse the Notion workspace structure**: Use **NOTION_FETCH_DATA** with `fetch_type='pages'` and an empty `query` to retrieve all accessible pages.
+
+3. **Determine the appropriate parent location**:
+   - Look for an existing page that would be a natural parent for LLM documentation.
+   - If no suitable parent exists, **create one**: Use **NOTION_CREATE_NOTION_PAGE** with `title="LLM Research"` and a valid `parent_id` from the browsed structure.
+
+4. **Extract the parent page ID**: Once you've identified or created the appropriate parent page, extract its `id` field.
+
+5. **Enrich the model data**: Add the `parent_page_id` field to each model object in the array.
+
+6. **Output the result**: Return **only** the enriched JSON array. Every object must have a populated `parent_page_id` field with a valid UUID value.
+
+**Critical**: Never return null, empty, or placeholder values for `parent_page_id`. If the parent page doesn't exist, create it using **NOTION_CREATE_NOTION_PAGE** before enriching the array.

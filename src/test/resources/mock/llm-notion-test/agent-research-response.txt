@@ -1,0 +1,5 @@
+[
+  {"model_name": "Claude Opus 4.6", "provider": "Anthropic", "capabilities": "Advanced reasoning with adaptive thinking", "performance": "SWE-bench 80.8%", "pricing": "$5/M input, $25/M output", "api_access": "Anthropic API", "notes": "1M context window"},
+  {"model_name": "GPT-5.4", "provider": "OpenAI", "capabilities": "Frontier reasoning with configurable effort", "performance": "Terminal-Bench 75.1%", "pricing": "$2.50/M input, $15/M output", "api_access": "OpenAI API", "notes": "1M context window"},
+  {"model_name": "Gemini 3.1 Pro", "provider": "Google", "capabilities": "Multimodal reasoning and tool coordination", "performance": "ARC-AGI-2 77.1%", "pricing": "$2/M input, $12/M output", "api_access": "Google AI Studio", "notes": "1M context window"}
+]

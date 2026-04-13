@@ -1,0 +1,129 @@
+I'll help you research the top LLMs for reasoning and tool use. Let me search for recent benchmarks and evaluations.Now let me search for more specific information on tool use capabilities and recent model releases:Based on my comprehensive research, I now have enough information to provide a detailed report on the top 3 LLMs for reasoning and tool use. Let me compile the findings.
+
+# Research: Top 3 Large Language Models for Reasoning and Tool Use
+
+Based on recent benchmarks and evaluations (2024-2026), here are the top three large language models that excel at reasoning and tool use capabilities:
+
+---
+
+## 1. **OpenAI o3 (and o4-mini)**
+
+**Organization:** OpenAI
+**Release Date:** January 31, 2025 (o3-mini), April 16, 2025 (o3 and o4-mini)
+**Current Status:** Generally available via ChatGPT Plus/Pro/Team, API, and enterprise plans
+
+### Key Strengths in Reasoning
+
+OpenAI o3 scored 96.7% on the American Invitational Mathematics Exam and 87.7% on a graduate-level science exam (GPQA Diamond), highlighting the model's increased capacity for solving complex problems in fields that require high-level reasoning. On the Frontier Math Benchmark, o3 recorded around 25% accuracy compared to the previous best of 2%, showcasing its superior mathematical reasoning abilities, and scored an impressive 96.7% accuracy on AIME, missing only one question.
+
+On the ARC-AGI benchmark, which evaluates an AI's ability to handle new logical and skill acquisition problems, o3 attained three times the accuracy of o1. With 87.5% accuracy in visual reasoning on ARC-AGI, o3 addresses prior models' struggles with spatial and physical object analysis.
+
+### Tool Use Capabilities
+
+For the first time, OpenAI's reasoning models can agentically use and combine every tool within ChatGPT—this includes searching the web, analyzing uploaded files and other data with Python, reasoning deeply about visual inputs, and even generating images. Both o3 and o4-mini were trained to use tools through reinforcement learning—teaching them not just how to use tools, but to reason about when to use them.
+
+### Notable Benchmark Scores
+
+- **AIME 2024:** 96.7% (compared to o1's 83.3%)
+- **GPQA Diamond:** 87.7%
+- **ARC-AGI (high-compute):** 87.5%
+- **Frontier Math:** 25.2% (previous best <2%)
+- **SWE-bench Verified:** 71.7%
+- **Codeforces:** Elo rating of 2727
+
+### Performance Notes
+
+At equal latency and cost with OpenAI o1, o3 delivers higher performance in ChatGPT—and they've validated that if they let it think longer, its performance keeps climbing. o3 now surpasses o1 across nearly every benchmark, with full tool access in ChatGPT and via API.
+
+---
+
+## 2. **Anthropic Claude Opus 4.5 / 4.6**
+
+**Organization:** Anthropic
+**Release Date:** November 2025 (Claude Opus 4.5), subsequent updates through 4.6
+**Current Status:** Available via Claude Pro, API, Amazon Bedrock, and Claude Code
+
+### Key Strengths in Reasoning
+
+Early tests of Claude 4 found it remarkably good at multi-step reasoning and tool use. Claude 4's Opus model is designed for "reasoning-heavy tasks like agentic search and long-running workflows". It can maintain coherent step-by-step plans over thousands of tokens.
+
+Claude Opus 4.5 achieves a remarkable score of 37.6% on ARC-AGI-2, a massive improvement that is more than double the score of GPT-5.1 (17.6%). Its major leap in abstract reasoning gives Opus 4.5 the cognitive headroom needed for complex task decomposition, tool use, and multi-step planning.
+
+### Tool Use and Coding Performance
+
+Claude Opus 4.5 delivers a state-of-the-art 80.9% on SWE-bench Verified, outperforming Gemini 3 Pro (76.2%) and GPT 5.1 (76.3%), which makes it one of the strongest models for real bug resolution. Claude Opus 4.5 set a new record with a score of 80.9% on SWE-bench Verified, becoming the first model to exceed the 80% threshold. This represents a 65% increase compared to Claude 3.5 Sonnet (49%) and surpasses all competing models.
+
+Opus 4.5 is the clear winner and exhibits the best frontier task planning and tool calling we've seen yet, according to early testers.
+
+### Notable Benchmark Scores
+
+- **SWE-bench Verified:** 80.9% (best-in-class)
+- **ARC-AGI-2:** 37.6%
+- **Aider Polyglot:** 89.4%
+- **Terminal-Bench:** 59.3%
+- **SWE-bench Multilingual:** Leading across 7 out of 8 programming languages
+- **GPQA Diamond:** ~87-89%
+
+### Long-Horizon Capabilities
+
+Claude Sonnet 4.5 can autonomously sustain complex, multi-step tasks for over 30 hours, while also being an all-around performer optimized for enterprise workloads like data processing. Claude Opus 4.5 excels at long-horizon, autonomous tasks, especially those that require sustained reasoning and multi-step execution.
+
+---
+
+## 3. **Google Gemini 3 Pro (and Deep Think)**
+
+**Organization:** Google DeepMind
+**Release Date:** November 18, 2025
+**Current Status:** Available via Gemini app, Google AI Studio, Vertex AI; Deep Think mode in limited release
+
+### Key Strengths in Reasoning
+
+Gemini 3 Pro demonstrates PhD-level reasoning with top scores on Humanity's Last Exam (37.5% without the usage of any tools) and GPQA Diamond (91.9%). It also sets a new standard for frontier models in mathematics, achieving a new state-of-the-art of 23.4% on MathArena Apex.
+
+Gemini 3 Pro's 31.1% score on ARC-AGI-2 (45.1% with Deep Think) is a massive jump from Gemini 2.5 Pro (4.9%) and nearly doubles the score of GPT-5.1 (17.6%). Most importantly this is the first time we're seeing a 40%+ result with Gemini 3 deep think, and 37.5% with Gemini 3 Pro, on the hardest reasoning test, the Humanity's Last Exam.
+
+### Tool Use and Agentic Capabilities
+
+Gemini 3.1 brings exceptional instruction following – with meaningful improved tool use and agentic coding. Gemini 3.1's agentic capabilities can build more helpful and intelligent personal AI assistants.
+
+Gemini 3 Pro's result on ScreenSpot-Pro, a key benchmark for agentic computer use, rose from 11.4% to 72.7%, demonstrating exceptional capability in UI interaction and tool manipulation.
+
+### Notable Benchmark Scores
+
+- **GPQA Diamond:** 91.9% (93.8% with Deep Think)
+- **AIME 2025:** 95% without tools, 100% with code execution
+- **MathArena Apex:** 23.4% (state-of-the-art)
+- **Humanity's Last Exam:** 37.5% (41% with Deep Think)
+- **ARC-AGI-2:** 31.1% (45.1% with Deep Think)
+- **SWE-bench Verified:** 76.2%
+- **MMMU-Pro:** 81%
+- **Video-MMMU:** 87.6%
+- **LMArena Elo:** 1501 (first model to break 1500)
+
+### Multimodal Reasoning Advantage
+
+Gemini 3 Pro redefines multimodal reasoning with 81% on MMMU-Pro and 87.6% on Video-MMMU. It also scores a state-of-the-art 72.1% on SimpleQA Verified, showing great progress on factual accuracy. This means Gemini 3 Pro is highly capable at solving complex problems across a vast array of topics like science and mathematics with a high degree of reliability.
+
+---
+
+## Honorable Mention: DeepSeek-R1 (Open Source Alternative)
+
+**Organization:** DeepSeek AI
+**Release Date:** January 2025 (original R1), May 2025 (R1-0528 update)
+**Current Status:** Open source (MIT license), 671B parameters with MoE architecture
+
+DeepSeek-R1 achieves performance comparable to OpenAI-o1-1217 on reasoning tasks. In the AIME 2025 test, the model's accuracy has increased from 70% in the previous version to 87.5% in the R1-0528 version. R1-0528 shows solid performance on Tau-Bench with scores of 53.5 (Airline) and 63.9 (Retail) for function calling improvements.
+
+As an open-source model competing with proprietary systems, DeepSeek positions itself as a serious competitor to top-tier proprietary models from OpenAI and Google, while maintaining the cost-efficiency and accessibility of open-source development.
+
+---
+
+## Summary
+
+All three leading models demonstrate exceptional reasoning capabilities with distinct advantages:
+
+- **OpenAI o3** leads in pure mathematical reasoning and abstract problem-solving with the highest AIME and Frontier Math scores
+- **Claude Opus 4.5** dominates in real-world software engineering tasks, tool use, and sustained multi-step workflows
+- **Gemini 3 Pro** excels in multimodal reasoning, scientific knowledge (GPQA), and offers the most comprehensive agentic capabilities with superior tool integration
+
+The choice between these models depends on specific use cases: o3 for mathematical/logical reasoning, Claude for coding and long-horizon tasks, and Gemini for multimodal understanding and integrated tool use.

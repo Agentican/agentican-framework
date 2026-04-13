@@ -1,0 +1,59 @@
+<task>
+  {task}
+</task>
+
+{#if !scratchpadEntries.isEmpty()}
+<scratchpad>
+  <index>{#for entry in scratchpadEntries}
+    <entry>
+      <key>{entry.key}</key>
+      <description>{entry.description}</description>
+    </entry>{/for}
+  </index>
+</scratchpad>
+{/if}
+
+{#if !knowledgeIndex.isEmpty()}
+<knowledge-base>
+  <context>The knowledge base contains entries previously researched and saved by you or other agents. Scan the index below — if any entry looks relevant to your task, call recall_knowledge with its id to retrieve the full facts. Avoid re-researching topics already covered.</context>
+  <index>{#for entry in knowledgeIndex}
+    <entry>
+      <id>{entry.id}</id>
+      <name>{entry.name}</name>
+      <description>{entry.description}</description>
+    </entry>{/for}
+  </index>
+  {#if !recalledKnowledge.isEmpty()}
+  <recalled>{#for entry in recalledKnowledge}
+    <entry>
+      <id>{entry.id}</id>
+      <name>{entry.name}</name>
+      <facts>{#for fact in entry.facts}
+        <fact>
+          <name>{fact.name}</name>
+          <content>{fact.content}</content>
+          <tags>{#for tag in fact.tags}{tag}{#if tag_hasNext}, {/if}{/for}</tags>
+        </fact>{/for}
+      </facts>
+    </entry>{/for}
+  </recalled>
+  {/if}
+</knowledge-base>
+{/if}
+
+{#if !toolResults.isEmpty()}
+<tool-results>
+  <context>These are results from tool calls you requested on your previous turn. If these results show your task's objective has been fulfilled, respond with your final output. Do not repeat actions that already succeeded.</context>
+  {#for result in toolResults}
+  <tool-result>
+    <name>{result.toolName}</name>
+    <output>{result.content}</output>
+  </tool-result>{/for}
+</tool-results>
+{/if}
+
+<output>
+  {#if iteration == 0}Use your available tools to complete the task. You have multiple turns — call tools now and receive results on your next turn. When done, respond with your final output following the format specified in the task instructions above.
+  {#else}Review the tool results above. If the task objective is fulfilled, respond with your final output following the format specified in the task instructions above. Otherwise, continue with additional tool calls.
+  {/if}
+</output>

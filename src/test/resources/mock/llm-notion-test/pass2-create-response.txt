@@ -1,0 +1,10 @@
+# Create Notion Page for LLM
+
+Use **NOTION_CREATE_NOTION_PAGE** with the `markdown` parameter to create the page with all content in a single API call:
+
+1. **Call NOTION_CREATE_NOTION_PAGE** with:
+   - `parent_id`: Set to `{{item.parent_page_id}}`
+   - `title`: Set to `{{item.model_name}}`
+   - `markdown`: Compose the full page content as Notion-flavored Markdown with sections for Overview, Reasoning & Tool Use Capabilities, Performance Metrics, Pricing Details, API Access Information, and Additional Notes.
+
+The markdown parameter creates the page with full content at creation time, avoiding separate calls to populate content.

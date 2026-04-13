@@ -1,0 +1,45 @@
+{
+  "name" : "LLM Capabilities Research and Ranking",
+  "description" : "Research and analyze the top large language models for reasoning and tool use capabilities, evaluating current benchmarks and expert opinions to identify the leading models in these specific areas.",
+  "agents" : [ {
+    "name" : "ai-researcher",
+    "role" : "AI and machine learning expert who researches and analyzes large language models, their capabilities, and performance benchmarks",
+    "skills" : [ ]
+  } ],
+  "paramConfigs": [ {
+    "name" : "count",
+    "description" : "Number of top LLMs to identify and analyze",
+    "defaultValue" : "3",
+    "required" : true
+  }, {
+    "name" : "capabilities",
+    "description" : "Specific capabilities to evaluate LLMs against",
+    "defaultValue" : "reasoning and tool use",
+    "required" : true
+  } ],
+  "stepConfigs": [ {
+    "name" : "research-llms",
+    "type" : "agent",
+    "agent" : "ai-researcher",
+    "instructions" : "# Research Top LLMs for Reasoning and Tool Use\n\nYour objective is to identify and research the top {{param.count}} large language models that excel at {{param.capabilities}}.\n\n## Action Steps:\n\n1. Search for recent benchmarks and evaluations of LLMs focusing on:\n   - Reasoning capabilities (mathematical reasoning, logical reasoning, complex problem-solving)\n   - Tool use and function calling abilities\n   - Recent benchmark results (MMLU, HumanEval, MATH, tool-use specific benchmarks)\n\n2. Identify the leading models based on:\n   - Published benchmark scores\n   - Expert evaluations and comparisons\n   - Real-world performance reports\n   - Recency (prioritize 2024-2025 models and evaluations)\n\n3. For each of the top {{param.count}} models, gather:\n   - Model name and organization\n   - Key strengths in reasoning\n   - Tool use capabilities and performance\n   - Notable benchmark scores\n   - Release date and current status\n\n4. Organize your findings in markdown with clear headings for each model, including supporting evidence and sources.",
+    "dependencies" : [ ],
+    "hitl" : false,
+    "skills" : [ ],
+    "over" : "",
+    "from" : "",
+    "paths" : [ ],
+    "defaultPath" : ""
+  }, {
+    "name" : "create-summary",
+    "type" : "agent",
+    "agent" : "ai-researcher",
+    "instructions" : "# Create Summary of Top LLMs for Reasoning and Tool Use\n\nYour objective is to synthesize the research into a clear, actionable summary of the top {{param.count}} LLMs.\n\n## Action Steps:\n\n1. Review the research findings:\n{{step.research-llms.output}}\n\n2. Create a concise summary that includes:\n   - A ranked list of the top {{param.count}} LLMs for {{param.capabilities}}\n   - For each model: name, organization, key strengths, and why it ranks in the top {{param.count}}\n   - Brief comparison highlighting what differentiates each model\n   - Any important caveats or considerations\n\n3. Format as clear, scannable markdown with:\n   - Executive summary at the top\n   - Detailed breakdown for each model\n   - Conclusion with recommendations\n\n4. Ensure all claims are supported by the research data.",
+    "dependencies" : [ "research-llms" ],
+    "hitl" : false,
+    "skills" : [ ],
+    "over" : "",
+    "from" : "",
+    "paths" : [ ],
+    "defaultPath" : ""
+  } ]
+}

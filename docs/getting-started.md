@@ -1,0 +1,145 @@
+# Getting Started
+
+This guide walks you through installing Agentican, configuring it, and running your first agentic task.
+
+## Requirements
+
+- **Java 25 or later**
+- **Maven 3.9+**
+- **Anthropic API key** (Agentican uses Claude as the default LLM)
+
+## Installation
+
+Add Agentican to your `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>ai.agentican</groupId>
+    <artifactId>agentican-framework</artifactId>
+    <version>1.0-SNAPSHOT</version>
+</dependency>
+```
+
+## Hello World
+
+Create a simple program that delegates a task to Agentican:
+
+```java
+import ai.agentican.framework.Agentican;
+import ai.agentican.framework.config.LlmConfig;
+import ai.agentican.framework.config.RuntimeConfig;
+
+public class Hello {
+
+    public static void main(String[] args) {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+                .build();
+
+        try (var agentican = Agentican.builder().config(config).build()) {
+
+            var handle = agentican.run("Explain quantum entanglement in 3 sentences.");
+
+            System.out.println(handle.result().lastOutput());
+        }
+    }
+}
+```
+
+Set your API key and run it:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+mvn compile exec:java -Dexec.mainClass=Hello
+```
+
+## What Just Happened?
+
+When you called `agentican.run("Explain quantum entanglement...")`, the framework:
+
+1. **Planned** the task — the LLM-powered planner created a workflow with the right agents and steps
+2. **Built** any agents the planner introduced
+3. **Refined** each step's instructions with available tool context
+4. **Executed** the workflow on virtual threads, returning a `TaskHandle`
+5. **Returned** the `TaskResult` when you called `handle.result()`
+
+For a simple explanation task, the planner created a single step with an LLM call. For multi-step tasks, it would compose specialized agents that work in parallel where possible.
+
+## Async Execution
+
+`run()` returns a `TaskHandle` immediately — execution happens on a virtual thread. You can:
+
+```java
+var handle = agentican.run("Long running task...");
+
+// Don't block — check later
+if (!handle.isDone()) {
+    // Do other work
+}
+
+// Block when ready
+var result = handle.result();
+
+// Or use CompletableFuture
+handle.resultAsync().thenAccept(result -> {
+    System.out.println(result.lastOutput());
+});
+
+// Cancel if needed
+handle.cancel();
+```
+
+## Adding Tools
+
+Out of the box, agents can search the web and fetch content (built into Claude). To give them more powers, register a toolkit:
+
+```java
+var myToolkit = new MyCustomToolkit();
+
+try (var agentican = Agentican.builder()
+        .config(config)
+        .toolkit("my-tools", myToolkit)
+        .build()) {
+
+    agentican.run("Use my tools to do the thing").result();
+}
+```
+
+See [Tools & Toolkits](tools.md) for how to write a toolkit, and how to use the built-in Composio and MCP integrations for hundreds of pre-built tools.
+
+## Human-in-the-Loop
+
+For tasks that need human approval, register a `HitlManager`:
+
+```java
+var hitlManager = new HitlManager((mgr, checkpoint) -> {
+
+    System.out.println("Approve? " + checkpoint.description());
+    var line = new Scanner(System.in).nextLine();
+
+    var response = line.equals("y")
+            ? HitlResponse.approve()
+            : HitlResponse.reject("User declined");
+
+    mgr.respond(checkpoint.id(), response);
+});
+
+try (var agentican = Agentican.builder()
+        .config(config)
+        .hitlManager(hitlManager)
+        .build()) {
+
+    agentican.run("Send an email summarizing today's standup").result();
+}
+```
+
+See [Human in the Loop](hitl.md) for the full HITL model.
+
+## Next Steps
+
+- [Core Concepts](concepts.md) — understand the architecture
+- [Tasks & Steps](tasks.md) — define workflows manually instead of via the planner
+- [Agents](agents.md) — define specialized agents with skills
+- [Tools & Toolkits](tools.md) — build custom toolkits
+- [Examples](examples.md) — common patterns and recipes

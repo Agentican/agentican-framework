@@ -1,0 +1,110 @@
+# Top 3 LLMs for Reasoning and Tool Use: Executive Summary
+
+Based on comprehensive benchmark evaluations through early 2025, three models stand out for exceptional reasoning and tool use capabilities. Each excels in distinct domains while delivering state-of-the-art performance across multiple benchmarks.
+
+**Quick Rankings:**
+1. **OpenAI o3** - Best for mathematical and abstract reasoning
+2. **Anthropic Claude Opus 4.5** - Best for software engineering and long-horizon tasks
+3. **Google Gemini 3 Pro** - Best for multimodal reasoning and integrated tool use
+
+---
+
+## 1. OpenAI o3 (and o4-mini)
+
+**Organization:** OpenAI
+**Status:** Generally available (January-April 2025)
+
+### Key Strengths
+
+**Mathematical & Abstract Reasoning Excellence**
+- Achieved 96.7% on AIME 2024 (American Invitational Mathematics Exam), missing just one question
+- Scored 25.2% on Frontier Math benchmark—more than 12x the previous best of <2%
+- Attained 87.5% on ARC-AGI visual reasoning, triple the accuracy of its predecessor o1
+- Earned Elo rating of 2727 on Codeforces competitive programming
+
+**Advanced Tool Integration**
+- First OpenAI reasoning model to agentically use and combine every ChatGPT tool
+- Trained via reinforcement learning to reason about when to use tools, not just how
+- Can simultaneously search the web, analyze files with Python, process visual inputs, and generate images
+
+**Why It Ranks #1:** OpenAI o3 delivers unmatched performance on pure reasoning tasks, especially mathematics and logic. Its 96.7% AIME score and breakthrough Frontier Math results (25.2% vs. <2% previously) represent the strongest mathematical reasoning capabilities available. The model's performance scales with increased thinking time, making it ideal for complex problem-solving.
+
+---
+
+## 2. Anthropic Claude Opus 4.5
+
+**Organization:** Anthropic
+**Status:** Available via Claude Pro and API (November 2025+)
+
+### Key Strengths
+
+**Software Engineering Dominance**
+- First model to exceed 80% on SWE-bench Verified with 80.9% accuracy
+- 65% improvement over Claude 3.5 Sonnet and outperforms all competitors on real bug resolution
+- Leads across 7 out of 8 programming languages on SWE-bench Multilingual
+- Achieved 89.4% on Aider Polyglot coding benchmark
+
+**Long-Horizon Task Execution**
+- Can autonomously sustain complex, multi-step tasks for over 30 hours
+- Scored 37.6% on ARC-AGI-2—more than double GPT-5.1's 17.6%
+- Excels at maintaining coherent step-by-step plans over thousands of tokens
+- "Best frontier task planning and tool calling we've seen yet" according to early testers
+
+**Why It Ranks #2:** Claude Opus 4.5 is the undisputed leader for real-world software engineering and coding tasks. Its record-breaking SWE-bench Verified score (80.9%) and ability to maintain complex workflows over extended periods make it the top choice for agentic systems, software development, and tasks requiring sustained reasoning across multiple steps.
+
+---
+
+## 3. Google Gemini 3 Pro (with Deep Think)
+
+**Organization:** Google DeepMind
+**Status:** Available via Gemini app, AI Studio, Vertex AI (November 2025)
+
+### Key Strengths
+
+**PhD-Level Scientific Reasoning**
+- Achieved 91.9% on GPQA Diamond (93.8% with Deep Think mode)
+- Scored 37.5% on Humanity's Last Exam (41% with Deep Think)
+- Perfect 100% on AIME 2025 with code execution, 95% without tools
+- First model to break 1500 Elo on LMArena (scored 1501)
+
+**Multimodal Reasoning Leadership**
+- Scored 81% on MMMU-Pro and 87.6% on Video-MMMU, redefining multimodal reasoning
+- Achieved 72.7% on ScreenSpot-Pro (up from 11.4%), demonstrating exceptional UI interaction capabilities
+- Delivered 72.1% on SimpleQA Verified for factual accuracy
+
+**Why It Ranks #3:** Gemini 3 Pro offers the most comprehensive and balanced capabilities, excelling across scientific reasoning, multimodal understanding, and agentic tool use. Its PhD-level performance on GPQA Diamond (91.9%) and exceptional video understanding make it the strongest choice for applications requiring diverse reasoning across text, images, and video, as well as integrated tool manipulation.
+
+---
+
+## Key Differentiators
+
+| Feature | OpenAI o3 | Claude Opus 4.5 | Gemini 3 Pro |
+|---------|-----------|-----------------|--------------|
+| **Best For** | Pure math & logic | Software engineering | Multimodal reasoning |
+| **Top Benchmark** | AIME 96.7% | SWE-bench 80.9% | GPQA Diamond 91.9% |
+| **Tool Use Style** | Agentically combines all tools | Long-horizon workflows | Integrated UI interaction |
+| **Unique Advantage** | Scales with thinking time | 30+ hour autonomous tasks | Video & multimodal understanding |
+| **Reasoning Approach** | Abstract problem-solving | Multi-step task planning | Scientific & visual reasoning |
+
+---
+
+## Important Considerations
+
+**Cost & Latency:** These frontier models require significant compute. OpenAI o3's performance improves with longer thinking time, which impacts both cost and response latency. Consider use case requirements when selecting.
+
+**Access & Availability:** All three models are available through their respective platforms (ChatGPT, Claude Pro, Gemini), though specific features like Deep Think mode may have limited availability.
+
+**Open Source Alternative:** DeepSeek-R1 (MIT license, 671B parameters) offers comparable reasoning performance at significantly lower cost, achieving 87.5% on AIME 2025—a viable option for those prioritizing cost-efficiency and open access.
+
+**Task-Specific Performance:** While all three excel at reasoning and tool use, no single model dominates across all benchmarks. Selection should align with specific needs:
+- Choose **o3** for mathematical proofs, competitive programming, or abstract logic
+- Choose **Claude Opus 4.5** for autonomous coding agents, bug fixes, or sustained multi-step workflows
+- Choose **Gemini 3 Pro** for scientific research, multimodal analysis, or comprehensive agentic systems
+
+---
+
+## Recommendation
+
+**For most reasoning-intensive applications requiring tool use:** Start with **Claude Opus 4.5** for its balanced performance, exceptional software engineering capabilities, and proven long-horizon execution. Escalate to **OpenAI o3** when facing mathematically complex problems, or choose **Gemini 3 Pro** when multimodal understanding is critical to your workflow.
+
+All three models represent the current state-of-the-art and demonstrate that frontier AI has reached unprecedented levels of reasoning sophistication and tool integration capabilities.
