@@ -4,7 +4,7 @@
 
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](#)
+![Build](https://github.com/Agentican/agentican-framework/actions/workflows/build.yml/badge.svg)
 
 Agentican lets Java developers add agentic capabilities to their applications with minimal ceremony. Describe a task in natural language, and an LLM-powered planner breaks it into steps, picks the right agents and tools, and executes the workflow — with human approval gates where you need them.
 
