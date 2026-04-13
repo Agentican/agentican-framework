@@ -1,4 +1,4 @@
-name: agentican-framework build
+name: Build
 
 on:
   push:
