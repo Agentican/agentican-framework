@@ -45,9 +45,6 @@ public class Json {
         }
     }
 
-    /**
-     * Find the first valid JSON object in text and deserialize it.
-     */
     public static <T> T findObject(String text, Class<T> type) {
 
         for (int i = 0; i < text.length(); i++) {
@@ -75,11 +72,6 @@ public class Json {
         throw new IllegalStateException("No valid JSON object found in response");
     }
 
-    /**
-     * Find a JSON array in text. Supports two formats:
-     * 1. Object with "loop" key: {"loop": [...], "shared_key": "value"} — merges shared keys into each element
-     * 2. Plain array: [...]
-     */
     @SuppressWarnings("unchecked")
     public static List<String> findArray(String text) {
 

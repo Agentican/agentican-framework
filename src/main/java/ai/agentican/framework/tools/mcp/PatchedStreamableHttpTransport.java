@@ -20,13 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
-/**
- * Drop-in replacement for HttpClientStreamableHttpTransport that fixes
- * <a href="https://github.com/modelcontextprotocol/java-sdk/issues/396">SDK issue #396</a>:
- * sendMessage now completes immediately on 202 Accepted (no body) instead of hanging.
- *
- * Uses java.net.http.HttpClient for HTTP, delegates JSON to the SDK's McpJsonMapper.
- */
 class PatchedStreamableHttpTransport implements McpClientTransport {
 
     private static final Logger LOG = LoggerFactory.getLogger(PatchedStreamableHttpTransport.class);

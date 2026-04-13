@@ -13,7 +13,8 @@ public record AgentResult(
     public AgentResult {
 
         if (status == null) throw new IllegalArgumentException("Status is required");
-        if (run == null) run = new RunLog(Ids.generate(), 0, null);
+
+        if (run == null) run = RunLog.of(Ids.generate(), 0, null);
     }
 
     public AgentResult(AgentStatus status, RunLog run) {

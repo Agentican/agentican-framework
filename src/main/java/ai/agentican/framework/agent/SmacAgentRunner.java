@@ -58,7 +58,7 @@ public class SmacAgentRunner implements AgentRunner {
 
         this.llm = llm;
 
-        // may move these to llmclient
+        // may move these to LlmClient
         this.llmName = llmName;
         this.llmProvider = llmProvider;
         this.llmModel = llmModel;
@@ -88,8 +88,9 @@ public class SmacAgentRunner implements AgentRunner {
     public AgentResult run(Agent agent, String task, List<String> activeSkills, Map<String, Toolkit> toolkits,
                            String taskId, String stepId, String stepName) {
 
-        return execute(agent, task, activeSkills, toolkits, taskId, stepId, stepName,
-                new AtomicBoolean(false));
+        var taskCancelled = new AtomicBoolean(false);
+
+        return execute(agent, task, activeSkills, toolkits, taskId, stepId, stepName, taskCancelled);
     }
 
     @Override
@@ -97,8 +98,10 @@ public class SmacAgentRunner implements AgentRunner {
                               List<ToolResult> hitlToolResults, Map<String, Toolkit> toolkits, String taskId,
                               String stepId, String stepName) {
 
+        var taskCancelled = new AtomicBoolean(false);
+
         return resumeExecution(agent, task, activeSkills, savedRun, hitlToolResults, toolkits, taskId, stepId, stepName,
-                new AtomicBoolean(false));
+                taskCancelled);
     }
 
     private AgentResult execute(Agent agent, String task, List<String> activeSkills, Map<String, Toolkit> toolkits,
@@ -112,8 +115,9 @@ public class SmacAgentRunner implements AgentRunner {
         ensureTaskLog(taskId, stepId, stepName);
 
         var runId = Ids.generate();
+        var agentName = agent.name();
 
-        taskStateStore.runStarted(taskId, stepId, runId, agent.name());
+        taskStateStore.runStarted(taskId, stepId, runId, agentName);
 
         var agentResult = loop(task, Instant.now(), List.of(), ctx, cancelled, taskId, stepId, stepName, runId, 0);
 
@@ -123,8 +127,8 @@ public class SmacAgentRunner implements AgentRunner {
     }
 
     private AgentResult resumeExecution(Agent agent, String task, List<String> activeSkills, RunLog savedRun,
-                                        List<ToolResult> hitlToolResults, Map<String, Toolkit> toolkits, String taskId,
-                                        String stepId, String stepName, AtomicBoolean cancelled) {
+                                        List<ToolResult> approvalToolResults, Map<String, Toolkit> toolkits,
+                                        String taskId, String stepId, String stepName, AtomicBoolean cancelled) {
 
         LOG.info("Resuming agent step: agent={}, savedTurns={}", agent.name(), savedRun.turns().size());
 
@@ -140,56 +144,56 @@ public class SmacAgentRunner implements AgentRunner {
 
         var executedCallIds = lastTurn.toolResults().stream().map(ToolResult::toolCallId).collect(Collectors.toSet());
 
-        var pendingHitlCalls = lastTurn.response().toolCalls().stream()
-                .filter(tc -> !executedCallIds.contains(tc.id()))
+        var pendingToolCalls = lastTurn.response().toolCalls().stream()
+                .filter(toolCall -> !executedCallIds.contains(toolCall.id()))
                 .toList();
 
-        var resolvedHitlResults = new ArrayList<ToolResult>();
+        var toolResults = new ArrayList<ToolResult>();
 
-        if (!hitlToolResults.isEmpty()) {
+        if (!approvalToolResults.isEmpty()) {
 
-            resolvedHitlResults.addAll(hitlToolResults);
+            toolResults.addAll(approvalToolResults);
 
-            for (var hitlResult : hitlToolResults) {
-                taskStateStore.toolCallCompleted(taskId, lastTurnId, hitlResult);
+            for (var approvalToolResult : approvalToolResults) {
+                taskStateStore.toolCallCompleted(taskId, lastTurnId, approvalToolResult);
             }
         }
         else {
 
-            for (var hitlCall : pendingHitlCalls) {
+            for (var pendingToolCall : pendingToolCalls) {
 
-                var toolkit = ctx.toolkits().get(hitlCall.toolName());
+                var toolkit = ctx.toolkits().get(pendingToolCall.toolName());
 
                 if (toolkit != null) {
 
-                    LOG.info("Executing approved HITL tool: {}", hitlCall.toolName());
+                    LOG.info("Executing approved HITL tool: {}", pendingToolCall.toolName());
 
-                    taskStateStore.toolCallStarted(taskId, lastTurnId, hitlCall);
+                    taskStateStore.toolCallStarted(taskId, lastTurnId, pendingToolCall);
 
                     try {
 
-                        var toolOutput = toolkit.execute(hitlCall.toolName(), hitlCall.args());
-                        var toolResult = new ToolResult(hitlCall.id(), hitlCall.toolName(), toolOutput);
+                        var toolOutput = toolkit.execute(pendingToolCall.toolName(), pendingToolCall.args());
+                        var toolResult = new ToolResult(pendingToolCall.id(), pendingToolCall.toolName(), toolOutput);
 
-                        resolvedHitlResults.add(toolResult);
+                        toolResults.add(toolResult);
 
                         taskStateStore.toolCallCompleted(taskId, lastTurnId, toolResult);
                     }
                     catch (Exception e) {
 
-                        LOG.error("Approved HITL tool {} failed: {}", hitlCall.toolName(), e.getMessage());
+                        LOG.error("Approved HITL tool {} failed: {}", pendingToolCall.toolName(), e.getMessage());
 
-                        var result = new ToolResult(hitlCall.id(), hitlCall.toolName(), toolErrorAsJson(e.getMessage()), e);
+                        var toolResult = new ToolResult(pendingToolCall.id(), pendingToolCall.toolName(), toolErrorAsJson(e.getMessage()), e);
 
-                        resolvedHitlResults.add(result);
+                        toolResults.add(toolResult);
 
-                        taskStateStore.toolCallCompleted(taskId, lastTurnId, result);
+                        taskStateStore.toolCallCompleted(taskId, lastTurnId, toolResult);
                     }
                 }
             }
         }
 
-        storeToolResultsInScratchpad(ctx.scratchpad(), resolvedHitlResults);
+        storeToolResultsInScratchpad(ctx.scratchpad(), toolResults);
 
         taskStateStore.turnCompleted(taskId, lastTurnId);
 
@@ -197,7 +201,7 @@ public class SmacAgentRunner implements AgentRunner {
 
         taskStateStore.runStarted(taskId, stepId, runId, agent.name());
 
-        var agentResult = loop(task, Instant.now(), resolvedHitlResults, ctx, cancelled, taskId, stepId, stepName, runId,
+        var agentResult = loop(task, Instant.now(), toolResults, ctx, cancelled, taskId, stepId, stepName, runId,
                 savedRun.turns().size());
 
         taskStateStore.runCompleted(taskId, runId);
@@ -371,17 +375,20 @@ public class SmacAgentRunner implements AgentRunner {
     private List<ToolResult> executeToolCalls(List<ToolCall> toolCalls, Map<String, Toolkit> taskToolkits,
                                               AtomicBoolean cancelled, int iteration, String taskId, String turnId) {
 
-        return Parallel.map(toolCalls, call -> {
+        return Parallel.map(toolCalls, toolCall -> {
 
             try {
 
-                return executeToolCall(call, taskToolkits, cancelled, iteration, taskId, turnId);
+                return executeToolCall(toolCall, taskToolkits, cancelled, iteration, taskId, turnId);
             }
             catch (Exception ex) {
 
-                LOG.error("Turn {}: tool {} failed unexpectedly: {}", iteration, call.toolName(), ex.getMessage());
+                var toolCallId = toolCall.id();
+                var toolName = toolCall.toolName();
 
-                var toolResult = new ToolResult(call.id(), call.toolName(),
+                LOG.error("Turn {}: tool {} failed unexpectedly: {}", iteration, toolName, ex.getMessage());
+
+                var toolResult = new ToolResult(toolCallId, toolName,
                         toolErrorAsJson(ex.getClass().getSimpleName() + ": " + ex.getMessage()), ex);
 
                 taskStateStore.toolCallCompleted(taskId, turnId, toolResult);
@@ -396,34 +403,37 @@ public class SmacAgentRunner implements AgentRunner {
 
         taskStateStore.toolCallStarted(taskId, turnId, toolCall);
 
+        var toolCallId = toolCall.id();
+        var toolCallArgs = toolCall.args();
+        var toolName = toolCall.toolName();
+
         if (taskCancelled.get()) {
 
-            var toolResult = new ToolResult(toolCall.id(), toolCall.toolName(),
-                    toolErrorAsJson("Execution cancelled"));
+            var toolResult = new ToolResult(toolCallId, toolName, toolErrorAsJson("Execution cancelled"));
 
             taskStateStore.toolCallCompleted(taskId, turnId, toolResult);
 
             return toolResult;
         }
 
-        var toolkit = taskToolkits.get(toolCall.toolName());
+        var toolkit = taskToolkits.get(toolName);
 
         if (toolkit == null) {
 
-            var toolResult = new ToolResult(toolCall.id(), toolCall.toolName(),
-                    toolErrorAsJson("No executor found for tool: " + toolCall.toolName()));
+            var toolResult = new ToolResult(toolCallId, toolName,
+                    toolErrorAsJson("No executor found for tool: " + toolName));
 
             taskStateStore.toolCallCompleted(taskId, turnId, toolResult);
 
             return toolResult;
         }
 
-        LOG.info(Logs.AGENT_TOOL_USE, iteration, toolCall.toolName());
+        LOG.info(Logs.AGENT_TOOL_USE, iteration, toolName);
 
         try {
 
-            var toolOutput = toolkit.execute(toolCall.toolName(), toolCall.args());
-            var toolResult = new ToolResult(toolCall.id(), toolCall.toolName(), toolOutput);
+            var toolOutput = toolkit.execute(toolName, toolCallArgs);
+            var toolResult = new ToolResult(toolCallId, toolName, toolOutput);
 
             taskStateStore.toolCallCompleted(taskId, turnId, toolResult);
 
@@ -431,10 +441,9 @@ public class SmacAgentRunner implements AgentRunner {
         }
         catch (Exception e) {
 
-            LOG.error("Turn {}: tool {} failed: {}", iteration, toolCall.toolName(), e.getMessage());
+            LOG.error("Turn {}: tool {} failed: {}", iteration, toolName, e.getMessage());
 
-            var toolResult = new ToolResult(toolCall.id(), toolCall.toolName(),
-                    toolErrorAsJson(e.getMessage()), e);
+            var toolResult = new ToolResult(toolCallId, toolName, toolErrorAsJson(e.getMessage()), e);
 
             taskStateStore.toolCallCompleted(taskId, turnId, toolResult);
 

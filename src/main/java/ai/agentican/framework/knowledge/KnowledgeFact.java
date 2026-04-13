@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-public record Fact(
+public record KnowledgeFact(
         String id,
         String name,
         String content,
@@ -12,7 +12,7 @@ public record Fact(
         Instant created,
         Instant updated) {
 
-    public Fact {
+    public KnowledgeFact {
 
         if (id == null || id.isBlank())
             throw new IllegalArgumentException("Fact id is required");
@@ -28,10 +28,10 @@ public record Fact(
         tags = List.copyOf(tags);
     }
 
-    public static Fact of(String name, String content, List<String> tags) {
+    public static KnowledgeFact of(String name, String content, List<String> tags) {
 
         var now = Instant.now();
 
-        return new Fact(UUID.randomUUID().toString(), name, content, tags, now, now);
+        return new KnowledgeFact(UUID.randomUUID().toString(), name, content, tags, now, now);
     }
 }

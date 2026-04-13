@@ -25,11 +25,11 @@ public record Agent(
         if (role == null || role.isBlank())
             throw new IllegalArgumentException("Agent role is required");
 
-        if (skills == null)
-            skills = List.of();
-
         if (runner == null)
             throw new IllegalArgumentException("AgentRunner is required");
+
+        if (skills == null)
+            skills = List.of();
     }
 
     public AgentResult run(String task, List<String> activeSkills, Map<String, Toolkit> toolkits, String taskId,

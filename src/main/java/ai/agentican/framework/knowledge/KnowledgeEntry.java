@@ -11,7 +11,7 @@ public class KnowledgeEntry {
     private final Instant created;
 
     private final List<KnowledgeFile> files = new CopyOnWriteArrayList<>();
-    private final List<Fact> facts = new CopyOnWriteArrayList<>();
+    private final List<KnowledgeFact> facts = new CopyOnWriteArrayList<>();
 
     private String name;
     private String description;
@@ -45,7 +45,7 @@ public class KnowledgeEntry {
     public String description() { return description; }
     public KnowledgeStatus status() { return status; }
     public List<KnowledgeFile> files() { return List.copyOf(files); }
-    public List<Fact> facts() { return List.copyOf(facts); }
+    public List<KnowledgeFact> facts() { return List.copyOf(facts); }
     public Instant created() { return created; }
     public Instant updated() { return updated; }
 
@@ -73,7 +73,7 @@ public class KnowledgeEntry {
         touch();
     }
 
-    public void addFact(Fact fact) {
+    public void addFact(KnowledgeFact fact) {
 
         facts.add(fact);
         touch();

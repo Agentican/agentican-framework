@@ -44,22 +44,21 @@ public class ComposioClient {
         if (accounts.isEmpty()) {
 
             LOG.warn("No active Composio connected accounts found for user '{}'", userId);
+
             return List.of();
         }
 
         LOG.info("Found {} connected toolkit(s) for user '{}': {}", accounts.size(), userId, accounts.keySet());
 
         return accounts.values().stream()
-                .map(info -> new ComposioToolkit(apiKey, userId, info.slug, info.displayName,
-                        info.accountId, httpClient))
+                .map(info -> new ComposioToolkit(apiKey, userId, info.slug(), info.displayName(),
+                        info.accountId(), httpClient))
                 .toList();
     }
 
-    private record ConnectedAccount(String slug, String displayName, String accountId) {}
+    private Map<String, ComposioConnectedAccount> discoverConnectedAccounts() {
 
-    private Map<String, ConnectedAccount> discoverConnectedAccounts() {
-
-        var accounts = new LinkedHashMap<String, ConnectedAccount>();
+        var accounts = new LinkedHashMap<String, ComposioConnectedAccount>();
 
         try {
 
@@ -77,7 +76,7 @@ public class ComposioClient {
                         var accountId = item.path("id").asText("");
                         var name = fetchToolkitDisplayName(slug);
 
-                        accounts.putIfAbsent(slug, new ConnectedAccount(slug, name, accountId));
+                        accounts.putIfAbsent(slug, new ComposioConnectedAccount(slug, name, accountId));
                     });
         }
         catch (Exception e) {

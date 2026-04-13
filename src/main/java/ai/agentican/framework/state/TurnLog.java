@@ -14,11 +14,13 @@ public class TurnLog {
     private final String id;
     private final int index;
     private final Instant startedAt;
+
+    private final List<ToolResult> toolResults;
+
     private volatile String messageId;
     private volatile LlmRequest request;
     private volatile String responseId;
     private volatile LlmResponse response;
-    private final List<ToolResult> toolResults;
     private volatile Instant completedAt;
 
     public TurnLog(String id, int index) {

@@ -16,10 +16,6 @@ public class MockLlmClient {
 
     private final CopyOnWriteArrayList<MockEntry> entries = new CopyOnWriteArrayList<>();
 
-    /**
-     * Register a response that matches when the user message OR system prompt contains the substring.
-     * Each entry is consumed once (first match wins, then removed).
-     */
     public MockLlmClient onSend(String matchSubstring, String responseText) {
 
         entries.add(new MockEntry(matchSubstring, endTurn(responseText)));
@@ -56,8 +52,6 @@ public class MockLlmClient {
                 + entries.stream().map(e -> e.match).toList()
                 + "\n  Request preview: " + fullText.substring(0, Math.min(200, fullText.length())));
     }
-
-    // --- Factory methods ---
 
     public static LlmResponse endTurn(String text) {
 

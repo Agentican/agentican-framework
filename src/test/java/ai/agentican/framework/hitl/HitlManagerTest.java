@@ -13,7 +13,8 @@ class HitlManagerTest {
     @Test
     void createAndRespondApproval() {
 
-        var manager = new HitlManager((mgr, cp) -> mgr.respond(cp.id(), HitlResponse.approve()));
+        var manager = new HitlManager((mgr, cp) -> mgr.respond(cp.id(),
+                HitlResponse.approve()));
 
         var toolCall = new ToolCall("tc-1", "deploy", Map.of("env", "prod"));
 
@@ -26,7 +27,8 @@ class HitlManagerTest {
     @Test
     void createAndRespondRejection() {
 
-        var manager = new HitlManager((mgr, cp) -> mgr.respond(cp.id(), HitlResponse.reject("Bad idea")));
+        var manager = new HitlManager((mgr, cp) -> mgr.respond(cp.id(),
+                HitlResponse.reject("Bad idea")));
 
         var toolCall = new ToolCall("tc-2", "delete-all", Map.of());
 
@@ -40,7 +42,8 @@ class HitlManagerTest {
     @Test
     void synchronousNotifierWorks() {
 
-        var manager = new HitlManager((mgr, cp) -> mgr.respond(cp.id(), HitlResponse.approve("Looks good")));
+        var manager = new HitlManager((mgr, cp) -> mgr.respond(cp.id(),
+                HitlResponse.approve("Looks good")));
 
         var checkpoint = manager.createQuestionCheckpoint("Should we proceed?", null, "ask-step");
         var response = manager.awaitResponse(checkpoint.id());
@@ -70,7 +73,8 @@ class HitlManagerTest {
     @Test
     void respondTwiceIgnored() {
 
-        var manager = new HitlManager((mgr, cp) -> mgr.respond(cp.id(), HitlResponse.approve()));
+        var manager = new HitlManager((mgr, cp) -> mgr.respond(cp.id(),
+                HitlResponse.approve()));
 
         var toolCall = new ToolCall("tc-4", "my-tool", Map.of());
 

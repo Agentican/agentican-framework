@@ -32,15 +32,14 @@ class KnowledgeToolkitTest {
         var store = new MemKnowledgeStore();
         var entry = new KnowledgeEntry("entry-1", "Customer Data", "All about customers");
 
-        entry.addFact(Fact.of("Fact One", "Content one", List.of("tag1")));
-        entry.addFact(Fact.of("Fact Two", "Content two", List.of("tag2")));
+        entry.addFact(KnowledgeFact.of("Fact One", "Content one", List.of("tag1")));
+        entry.addFact(KnowledgeFact.of("Fact Two", "Content two", List.of("tag2")));
         entry.setStatus(KnowledgeStatus.INDEXED);
         store.save(entry);
 
         var toolkit = new KnowledgeToolkit(store);
 
-        var result = toolkit.execute(KnowledgeToolkit.TOOL_NAME,
-                Map.of("entry_ids", List.of("entry-1")));
+        var result = toolkit.execute(KnowledgeToolkit.TOOL_NAME, Map.of("entry_ids", List.of("entry-1")));
 
         var parsed = parse(result);
         var entries = entries(parsed);
@@ -73,8 +72,7 @@ class KnowledgeToolkitTest {
 
         var toolkit = new KnowledgeToolkit(store);
 
-        var result = toolkit.execute(KnowledgeToolkit.TOOL_NAME,
-                Map.of("entry_ids", List.of("id-1", "id-2")));
+        var result = toolkit.execute(KnowledgeToolkit.TOOL_NAME, Map.of("entry_ids", List.of("id-1", "id-2")));
 
         var entries = entries(parse(result));
 
@@ -87,8 +85,7 @@ class KnowledgeToolkitTest {
         var store = new MemKnowledgeStore();
         var toolkit = new KnowledgeToolkit(store);
 
-        var result = toolkit.execute(KnowledgeToolkit.TOOL_NAME,
-                Map.of("entry_ids", List.of("does-not-exist")));
+        var result = toolkit.execute(KnowledgeToolkit.TOOL_NAME, Map.of("entry_ids", List.of("does-not-exist")));
 
         var entries = entries(parse(result));
 

@@ -58,10 +58,10 @@ class TaskRunnerBranchTest {
                 .step("decide", "producer-agent", "Pick a path")
                 .branch("branch-step", branch -> branch
                         .from("decide")
-                        .path("path-a",
-                                new PlanStepAgent("do-a", "path-a-agent", "Execute path A", null, false, null, null))
-                        .path("path-b",
-                                new PlanStepAgent("do-b", "path-b-agent", "Execute path B", null, false, null, null)))
+                        .path("path-a", new PlanStepAgent("do-a", "path-a-agent",
+                                "Execute path A", null, false, null, null))
+                        .path("path-b", new PlanStepAgent("do-b", "path-b-agent",
+                                "Execute path B", null, false, null, null)))
                 .build();
 
         var result = runner.run(task);
@@ -93,10 +93,10 @@ class TaskRunnerBranchTest {
                 .step("decide", "producer-agent", "Pick a path")
                 .branch("branch-step", branch -> branch
                         .from("decide")
-                        .path("path-a",
-                                new PlanStepAgent("do-a", "path-a-agent", "Execute path A", null, false, null, null))
-                        .path("path-b",
-                                new PlanStepAgent("do-b", "path-b-agent", "Execute path B", null, false, null, null))
+                        .path("path-a", new PlanStepAgent("do-a", "path-a-agent",
+                                "Execute path A", null, false, null, null))
+                        .path("path-b", new PlanStepAgent("do-b", "path-b-agent",
+                                "Execute path B", null, false, null, null))
                         .defaultPath("path-b"))
                 .build();
 
@@ -129,10 +129,10 @@ class TaskRunnerBranchTest {
                 .step("decide", "producer-agent", "Pick a path")
                 .branch("branch-step", branch -> branch
                         .from("decide")
-                        .path("path-a",
-                                new PlanStepAgent("do-a", "path-a-agent", "Execute path A", null, false, null, null))
-                        .path("path-b",
-                                new PlanStepAgent("do-b", "path-b-agent", "Execute path B", null, false, null, null)))
+                        .path("path-a", new PlanStepAgent("do-a", "path-a-agent",
+                                "Execute path A", null, false, null, null))
+                        .path("path-b", new PlanStepAgent("do-b", "path-b-agent",
+                                "Execute path B", null, false, null, null)))
                 .build();
 
         var result = runner.run(task);
@@ -163,10 +163,10 @@ class TaskRunnerBranchTest {
                 .step("decide", "producer-agent", "Pick a path")
                 .branch("branch-step", branch -> branch
                         .from("decide")
-                        .path("path-a",
-                                new PlanStepAgent("do-a", "path-a-agent", "Execute path A", null, false, null, null))
-                        .path("path-b",
-                                new PlanStepAgent("do-b", "path-b-agent", "Execute path B", null, false, null, null)))
+                        .path("path-a", new PlanStepAgent("do-a", "path-a-agent",
+                                "Execute path A", null, false, null, null))
+                        .path("path-b", new PlanStepAgent("do-b", "path-b-agent",
+                                "Execute path B", null, false, null, null)))
                 .build();
 
         var result = runner.run(task);
@@ -198,10 +198,10 @@ class TaskRunnerBranchTest {
                 .step("decide", "producer-agent", "Pick a path")
                 .branch("branch-step", branch -> branch
                         .from("decide")
-                        .path("path-a",
-                                new PlanStepAgent("do-a", "path-a-agent", "Execute path A", null, false, null, null))
-                        .path("path-b",
-                                new PlanStepAgent("do-b", "path-b-agent", "Execute path B", null, false, null, null)))
+                        .path("path-a", new PlanStepAgent("do-a", "path-a-agent",
+                                "Execute path A", null, false, null, null))
+                        .path("path-b", new PlanStepAgent("do-b", "path-b-agent",
+                                "Execute path B", null, false, null, null)))
                 .build();
 
         var result = runner.run(task);

@@ -18,28 +18,26 @@ class RecordValidationTest {
     @Test
     void agentRequiresName() {
 
-        assertThrows(IllegalArgumentException.class,
-                () -> new Agent(null, "role", List.of(), dummyRunner));
+        assertThrows(IllegalArgumentException.class, () -> new Agent(null, "role", List.of(), dummyRunner));
     }
 
     @Test
     void agentRequiresRole() {
 
-        assertThrows(IllegalArgumentException.class,
-                () -> new Agent("name", null, List.of(), dummyRunner));
+        assertThrows(IllegalArgumentException.class, () -> new Agent("name", null, List.of(), dummyRunner));
     }
 
     @Test
     void taskRequiresSteps() {
 
-        assertThrows(IllegalArgumentException.class,
-                () -> new Plan(null, "name", "desc", List.of(), List.of()));
+        assertThrows(IllegalArgumentException.class, () ->
+                new Plan(null, "name", "desc", List.of(), List.of()));
     }
 
     @Test
     void taskStepResultRequiresName() {
 
-        assertThrows(IllegalArgumentException.class,
-                () -> new TaskStepResult(null, TaskStatus.COMPLETED, "output", List.of()));
+        assertThrows(IllegalArgumentException.class, () ->
+                new TaskStepResult(null, TaskStatus.COMPLETED, "output", List.of()));
     }
 }

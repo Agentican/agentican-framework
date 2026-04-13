@@ -13,14 +13,14 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-public class LlmFactExtractor implements FactExtractor {
+public class LlmKnowledgeExtractor implements KnowledgeExtractor {
 
-    private static final Logger LOG = LoggerFactory.getLogger(LlmFactExtractor.class);
+    private static final Logger LOG = LoggerFactory.getLogger(LlmKnowledgeExtractor.class);
     private static final Templates TEMPLATES = new Templates();
 
     private final LlmClient llm;
 
-    public LlmFactExtractor(LlmClient llm) {
+    public LlmKnowledgeExtractor(LlmClient llm) {
 
         if (llm == null)
             throw new IllegalArgumentException("LLM client is required");
@@ -29,7 +29,7 @@ public class LlmFactExtractor implements FactExtractor {
     }
 
     @Override
-    public List<Fact> extractFacts(String text) {
+    public List<KnowledgeFact> extractFacts(String text) {
 
         if (text == null || text.isBlank())
             return List.of();
@@ -51,7 +51,7 @@ public class LlmFactExtractor implements FactExtractor {
 
             return extractionOutput.facts.stream()
                     .filter(fact -> fact.name != null && !fact.name.isBlank())
-                    .map(fact -> Fact.of(fact.name, fact.content != null ? fact.content : "",
+                    .map(fact -> KnowledgeFact.of(fact.name, fact.content != null ? fact.content : "",
                             fact.tags != null ? fact.tags : List.of()))
                     .toList();
         }

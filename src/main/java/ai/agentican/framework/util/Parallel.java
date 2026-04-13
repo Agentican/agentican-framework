@@ -27,9 +27,11 @@ public class Parallel {
                         if (mdc != null) MDC.setContextMap(mdc);
 
                         try {
+
                             return fn.apply(item);
                         }
                         finally {
+
                             MDC.clear();
                         }
                     }))
@@ -37,13 +39,12 @@ public class Parallel {
 
             scope.join();
 
-            return subtasks.stream()
-                    .map(Subtask::get)
-                    .toList();
+            return subtasks.stream().map(Subtask::get).toList();
         }
         catch (InterruptedException e) {
 
             Thread.currentThread().interrupt();
+
             throw new RuntimeException("Parallel execution interrupted", e);
         }
     }

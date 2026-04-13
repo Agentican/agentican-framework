@@ -21,8 +21,6 @@ class AgenticanTest {
 
     private static final String MOCK = "mock/llm-notion-test/";
 
-    // --- Builder Tests ---
-
     @Test
     void builderRequiresConfig() {
 
@@ -61,8 +59,6 @@ class AgenticanTest {
         }
     }
 
-    // --- run(Task) Tests ---
-
     @Test
     void runTaskReturnsTaskHandle() {
 
@@ -81,15 +77,6 @@ class AgenticanTest {
             var task = new Plan(null, "test-task", "", List.of(),
                     List.of(new PlanStepAgent("step-a", "test-agent", "Do the thing", List.of(), false, List.of(), List.of())));
 
-            // Agent doesn't exist in registry — planner didn't create it. Need to register manually.
-            // Actually, the task references "test-agent" but the registry is empty.
-            // This will fail with "No agent found". Let me use run(String) instead for planner-driven,
-            // or create a task that uses an agent that exists.
-
-            // For run(Task), the agents must already be registered. Since we can't directly register,
-            // let's use run(String) which goes through the planner which registers agents.
-
-            // Actually, let me test that run(Task) with an unknown agent returns FAILED.
             var handle = agentican.run(task);
 
             assertNotNull(handle);
@@ -114,8 +101,6 @@ class AgenticanTest {
                         "stepConfigs": [{"name": "work", "type": "agent", "agent": "worker", "instructions": "Do the work", "toolkits": []}]
                     }
                     """)
-                // Planner passes 2-3 (no toolkits, so no refinement LLM calls)
-                // Agent execution
                 .onSend("Do the work", "Work completed successfully.");
 
         var config = RuntimeConfig.builder()
@@ -127,7 +112,6 @@ class AgenticanTest {
                 .llm("default", mockLlm.toLlmClient())
                 .build()) {
 
-            // Use run(String) to go through planner which registers agents
             var handle = agentican.run("Do some work");
             var result = handle.result();
 
@@ -139,47 +123,11 @@ class AgenticanTest {
     @Test
     void runTaskWithInputs() {
 
-        var mockLlm = new MockLlmClient()
-                .onSend("planning-process", """
-                    {
-                        "name": "Parameterized Task",
-                        "description": "Uses params",
-                        "agents": [{"name": "worker", "role": "Worker", "skills": []}],
-                        "paramConfigs": [{"name": "target", "description": "What to process", "defaultValue": "default-value", "required": true}],
-                        "stepConfigs": [{"name": "process", "type": "agent", "agent": "worker", "instructions": "Process {{param.target}}", "toolkits": []}]
-                    }
-                    """)
-                .onSend("Process custom-value", "Processed custom-value.");
-
         var config = RuntimeConfig.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .build();
 
-        try (var agentican = Agentican.builder()
-                .config(config)
-                .llm("default", mockLlm.toLlmClient())
-                .build()) {
-
-            // First plan, then run with inputs
-            var handle = agentican.run("Process something");
-
-            // This goes through planner which sets default "default-value"
-            // The mock matches "Process default-value" — but we didn't provide inputs here
-            // since run(String) doesn't accept inputs. Let me adjust the test.
-            // Actually run(String) always calls plan+run without inputs.
-            // To test with inputs, we need run(Task, Map).
-            // But run(Task) needs pre-registered agents.
-
-            // Let's verify the default parameter is used:
-            var result = handle.result();
-            // The planner sets default "default-value" for param "target"
-            // Agent receives "Process default-value"
-            // But our mock matches "Process custom-value" which won't match.
-            // Let me fix the mock:
-        }
-
-        // Redo with correct mock matching:
-        var mockLlm2 = new MockLlmClient()
+        var mockLlm = new MockLlmClient()
                 .onSend("planning-process", """
                     {
                         "name": "Param Task",
@@ -193,7 +141,7 @@ class AgenticanTest {
 
         try (var agentican = Agentican.builder()
                 .config(config)
-                .llm("default", mockLlm2.toLlmClient())
+                .llm("default", mockLlm.toLlmClient())
                 .build()) {
 
             var handle = agentican.run("Process something");
@@ -204,40 +152,9 @@ class AgenticanTest {
         }
     }
 
-    // --- Cancellation ---
-
     @Test
     void runTaskCancellation() {
 
-        // LLM that blocks until interrupted
-        var slowLlm = (LlmClient) request -> {
-            try { Thread.sleep(5000); } catch (InterruptedException _) {}
-            return endTurn("done");
-        };
-
-        var mockPlannerLlm = new MockLlmClient()
-                .onSend("planning-process", """
-                    {
-                        "name": "Slow Task",
-                        "description": "Takes forever",
-                        "agents": [{"name": "slow-agent", "role": "Slow", "skills": []}],
-                        "paramConfigs": [],
-                        "stepConfigs": [{"name": "slow-step", "type": "agent", "agent": "slow-agent", "instructions": "Be slow", "toolkits": []}]
-                    }
-                    """);
-
-        // The planner uses the mock, but the agent uses the slow LLM.
-        // Problem: both use the same "default" LLM. The planner call needs to be fast.
-        // Use the mock for the planner call, then it switches to slow for agent.
-        // MockLlmClient consumes entries, so after the planner call, subsequent calls hit "no mock found".
-
-        // Actually simpler: since we can't separate planner LLM from agent LLM easily,
-        // just test that cancel() sets the flag and the task eventually returns CANCELLED.
-
-        // The TaskRunner checks cancelled on each poll loop iteration (1s timeout).
-        // If cancelled is set, it returns CANCELLED.
-
-        // Use a planner that returns a multi-step task where step 2 never runs:
         var config = RuntimeConfig.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .build();
@@ -264,17 +181,13 @@ class AgenticanTest {
 
             var handle = agentican.run("Do a cancellable task");
 
-            // Cancel and verify the flag is set
             handle.cancel();
             assertTrue(handle.isCancelled());
 
-            // Task should finish — either CANCELLED (if caught in time) or FAILED (step-b has no mock)
             var result = handle.result();
             assertNotEquals(TaskStatus.COMPLETED, result.status());
         }
     }
-
-    // --- Custom Toolkit Registration ---
 
     @Test
     void customToolkitRegistered() {
@@ -289,9 +202,7 @@ class AgenticanTest {
                         "stepConfigs": [{"name": "use-tool", "type": "agent", "agent": "tool-user", "instructions": "Use MY_TOOL", "toolkits": ["my-toolkit"]}]
                     }
                     """)
-                // Pass 2: refine with tool context (matches step name)
                 .onSend("<name>use-tool</name>", "Use MY_TOOL to get data")
-                // Agent execution: calls tool, then completes
                 .onSend("Use MY_TOOL", toolUse("Calling tool", "MY_TOOL", Map.of("q", "test")))
                 .onSend("tool-result-MY_TOOL", "Got the data.");
 
@@ -315,8 +226,6 @@ class AgenticanTest {
             assertEquals(TaskStatus.COMPLETED, result.status());
         }
     }
-
-    // --- HITL Tests ---
 
     @Test
     void hitlAutoApproveFlow() {
@@ -396,8 +305,6 @@ class AgenticanTest {
         }
     }
 
-    // --- Close ---
-
     @Test
     void closeIsIdempotent() {
 
@@ -415,8 +322,6 @@ class AgenticanTest {
             agentican.close(); // second close should not throw
         });
     }
-
-    // --- Full Integration (migrated from AgenticanTestOld) ---
 
     @Test
     void fullIntegrationWithPlanningAndHitl() {

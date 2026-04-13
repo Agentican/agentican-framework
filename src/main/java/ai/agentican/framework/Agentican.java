@@ -26,12 +26,12 @@ import ai.agentican.framework.util.Ids;
 import ai.agentican.framework.util.Mdc;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.planning.PlannerAgent;
-
 import ai.agentican.framework.tools.Toolkit;
 import ai.agentican.framework.tools.ToolkitRegistry;
 import ai.agentican.framework.tools.composio.ComposioClient;
 import ai.agentican.framework.tools.mcp.McpToolkit;
 import ai.agentican.framework.util.Logs;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -55,12 +55,11 @@ public class Agentican implements AutoCloseable {
     private final AgentRegistry agentRegistry;
     private final ToolkitRegistry toolkitRegistry;
 
-    private final TaskStateStore taskStateStore;
-
     private final PlannerAgent taskPlanner;
     private final TaskRunner taskRunner;
     private final TaskDecorator taskDecorator;
     private final TaskListener taskListener;
+    private final TaskStateStore taskStateStore;
     private final HitlManager hitlManager;
     private final KnowledgeStore knowledgeStore;
 
@@ -81,6 +80,7 @@ public class Agentican implements AutoCloseable {
 
         this.taskDecorator = taskDecorator;
         this.taskListener = taskListener != null ? taskListener : new TaskListener() {};
+        this.taskStateStore = new NotifyingTaskStateStore(taskStateStore, this.taskListener);
         this.hitlManager = hitlManager;
         this.knowledgeStore = knowledgeStore;
 
@@ -109,14 +109,14 @@ public class Agentican implements AutoCloseable {
 
         this.llms = Collections.unmodifiableMap(mutableLlms);
 
-        // build toolkits
+        // register toolkits
         var toolkitRegistry = new ToolkitRegistry();
 
-        // MCP
+        // register MCP toolkits
         config.mcp().forEach(mcpConfig ->
                 toolkitRegistry.register(mcpConfig.slug(), McpToolkit.of(mcpConfig)));
 
-        // Composio
+        // register Composio toolkits
         var composioConfig = config.composio();
 
         if (composioConfig != null && composioConfig.apiKey() != null) {
@@ -130,26 +130,24 @@ public class Agentican implements AutoCloseable {
                     toolkitRegistry.register(composioToolkit.slug(), composioToolkit));
         }
 
-        // custom
+        // register custom toolkits
         toolkits.forEach(toolkitRegistry::register);
 
-        // built-in
+        // register built-in toolkits
         toolkitRegistry.register(AskQuestionToolkit.TOOL_NAME, new AskQuestionToolkit());
 
         this.toolkitRegistry = toolkitRegistry;
 
-        this.taskStateStore = new NotifyingTaskStateStore(taskStateStore, this.taskListener);
-
         var defaultLlm = this.llms.get(LlmConfig.DEFAULT);
 
-        // build agents
+        // register agents
         var agentRegistry = new AgentRegistry();
 
         config.agents().forEach(agentConfig -> agentRegistry.register(buildAgent(agentConfig)));
 
         this.agentRegistry = agentRegistry;
 
-        // build plans
+        // register plans
         var planRegistry = new PlanRegistry();
 
         config.plans().forEach(planConfig -> planRegistry.register(planConfig.toPlan()));
@@ -203,9 +201,9 @@ public class Agentican implements AutoCloseable {
             }
         }));
 
-        var taskResult = CompletableFuture.supplyAsync(asyncTaskRunner, taskExecutor);
+        var asyncTaskResult = CompletableFuture.supplyAsync(asyncTaskRunner, taskExecutor);
 
-        return new TaskHandle(taskId, taskResult, taskCancelled);
+        return new TaskHandle(taskId, asyncTaskResult, taskCancelled);
     }
 
     public TaskHandle run(String taskDescription) {
@@ -225,6 +223,7 @@ public class Agentican implements AutoCloseable {
                 taskListener.onPlanStarted(taskId);
 
                 var plan = taskPlanner.plan(taskDescription);
+
                 planRegistry.registerIfAbsent(plan);
 
                 taskListener.onPlanCompleted(taskId, plan.id());
@@ -236,8 +235,7 @@ public class Agentican implements AutoCloseable {
 
                 LOG.error("Task {} failed: {}", taskId, e.getMessage(), e);
 
-                taskListener.onTaskCompleted(taskId,
-                        TaskStatus.FAILED);
+                taskListener.onTaskCompleted(taskId, TaskStatus.FAILED);
 
                 throw e;
             }
@@ -254,24 +252,24 @@ public class Agentican implements AutoCloseable {
         return taskDecorator != null ? taskDecorator.decorate(supplier) : supplier;
     }
 
-    public AgentRegistry agents() {
-
-        return agentRegistry;
-    }
-
     public PlanRegistry plans() {
 
         return planRegistry;
     }
 
+    public AgentRegistry agents() {
+
+        return agentRegistry;
+    }
+
+    public ToolkitRegistry toolkits() {
+
+        return toolkitRegistry;
+    }
+
     public HitlManager hitlManager() {
 
         return hitlManager;
-    }
-
-    public ToolkitRegistry toolkitRegistry() {
-
-        return toolkitRegistry;
     }
 
     private Agent buildAgent(AgentConfig agentConfig) {
@@ -293,9 +291,8 @@ public class Agentican implements AutoCloseable {
         var maxTurns = agentRunnerConfig.maxTurns();
         var timeout = agentRunnerConfig.timeout();
 
-        // Resolve LLM config for metadata (provider, model)
         var llmConfig = config.llm().stream()
-                .filter(c -> c.name().equals(llmName))
+                .filter(llm -> llm.name().equals(llmName))
                 .findFirst()
                 .orElse(config.llm().isEmpty() ? null : config.llm().getFirst());
 
@@ -313,7 +310,7 @@ public class Agentican implements AutoCloseable {
 
         var agentRunner = agentRunnerBuilder.build();
 
-        var agent = new Agent(agentName, agentRole, agentSkills, agentRunner);
+        var agent = Agent.of(agentName, agentRole, agentSkills, agentRunner);
 
         LOG.info(Logs.AGENTICAN_BUILT_AGENT, agentName);
 
@@ -323,9 +320,8 @@ public class Agentican implements AutoCloseable {
     @Override
     public void close() {
 
-        if (ownsExecutor) {
+        if (ownsExecutor)
             taskExecutor.shutdownNow();
-        }
 
         toolkitRegistry.close();
     }
@@ -337,23 +333,23 @@ public class Agentican implements AutoCloseable {
         private final Map<String, LlmClient> llms = new LinkedHashMap<>();
         private final Map<String, Toolkit> toolkits = new LinkedHashMap<>();
 
-        private TaskStateStore taskStateStore;
         private HitlManager hitlManager;
         private KnowledgeStore knowledgeStore;
         private LlmClientDecorator llmDecorator;
         private TaskDecorator taskDecorator;
         private TaskListener stepListener;
+        private TaskStateStore taskStateStore;
         private ExecutorService taskExecutor;
 
         public AgenticanBuilder config(RuntimeConfig config) { this.config = config; return this; }
         public AgenticanBuilder llm(String name, LlmClient llm) { this.llms.put(name, llm); return this; }
+        public AgenticanBuilder llmDecorator(LlmClientDecorator llmDecorator) { this.llmDecorator = llmDecorator; return this; }
         public AgenticanBuilder toolkit(String slug, Toolkit toolkit) { this.toolkits.put(slug, toolkit); return this; }
         public AgenticanBuilder hitlManager(HitlManager hitlManager) { this.hitlManager = hitlManager; return this; }
         public AgenticanBuilder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
-        public AgenticanBuilder taskStateStore(TaskStateStore taskStateStore) { this.taskStateStore = taskStateStore; return this; }
-        public AgenticanBuilder llmDecorator(LlmClientDecorator llmDecorator) { this.llmDecorator = llmDecorator; return this; }
         public AgenticanBuilder taskDecorator(TaskDecorator taskDecorator) { this.taskDecorator = taskDecorator; return this; }
-        public AgenticanBuilder stepListener(TaskListener stepListener) { this.stepListener = stepListener; return this; }
+        public AgenticanBuilder stepListener(TaskListener taskListener) { this.stepListener = taskListener; return this; }
+        public AgenticanBuilder taskStateStore(TaskStateStore taskStateStore) { this.taskStateStore = taskStateStore; return this; }
         public AgenticanBuilder taskExecutor(ExecutorService taskExecutor) { this.taskExecutor = taskExecutor; return this; }
 
         public Agentican build() {
@@ -365,8 +361,8 @@ public class Agentican implements AutoCloseable {
             knowledgeStore = knowledgeStore != null ? knowledgeStore : new MemKnowledgeStore();
             taskStateStore = taskStateStore != null ? taskStateStore : new MemTaskStateStore();
 
-            return new Agentican(config, llms, toolkits, taskStateStore, hitlManager, knowledgeStore,
-                    llmDecorator, taskDecorator, stepListener, taskExecutor);
+            return new Agentican(config, llms, toolkits, taskStateStore, hitlManager, knowledgeStore, llmDecorator,
+                    taskDecorator, stepListener, taskExecutor);
         }
     }
 }

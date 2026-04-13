@@ -114,9 +114,11 @@ public class McpToolkit implements Toolkit, AutoCloseable {
         if (client != null) {
 
             try {
+
                 client.close();
             }
             catch (Exception e) {
+
                 LOG.debug("Error closing MCP client '{}': {}", name, e.getMessage());
             }
         }

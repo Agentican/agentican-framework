@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class LlmFactExtractorTest {
+class LlmKnowledgeFactExtractorTest {
 
     @Test
     void extractsFactsFromText() {
@@ -23,7 +23,7 @@ class LlmFactExtractorTest {
 
         var mockLlm = new MockLlmClient().onSend("", json);
 
-        var extractor = new LlmFactExtractor(mockLlm.toLlmClient());
+        var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
 
         var facts = extractor.extractFacts("some text about a product");
 
@@ -37,7 +37,7 @@ class LlmFactExtractorTest {
     @Test
     void emptyTextReturnsEmpty() {
 
-        var extractor = new LlmFactExtractor(new MockLlmClient().toLlmClient());
+        var extractor = new LlmKnowledgeExtractor(new MockLlmClient().toLlmClient());
 
         assertTrue(extractor.extractFacts("").isEmpty());
         assertTrue(extractor.extractFacts(null).isEmpty());
@@ -47,10 +47,11 @@ class LlmFactExtractorTest {
     void llmFailureReturnsEmpty() {
 
         LlmClient throwingClient = request -> {
+
             throw new RuntimeException("LLM is down");
         };
 
-        var extractor = new LlmFactExtractor(throwingClient);
+        var extractor = new LlmKnowledgeExtractor(throwingClient);
 
         assertTrue(extractor.extractFacts("some text").isEmpty());
     }
@@ -60,7 +61,7 @@ class LlmFactExtractorTest {
 
         var mockLlm = new MockLlmClient().onSend("", "this is not JSON at all");
 
-        var extractor = new LlmFactExtractor(mockLlm.toLlmClient());
+        var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
 
         assertTrue(extractor.extractFacts("some text").isEmpty());
     }

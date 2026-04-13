@@ -43,7 +43,6 @@ class MemKnowledgeStoreTest {
         var store = new MemKnowledgeStore();
 
         var indexing = KnowledgeEntry.of("indexing", "desc");
-        // default status is INDEXING
 
         var indexed = KnowledgeEntry.of("indexed", "desc");
         indexed.setStatus(KnowledgeStatus.INDEXED);
