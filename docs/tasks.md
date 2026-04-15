@@ -6,15 +6,24 @@ A `Plan` is a structured workflow definition. You can create one by hand or let 
 
 ```java
 record Plan(
-    String id,              // auto-generated if null
+    String id,              // internal UUID, auto-generated
     String name,
     String description,
     List<PlanParam> params,
-    List<PlanStep> steps
+    List<PlanStep> steps,
+    String externalId       // optional stable business key
 )
 ```
 
-A plan has an auto-generated ID, a name, description, optional parameters, and a list of steps. Steps can depend on each other; the runner builds a dependency graph and executes independent steps in parallel.
+A plan has an auto-generated internal UUID, a name, description, optional parameters, and a list of steps. Steps can depend on each other; the runner builds a dependency graph and executes independent steps in parallel.
+
+Plans registered at boot (via `RuntimeConfig.plans` or `Agentican.builder().plan(...)`) must carry an `externalId` so a catalog can upsert on redeploys. Factories:
+
+```java
+Plan.of(name, description, params, steps);                        // no externalId (planner output, tests)
+Plan.withExternalId(externalId, name, description, params, steps); // cataloged plan
+Plan.builder(name)....build();                                     // no externalId
+```
 
 ## Step Types
 
@@ -213,18 +222,28 @@ Cyclic dependencies are detected at task start and throw `IllegalStateException`
 ## Running Plans
 
 ```java
-// Plan from natural language
+// Plan from natural language — planner may REUSE a cataloged plan or CREATE a new one.
+// When it reuses, extracted param values ride in PlanningResult.inputs() and flow into the task.
 TaskHandle h1 = agentican.run("Research and summarize quantum computing");
 
-// Run a pre-built plan
+// Run a pre-built plan directly (skips the planner)
 TaskHandle h2 = agentican.run(myPlan);
 
-// Run with parameter overrides
+// Run with parameter values
 TaskHandle h3 = agentican.run(myPlan, Map.of("topic", "quantum computing"));
 
 // All return TaskHandle — block on result() or use resultAsync()
 TaskResult result = h1.result();
 ```
+
+### Planner reuse-or-create
+
+When you pass a natural-language task, `PlannerAgent.plan(String)` returns a `PlanningResult(Plan, Map<String, String> inputs)`. The planner prompt includes an `<existing-plans>` block listing cataloged plans (internal id, name, description, param names), and the LLM returns one of:
+
+- **`ReuseExisting(planRef, inputs)`** — when an existing plan fits. `planRef` is the internal plan id; `inputs` are the param values extracted from the user's description. The framework looks the plan up in the `PlanRegistry` and runs it with those inputs.
+- **`PlannerOutput(...)`** — a brand-new plan (agents, skills, steps). The framework registers any new agents/skills and then runs a refinement pass over each step.
+
+If the planner hallucinates a `planRef` that isn't in the catalog, the framework retries once with an empty `<existing-plans>` block, forcing a create.
 
 ## TaskHandle
 

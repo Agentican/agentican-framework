@@ -1,17 +1,17 @@
 # Agents
 
-An `Agent` represents a specialized worker — a name, role, optional skills, and a runner that executes the actual work.
+An `Agent` represents a specialized worker — a name, role, an `AgentRunner` that executes the actual work, and the `AgentConfig` it was built from.
 
 ## Defining Agents
 
 The simplest way to define an agent is via configuration:
 
 ```java
-var researcher = AgentConfig.builder()
-        .name("researcher")
-        .role("Expert researcher who finds and synthesizes information")
-        .skill(SkillConfig.of("citations", "Always include source URLs"))
-        .build();
+var researcher = AgentConfig.forCatalog(
+        "agent.researcher.v1",                         // externalId — required for catalog agents
+        "researcher",                                  // name
+        "Expert researcher who finds and synthesizes information",
+        "default");                                    // llm name
 
 var config = RuntimeConfig.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
@@ -19,7 +19,9 @@ var config = RuntimeConfig.builder()
         .build();
 ```
 
-Agents from config are pre-registered in the `AgentRegistry` when Agentican starts. They're available for tasks to reference by name.
+Any agent you register at startup — through `RuntimeConfig.agents` or `Agentican.builder().agent(...)` — must declare an `externalId`. Planner-created agents don't need one.
+
+Agents from config are pre-registered in the `AgentRegistry` when Agentican starts. They're available for plan steps to reference by name or id.
 
 ## Agents from Planning
 
@@ -33,47 +35,69 @@ The planner might create:
 - **`AI Research Specialist`** — handles the research step
 - **`Documentation Specialist`** — writes the report
 
-These get built and registered automatically. Subsequent tasks can reference the same agents (the planner uses existing ones when their roles match).
+Any planner-introduced `AgentConfig` that isn't already in the registry is passed through `AgentFactory` and registered. Subsequent tasks can reference the same agents (the planner sees them in its prompt).
 
 ## Agent Anatomy
 
 ```java
 record Agent(
+    String id,
     String name,
     String role,
-    List<SkillConfig> skills,
-    AgentRunner runner
+    AgentRunner runner,
+    AgentConfig config   // null for Agent.of(name, role, runner) — typically only in tests
 )
 ```
 
-- **`name`** — unique identifier, used in task steps
+- **`id`** — internal UUID (auto-generated if null)
+- **`name`** — display name, used in plan step references
 - **`role`** — short description of the agent's expertise (used in the system prompt)
-- **`skills`** — optional named instruction sets that activate per-step
 - **`runner`** — the execution strategy (almost always `SmacAgentRunner`)
+- **`config`** — the `AgentConfig` this agent was built from; `null` if built via the legacy `Agent.of(name, role, runner)` / `Agent.of(id, name, role, runner)` factories (used in test fixtures — these agents do not persist to a catalog)
+
+Preferred factory:
+
+```java
+Agent.of(agentConfig, runner);    // preserves config on the Agent record
+```
+
+## AgentFactory
+
+`AgentFactory` turns an `AgentConfig` into a runtime `Agent`. It's wired with the LLM clients, the HITL manager, the knowledge store, the task state store, the skill registry, and the task listener:
+
+```java
+var factory = new AgentFactory(
+        config, llms, hitlManager, knowledgeStore,
+        taskStateStore, skillRegistry, taskListener);
+
+Agent agent = factory.build(agentConfig);
+```
+
+`Agentican` constructs the factory internally. Persistent agent registries can call it from their `seed(factory)` hook to rehydrate cataloged agents at boot.
 
 ## Skills
 
-Skills are reusable instruction blocks. Define them once on the agent, activate them per-step.
+Skills are reusable instruction blocks. They live in a top-level `SkillRegistry` (seeded from `RuntimeConfig.skills` and the fluent builder) and are referenced by plan steps.
 
 ```java
-var analyst = AgentConfig.builder()
-        .name("analyst")
-        .role("Data analyst")
-        .skill(SkillConfig.of("statistical-rigor",
+var config = RuntimeConfig.builder()
+        .llm(...)
+        .skill(SkillConfig.forCatalog("skill.statistical-rigor.v1", "statistical-rigor",
                 "Use p-values, confidence intervals, and explain assumptions"))
-        .skill(SkillConfig.of("plain-english",
+        .skill(SkillConfig.forCatalog("skill.plain-english.v1", "plain-english",
                 "Translate findings into non-technical language"))
+        .agent(AgentConfig.forCatalog("agent.analyst.v1", "analyst", "Data analyst", "default"))
         .build();
 ```
 
-A task step then enables the relevant skills:
+A plan step activates skills by name or id:
 
 ```java
 PlanStepAgent.builder("explain-findings")
-    .agent("analyst")
-    .instructions("Explain the results to a general audience")
-    .skill("plain-english")  // ← only this skill is activated for this step
-    .build();
+        .agent("analyst")
+        .instructions("Explain the results to a general audience")
+        .skill("plain-english")  // ← only this skill is activated for this step
+        .build();
 ```
 
 The agent's system prompt for that step will include the `plain-english` instructions but not `statistical-rigor`.
@@ -110,7 +134,7 @@ For most cases, you don't need a custom runner. If you build one, the framework 
 
 ## SmacAgentRunner
 
-The default runner. Configurable via `Agentican` builder through `WorkerConfig`:
+The default runner. Configurable via `WorkerConfig`:
 
 ```java
 var config = RuntimeConfig.builder()
@@ -134,13 +158,13 @@ The runner does roughly this on each turn:
 
 ## Multi-Agent Collaboration
 
-When the planner creates multiple agents, they don't talk to each other directly. Instead, they share state through the task graph:
+When the planner creates multiple agents, they don't talk to each other directly. Instead, they share state through the plan graph:
 
 - Agent A produces output for step `research`
 - Agent B's step `summarize` depends on `research`, with instructions like `Summarize: {{step.research.output}}`
 - The runner resolves the placeholder and gives Agent B the output as data
 
-This keeps each agent stateless and independent. The task graph is the integration layer.
+This keeps each agent stateless and independent. The plan graph is the integration layer.
 
 ## LLM Selection
 
@@ -148,9 +172,10 @@ By default, all agents use the `default` LLM client. You can specify a different
 
 ```java
 AgentConfig.builder()
+        .externalId("agent.fast-classifier.v1")
         .name("fast-classifier")
         .role("Quick yes/no classifier")
-        .llm("haiku")  // ← LLM name from RuntimeConfig
+        .llm("haiku")                 // ← LLM name from RuntimeConfig
         .build()
 ```
 

@@ -258,8 +258,8 @@ Use a fast/cheap model for classification and a stronger one for content generat
 var config = RuntimeConfig.builder()
         .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
         .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
-        .agent(AgentConfig.builder().name("classifier").role("Quick classifier").llm("haiku").build())
-        .agent(AgentConfig.builder().name("writer").role("High-quality writer").build())  // uses default
+        .agent(AgentConfig.forCatalog("agent.classifier.v1", "classifier", "Quick classifier", "haiku"))
+        .agent(AgentConfig.forCatalog("agent.writer.v1",     "writer",     "High-quality writer", "default"))
         .build();
 ```
 

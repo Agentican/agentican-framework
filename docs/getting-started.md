@@ -58,9 +58,9 @@ mvn compile exec:java -Dexec.mainClass=Hello
 
 When you called `agentican.run("Explain quantum entanglement...")`, the framework:
 
-1. **Planned** the task — the LLM-powered planner created a workflow with the right agents and steps
-2. **Built** any agents the planner introduced
-3. **Refined** each step's instructions with available tool context
+1. **Planned** the task — `PlannerAgent` decided whether to reuse a cataloged `Plan` or create a new one from the description
+2. **Built** any agents the planner introduced via `AgentFactory`
+3. **Refined** each step's instructions with available tool context (create path only)
 4. **Executed** the workflow on virtual threads, returning a `TaskHandle`
 5. **Returned** the `TaskResult` when you called `handle.result()`
 

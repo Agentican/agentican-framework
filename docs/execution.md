@@ -50,6 +50,8 @@ public interface TaskStateStore {
 
     // Task lifecycle
     void taskStarted(String taskId, String taskName, Plan plan, Map<String, String> params);
+    void taskStarted(String taskId, String taskName, Plan plan, Map<String, String> params,
+                     String parentTaskId, String parentStepId, int iterationIndex);
     void taskCompleted(String taskId, TaskStatus status);
 
     // Step lifecycle
@@ -83,6 +85,23 @@ public interface TaskStateStore {
 ```
 
 Each mutation method takes the parent's ID to place the new object in the hierarchy. For example, `runStarted` takes `stepId` so the store knows which step the run belongs to, and `turnStarted` takes `runId`.
+
+The overload of `taskStarted(..., parentTaskId, parentStepId, iterationIndex)` is what loop/branch sub-tasks use so a `TaskLog` can point back at its parent step and iteration index.
+
+### Reconstitution Constructors
+
+`TaskLog`, `StepLog`, and `TurnLog` each expose constructors that accept full state — id, timestamps, child collections, etc. — so a persistent store can round-trip an existing row back into a log object without stamping fresh `Instant.now()` values. Use these when implementing `load(taskId)` against a database:
+
+```java
+new TaskLog(taskId, taskName, plan, params,
+            parentTaskId, parentStepId, iterationIndex, createdAt);
+
+new StepLog(id, stepName, createdAt);
+
+new TurnLog(id, index, messageId, request,
+            responseId, response, toolResults,
+            startedAt, completedAt);
+```
 
 ## MemTaskStateStore
 

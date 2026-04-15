@@ -57,11 +57,13 @@ That's it. The planner figures out what agents and steps are needed, executes th
 
 - **`Agentican`** — main entry point with builder API
 - **`Plan` / `PlanStep`** — declarative workflow model (agent steps, loops, branches)
-- **`Agent` / `AgentRunner`** — agent abstraction with pluggable runners
+- **`Agent` / `AgentRunner` / `AgentFactory`** — agent abstraction with pluggable runners and a factory that turns `AgentConfig` into a runtime `Agent`
 - **`SmacAgentRunner`** — production-ready agent loop with tool calling and HITL
+- **`PlannerAgent`** — LLM planner that decides whether to reuse a cataloged `Plan` or create a new one from natural language
+- **`AgentRegistry` / `SkillRegistry` / `PlanRegistry`** — interfaces with `InMemory*` defaults; persistent backends plug in via the builder
 - **`Toolkit`** — pluggable tool provider interface
 - **`HitlManager`** — checkpoint-based human-in-the-loop coordination
-- **`KnowledgeStore`** — persistent fact storage with `RECALL_KNOWLEDGE` tool for agents
+- **`KnowledgeStore`** — persistent fact storage with automatic extraction and a `RECALL_KNOWLEDGE` tool for agents
 - **`TaskLog` / `TaskStateStore`** — unified trace + state for every task run
 - **Built-in toolkits**: `ScratchpadToolkit` (per-task memory), `AskQuestionToolkit` (user questions), `KnowledgeToolkit` (cross-task facts)
 - **Out-of-the-box integrations**: Anthropic Claude, Composio, Model Context Protocol (MCP)

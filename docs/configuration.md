@@ -6,11 +6,12 @@ Agentican is configured via `RuntimeConfig`. You can build it programmatically o
 
 ```java
 record RuntimeConfig(
-    List<LlmConfig> llm,           // at least one required
+    List<LlmConfig> llm,        // at least one required
     List<McpConfig> mcp,
     ComposioConfig composio,
     WorkerConfig agentRunner,
     List<AgentConfig> agents,
+    List<SkillConfig> skills,
     List<PlanConfig> plans
 )
 ```
@@ -21,9 +22,12 @@ Build with the fluent API:
 var config = RuntimeConfig.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
         .worker(WorkerConfig.builder().maxTurns(20).build())
-        .agent(AgentConfig.builder().name("researcher").role("...").build())
+        .agent(AgentConfig.forCatalog("agent.researcher.v1", "researcher", "...", "default"))
+        .skill(SkillConfig.forCatalog("skill.citations.v1", "citations", "Always cite sources"))
         .build();
 ```
+
+> **External IDs required.** Any `AgentConfig`, `SkillConfig`, or `PlanConfig` registered via `RuntimeConfig` or the Agentican fluent builder must have an `externalId`. See [External IDs](#external-ids).
 
 ## LlmConfig
 
@@ -43,7 +47,10 @@ You can register multiple LLMs and assign them to specific agents:
 RuntimeConfig.builder()
         .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
         .llm(LlmConfig.builder().name("fast").apiKey(key).model("claude-haiku-4-5").build())
-        .agent(AgentConfig.builder().name("classifier").role("...").llm("fast").build())
+        .agent(AgentConfig.builder()
+                .externalId("agent.classifier.v1")
+                .name("classifier").role("...").llm("fast")
+                .build())
         .build();
 ```
 
@@ -63,16 +70,7 @@ WorkerConfig.builder()
 
 ### LLM Retry
 
-LLM calls are automatically retried on transient failures (rate limits, server errors, network issues) with exponential backoff and jitter. This is handled by `RetryingLlmClient`, which wraps every LLM client at construction time — all callers (agent runner, planner, fact extractor) get retries automatically.
-
-Configure via `WorkerConfig`:
-
-```java
-WorkerConfig.builder()
-        .llmMaxRetries(3)                        // max retry attempts (default 3)
-        .llmRetryBaseDelay(Duration.ofSeconds(1)) // base delay, doubles each retry (default 1s)
-        .build()
-```
+LLM calls are automatically retried on transient failures (rate limits, server errors, network issues) with exponential backoff and jitter. This is handled by `RetryingLlmClient`, which wraps every LLM client at construction time — all callers (agent runner, planner, knowledge extractor) get retries automatically.
 
 Retryable errors: `IOException`, `TimeoutException`, HTTP 429/500/503/529, rate limit responses.
 
@@ -98,7 +96,7 @@ Observe tokens in real time:
 public class MyListener implements TaskListener {
     @Override
     public void onToken(String taskId, String turnId, String token) {
-        System.out.print(token); // real-time output
+        System.out.print(token);
     }
 }
 ```
@@ -106,15 +104,53 @@ public class MyListener implements TaskListener {
 ## AgentConfig
 
 ```java
-AgentConfig.builder()
-        .name("researcher")
-        .role("Expert at finding and synthesizing information")
-        .llm("default")              // optional, uses default LLM if omitted
-        .skill(SkillConfig.of("citations", "Always cite sources"))
-        .build()
+record AgentConfig(
+    String id,          // internal UUID, auto-generated
+    String name,
+    String role,
+    String llm,
+    String externalId   // required for config/builder agents
+)
 ```
 
-Agents from config are pre-registered when Agentican starts. They can be referenced by name in task steps.
+```java
+AgentConfig.forCatalog("agent.researcher.v1", "researcher",
+        "Expert at finding and synthesizing information", "default");
+
+AgentConfig.builder()
+        .externalId("agent.researcher.v1")
+        .name("researcher")
+        .role("Expert at finding and synthesizing information")
+        .llm("default")                // optional; defaults to the "default" LLM
+        .build();
+```
+
+Agents from config are pre-registered when Agentican starts. They can be referenced by name (or id) in plan steps.
+
+## SkillConfig
+
+Skills are reusable instruction blocks that plan steps can activate by id/name. They live in the top-level `RuntimeConfig.skills` list — they are not nested inside `AgentConfig`.
+
+```java
+record SkillConfig(String id, String name, String instructions, String externalId)
+```
+
+```java
+SkillConfig.forCatalog("skill.citations.v1", "citations", "Always include source URLs");
+```
+
+## PlanConfig
+
+Pre-built plans you want registered at boot. Each needs an `externalId`.
+
+```java
+var plan = new PlanConfig(
+        "research-and-summarize",                      // name
+        "Research a topic and summarize it",           // description
+        List.of(new PlanConfig.PlanParamConfig("topic", "Topic to research", "AI", true)),
+        List.of(/* PlanStepConfig entries */),
+        "plan.research-and-summarize.v1");             // externalId
+```
 
 ## ComposioConfig
 
@@ -139,9 +175,7 @@ McpConfig.builder()
         .build()
 ```
 
-Multiple MCP servers can be registered. Each is accessed via its `slug`.
-
-The framework tries Streamable HTTP transport first, then falls back to SSE.
+Multiple MCP servers can be registered. Each is accessed via its `slug`. The framework tries Streamable HTTP transport first, then falls back to SSE.
 
 ## YAML Configuration
 
@@ -161,11 +195,20 @@ composio:
   userId: user@example.com
 
 agents:
-  - name: researcher
+  - externalId: agent.researcher.v1
+    name: researcher
     role: Expert researcher who finds and synthesizes information
 
-  - name: writer
+  - externalId: agent.writer.v1
+    name: writer
     role: Documentation specialist with clear, concise writing style
+
+skills:
+  - externalId: skill.citations.v1
+    name: citations
+    instructions: Always include source URLs
+
+plans: []
 ```
 
 ```java
@@ -180,18 +223,38 @@ The `Agentican.builder()` accepts the runtime config plus optional overrides:
 
 ```java
 Agentican.builder()
-        .config(config)                            // required
-        .llm("name", llmClient)                    // pre-built LLM client (overrides config)
-        .toolkit("slug", toolkit)                  // custom toolkit
-        .hitlManager(hitlManager)                  // HITL coordinator (default: logging notifier)
-        .taskStateStore(taskStateStore)                // log persistence (default: in-memory)
-        .knowledgeStore(knowledgeStore)            // custom knowledge store (default: in-memory)
-        .llmDecorator(llmDecorator)                // decorates every LLM client (used by metrics/OTel)
-        .taskDecorator(taskDecorator)              // decorates task submission (used by OTel for context propagation)
-        .stepListener(stepListener)                // listens to task/step/run/turn lifecycle events
-        .taskExecutor(executor)                    // custom executor for task virtual threads
+        .config(config)                             // required
+
+        // Catalog entries (parity with RuntimeConfig's lists):
+        .agent(AgentConfig.forCatalog(...))
+        .skill(SkillConfig.forCatalog(...))
+        .plan(planConfig)
+        .mcp(McpConfig.builder()...build())
+        .composio(ComposioConfig.builder()...build())
+
+        // LLM + toolkits:
+        .llm("name", llmClient)                     // pre-built LLM client
+        .toolkit("slug", toolkit)                   // custom toolkit
+
+        // Registry overrides (default: in-memory):
+        .agentRegistry(myAgentRegistry)
+        .skillRegistry(mySkillRegistry)
+        .planRegistry(myPlanRegistry)
+
+        // Stores + coordination:
+        .hitlManager(hitlManager)                   // default: logging notifier
+        .taskStateStore(taskStateStore)             // default: in-memory
+        .knowledgeStore(knowledgeStore)             // default: in-memory
+
+        // Observability + extension points:
+        .llmDecorator(llmDecorator)
+        .taskDecorator(taskDecorator)
+        .stepListener(listener)
+        .taskExecutor(executor)
         .build();
 ```
+
+> Agents, skills, and plans supplied via both `RuntimeConfig` and the builder are merged. Each still must carry an `externalId` — the validation runs for both sources.
 
 ### Extension Points
 
@@ -200,10 +263,11 @@ Agentican.builder()
 | `TaskListener` | Receives lifecycle events for tasks, steps, runs, turns, messages, responses, tool calls, and HITL. Used by OTel for span creation and metrics for counters. |
 | `LlmClientDecorator` | Wraps every config-built `LlmClient`. Used by metrics (counters/timers) and OTel (LLM call spans). |
 | `TaskDecorator` | Wraps the `Supplier` passed to `CompletableFuture.supplyAsync()` for each task. Used by OTel to propagate trace context to virtual threads. Supports `snapshot()` for step-level context capture. |
+| `AgentRegistry` / `SkillRegistry` / `PlanRegistry` | Registry interfaces; supply a persistent backend via `.agentRegistry(...)` etc. Each exposes a `seed(...)` hook the framework calls once at boot. |
 
 ### Pre-built LLM Clients
 
-If you want to inject your own `LlmClient` (for testing, custom providers, or to wrap with logging/retry/caching), use `.llm(name, llmClient)`. This takes precedence over `LlmConfig` entries with the same name.
+If you want to inject your own `LlmClient` (for testing, custom providers, or to wrap with logging/caching), use `.llm(name, llmClient)`. This takes precedence over `LlmConfig` entries with the same name.
 
 ```java
 LlmClient cachedClient = LlmClient.withLogging(myCustomClient);
@@ -227,16 +291,7 @@ Agentican.builder()
 
 ### Custom TaskStateStore
 
-If not provided, Agentican creates a `MemTaskStateStore`. Implement your own for durable storage:
-
-The `TaskStateStore` interface uses granular mutation methods for each lifecycle event (e.g., `taskStarted()`, `stepStarted()`, `runStarted()`, `turnStarted()`, `messageSent()`, `responseReceived()`, `toolCallStarted()`, etc.) plus query methods:
-
-```java
-TaskLog load(String taskId);
-List<TaskLog> list();
-```
-
-The default `MemTaskStateStore` stores everything in memory. For durable storage, implement the full `TaskStateStore` interface against your database.
+If not provided, Agentican creates a `MemTaskStateStore`. Implement your own for durable storage — the `TaskStateStore` interface uses granular mutation methods (`taskStarted()`, `stepStarted()`, `runStarted()`, `turnStarted()`, `messageSent()`, etc.) plus query methods `load(taskId)` and `list()`.
 
 ```java
 Agentican.builder()
@@ -244,6 +299,28 @@ Agentican.builder()
         .taskStateStore(new DatabaseTaskStateStore(dataSource))
         .build();
 ```
+
+## External IDs
+
+`AgentConfig`, `SkillConfig`, `PlanConfig`, and `Plan` all carry an optional `externalId` separate from their internal UUID `id`. The `externalId` is a stable business key that a persistent catalog upserts on, so redeploys don't duplicate rows.
+
+Anything registered through `RuntimeConfig` or the Agentican fluent builder **must** set an `externalId`. `Agentican.build()` throws `IllegalStateException` on any missing one:
+
+```
+skill 'citations' is missing an externalId. Config-file and fluent-builder
+skills must declare a stable externalId so the catalog can upsert
+consistently across deploys.
+```
+
+Use the `forCatalog(externalId, ...)` factories or the `externalId(...)` builder method:
+
+```java
+AgentConfig.forCatalog("agent.researcher.v1", "researcher", "Expert researcher", "default");
+SkillConfig.forCatalog("skill.citations.v1",  "citations",  "Always cite sources");
+Plan.withExternalId("plan.research.v1", "research", "...", params, steps);
+```
+
+Planner-created agents, skills, and plans have no `externalId` — they're ephemeral, scoped to the run that produced them.
 
 ## Environment Variables
 
