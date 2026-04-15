@@ -1,4 +1,5 @@
 {
+  "type": "create",
   "name": "LLM Research and Documentation",
   "description": "Research the top {{param.count}} LLMs based on {{param.criteria}}, gather pricing information, and create individual Notion pages for each model.",
   "paramConfigs": [

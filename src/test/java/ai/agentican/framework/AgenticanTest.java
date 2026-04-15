@@ -1,13 +1,15 @@
 package ai.agentican.framework;
 
+import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.LlmConfig;
+import ai.agentican.framework.config.PlanConfig;
 import ai.agentican.framework.config.RuntimeConfig;
+import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.tools.ToolDefinition;
 import org.junit.jupiter.api.Test;
 
@@ -91,9 +93,10 @@ class AgenticanTest {
     void runTaskWithKnownAgent() {
 
         var mockLlm = new MockLlmClient()
-                // Planner pass 1: creates agent
+
                 .onSend("planning-process", """
                     {
+                        "type": "create",
                         "name": "Simple Task",
                         "description": "A simple task",
                         "agents": [{"name": "worker", "role": "Does work", "skills": []}],
@@ -130,6 +133,7 @@ class AgenticanTest {
         var mockLlm = new MockLlmClient()
                 .onSend("planning-process", """
                     {
+                        "type": "create",
                         "name": "Param Task",
                         "description": "Uses params",
                         "agents": [{"name": "worker", "role": "Worker", "skills": []}],
@@ -162,6 +166,7 @@ class AgenticanTest {
         var mockLlm = new MockLlmClient()
                 .onSend("planning-process", """
                     {
+                        "type": "create",
                         "name": "Cancel Task",
                         "description": "Test",
                         "agents": [{"name": "agent-a", "role": "Worker", "skills": []}],
@@ -195,16 +200,24 @@ class AgenticanTest {
         var mockLlm = new MockLlmClient()
                 .onSend("planning-process", """
                     {
+                        "type": "create",
                         "name": "Tool Task",
                         "description": "Uses tools",
                         "agents": [{"name": "tool-user", "role": "Uses tools", "skills": []}],
                         "paramConfigs": [],
-                        "stepConfigs": [{"name": "use-tool", "type": "agent", "agent": "tool-user", "instructions": "Use MY_TOOL", "toolkits": ["my-toolkit"]}]
+                        "stepConfigs": [{"name": "use-tool", "type": "agent", "agent": "tool-user", "instructions": "Use MY_TOOL", "tools": ["MY_TOOL"]}]
                     }
                     """)
-                .onSend("<name>use-tool</name>", "Use MY_TOOL to get data")
+                .onSend("plan refiner", """
+                    {
+                      "paramConfigs": [],
+                      "stepConfigs": [
+                        {"name": "use-tool", "type": "agent", "agent": "tool-user", "instructions": "Use MY_TOOL to get data", "tools": ["MY_TOOL"]}
+                      ]
+                    }
+                    """)
                 .onSend("Use MY_TOOL", toolUse("Calling tool", "MY_TOOL", Map.of("q", "test")))
-                .onSend("tool-result-MY_TOOL", "Got the data.");
+                .onSend("<name>MY_TOOL</name>", "Got the data.");
 
         var myToolkit = new MockToolkit(List.of(
                 new ToolDefinition("MY_TOOL", "A custom tool", Map.of(), List.of())))
@@ -233,6 +246,7 @@ class AgenticanTest {
         var mockLlm = new MockLlmClient()
                 .onSend("planning-process", """
                     {
+                        "type": "create",
                         "name": "HITL Task",
                         "description": "Needs approval",
                         "agents": [{"name": "writer", "role": "Writer", "skills": []}],
@@ -268,16 +282,24 @@ class AgenticanTest {
         var mockLlm = new MockLlmClient()
                 .onSend("planning-process", """
                     {
+                        "type": "create",
                         "name": "Tool HITL Task",
                         "description": "Tool needs approval",
                         "agents": [{"name": "builder", "role": "Builder", "skills": []}],
                         "paramConfigs": [],
-                        "stepConfigs": [{"name": "build", "type": "agent", "agent": "builder", "instructions": "Build with SAFE_TOOL", "toolkits": ["tools"]}]
+                        "stepConfigs": [{"name": "build", "type": "agent", "agent": "builder", "instructions": "Build with SAFE_TOOL", "tools": ["SAFE_TOOL"]}]
                     }
                     """)
-                .onSend("<name>build</name>", "Use SAFE_TOOL to build")
+                .onSend("plan refiner", """
+                    {
+                      "paramConfigs": [],
+                      "stepConfigs": [
+                        {"name": "build", "type": "agent", "agent": "builder", "instructions": "Use SAFE_TOOL to build", "tools": ["SAFE_TOOL"]}
+                      ]
+                    }
+                    """)
                 .onSend("Use SAFE_TOOL", toolUse("Building", "SAFE_TOOL", Map.of("action", "create")))
-                .onSend("tool-result-SAFE_TOOL", "Build complete.");
+                .onSend("<name>SAFE_TOOL</name>", "Build complete.");
 
         var toolkit = new MockToolkit(List.of(
                 new ToolDefinition("SAFE_TOOL", "A dangerous tool", Map.of(), List.of())))
@@ -319,7 +341,7 @@ class AgenticanTest {
 
         assertDoesNotThrow(() -> {
             agentican.close();
-            agentican.close(); // second close should not throw
+            agentican.close();
         });
     }
 
@@ -330,25 +352,27 @@ class AgenticanTest {
         var createPageResponse = readResource(MOCK + "toolkit-create-page-response.json");
 
         var mockLlm = new MockLlmClient()
+
+                .onSendRepeated("curate a team knowledge base", endTurn("{\"entries\":[]}"))
                 .onSend("planning-process", readResource(MOCK + "pass1-response.json"))
                 .onSend("<name>setup-notion</name>", readResource(MOCK + "pass2-setup-response.txt"))
                 .onSend("<name>create-page</name>", readResource(MOCK + "pass2-create-response.txt"))
                 .onSend("loop step", readResource(MOCK + "pass3-response.json"))
                 .onSend("Research Top LLMs", readResource(MOCK + "agent-research-response.txt"))
-                .onSend("Use your available tools", toolUse("Browsing workspace.",
+                .onSend("Browse", toolUse("Browsing workspace.",
                         "NOTION_FETCH_DATA", Map.of("fetch_type", "pages", "query", "")))
-                .onSend("NOTION_FETCH_DATA", toolUse("Creating LLM Research parent page.",
+                .onSend("<name>NOTION_FETCH_DATA</name>", toolUse("Creating LLM Research parent page.",
                         "NOTION_CREATE_NOTION_PAGE", Map.of("parent_id", "32f5d50f-1480-80d8-acb9-ef671eb4623b", "title", "LLM Research")))
-                .onSend("tool-result-NOTION_CREATE_NOTION_PAGE", readResource(MOCK + "agent-setup-response.txt"))
+                .onSend("<name>NOTION_CREATE_NOTION_PAGE</name>", readResource(MOCK + "agent-setup-response.txt"))
                 .onSend("Claude Opus 4.6", toolUse("Creating page.",
                         "NOTION_CREATE_NOTION_PAGE", Map.of("parent_id", "mock-parent-page-id-001", "title", "Claude Opus 4.6", "markdown", "# Overview")))
                 .onSend("GPT-5.4", toolUse("Creating page.",
                         "NOTION_CREATE_NOTION_PAGE", Map.of("parent_id", "mock-parent-page-id-001", "title", "GPT-5.4", "markdown", "# Overview")))
                 .onSend("Gemini 3.1 Pro", toolUse("Creating page.",
                         "NOTION_CREATE_NOTION_PAGE", Map.of("parent_id", "mock-parent-page-id-001", "title", "Gemini 3.1 Pro", "markdown", "# Overview")))
-                .onSend("tool-result-NOTION_CREATE_NOTION_PAGE", "Page created successfully.")
-                .onSend("tool-result-NOTION_CREATE_NOTION_PAGE", "Page created successfully.")
-                .onSend("tool-result-NOTION_CREATE_NOTION_PAGE", "Page created successfully.");
+                .onSend("<name>NOTION_CREATE_NOTION_PAGE</name>", "Page created successfully.")
+                .onSend("<name>NOTION_CREATE_NOTION_PAGE</name>", "Page created successfully.")
+                .onSend("<name>NOTION_CREATE_NOTION_PAGE</name>", "Page created successfully.");
 
         var notionToolkit = new MockToolkit(List.of(
                 new ToolDefinition("NOTION_CREATE_NOTION_PAGE", "Create a new Notion page",
@@ -391,5 +415,96 @@ class AgenticanTest {
             assertEquals(TaskStatus.COMPLETED, result.result().status());
             assertTrue(result.result().stepResults().size() >= 3);
         }
+    }
+
+    @Test
+    void fluentAgentIsRegistered() {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .agent(AgentConfig.forCatalog("fluent-agent-id", "FluentAgent", "a fluent test role", null))
+                .build()) {
+
+            assertTrue(agentican.agents().isRegisteredByName("FluentAgent"));
+            assertEquals("FluentAgent", agentican.agents().getByName("FluentAgent").name());
+        }
+    }
+
+    @Test
+    void fluentSkillIsRegistered() {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .skill(SkillConfig.forCatalog("fluent-skill-id", "FluentSkill", "do the thing"))
+                .build()) {
+
+            assertTrue(agentican.skills().isRegisteredByName("FluentSkill"));
+        }
+    }
+
+    @Test
+    void fluentPlanIsRegistered() {
+
+        var step = new PlanConfig.PlanStepConfig("s1", "agent", "noop", "do nothing",
+                List.of(), false, List.of(), List.of(), null, null, List.of(), null, List.of());
+
+        var planConfig = new PlanConfig("fluent-plan", "desc", List.of(), List.of(step), "fluent-plan-ext");
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .plan(planConfig)
+                .build()) {
+
+            assertNotNull(agentican.plans().get("fluent-plan"));
+        }
+    }
+
+    @Test
+    void fluentAndConfigAgentsBothRegister() {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .agent(AgentConfig.forCatalog("config-agent-id", "FromConfig", "config role", null))
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .agent(AgentConfig.forCatalog("fluent-agent-id", "FromFluent", "fluent role", null))
+                .build()) {
+
+            assertTrue(agentican.agents().isRegisteredByName("FromConfig"));
+            assertTrue(agentican.agents().isRegisteredByName("FromFluent"));
+        }
+    }
+
+    @Test
+    void agentMissingExternalIdFailsAtBoot() {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        var builder = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .agent(AgentConfig.of("Nameless", "role", null));
+
+        assertThrows(IllegalStateException.class, builder::build);
     }
 }

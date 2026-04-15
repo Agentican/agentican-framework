@@ -21,12 +21,18 @@ public class StepLog {
     private volatile TaskStatus status;
     private volatile HitlCheckpoint checkpoint;
     private volatile Instant completedAt;
+    private volatile TokenUsage aggregateTokenUsage;
 
     public StepLog(String id, String stepName) {
 
+        this(id, stepName, Instant.now());
+    }
+
+    public StepLog(String id, String stepName, Instant createdAt) {
+
         this.id = id;
         this.stepName = stepName;
-        this.createdAt = Instant.now();
+        this.createdAt = createdAt != null ? createdAt : Instant.now();
     }
 
     public String id() { return id; }
@@ -39,6 +45,7 @@ public class StepLog {
     public HitlCheckpoint checkpoint() { return checkpoint; }
 
     public TokenUsage tokenUsage() {
+        if (aggregateTokenUsage != null) return aggregateTokenUsage;
         return TokenUsage.sum(runs.stream().map(RunLog::tokenUsage));
     }
 
@@ -60,4 +67,6 @@ public class StepLog {
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
 
     public void addRun(RunLog run) { runs.add(run); }
+
+    public void setAggregateTokenUsage(TokenUsage usage) { this.aggregateTokenUsage = usage; }
 }

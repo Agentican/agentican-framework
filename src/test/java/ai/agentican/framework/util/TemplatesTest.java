@@ -1,7 +1,6 @@
 package ai.agentican.framework.util;
 
 import ai.agentican.framework.config.SkillConfig;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -24,7 +23,7 @@ class TemplatesTest {
     @Test
     void renderSystemPromptWithSkills() {
 
-        var skills = List.of(new SkillConfig("summarize", "Summarize long text"));
+        var skills = List.of(SkillConfig.of("summarize", "Summarize long text"));
 
         var result = templates.renderSystemPrompt("TestBot", "A helper", skills);
 
@@ -33,48 +32,59 @@ class TemplatesTest {
     }
 
     @Test
-    void renderUserMessage() {
+    void renderTaskBlock() {
 
-        var result = templates.renderUserMessage("Write a poem about cats", 0, List.of(), List.of());
+        var result = templates.renderTaskBlock("Write a poem about cats");
 
-        assertTrue(result.contains("Write a poem about cats"), "Expected task in: " + result);
-        assertTrue(result.contains("Use your available tools"), "Expected iteration 0 text in: " + result);
+        assertTrue(result.contains("<task>"), "Expected task tag in: " + result);
+        assertTrue(result.contains("Write a poem about cats"), "Expected task content in: " + result);
     }
 
     @Test
-    void renderUserMessageSecondIteration() {
+    void renderUserMessageWithProgress() {
 
-        var result = templates.renderUserMessage("Do something", 1, List.of(), List.of());
+        var progress = List.of(
+                new ai.agentican.framework.agent.ProgressEntry("web_search", "{\"q\":\"foo\"}", "{\"results\":[]}"));
 
-        assertTrue(result.contains("Review the tool results"), "Expected iteration > 0 text in: " + result);
+        var result = templates.renderUserMessage(1, List.of(), List.of(), progress, List.of(), List.of());
+
+        assertTrue(result.contains("<progress>"), "Expected progress block in: " + result);
+        assertTrue(result.contains("web_search"), "Expected tool name in progress: " + result);
     }
 
     @Test
-    void renderPlannerPromptWithNoAgentsOrToolkits() {
+    void renderUserMessageOmitsTask() {
 
-        var result = templates.renderPlannerPrompt(List.of(), List.of());
+        var result = templates.renderUserMessage(0, List.of(), List.of(), List.of(), List.of(), List.of());
+
+        assertFalse(result.contains("<task>"), "Task block must not be rendered in user message: " + result);
+    }
+
+    @Test
+    void renderPlannerPromptWithNoAgentsOrTools() {
+
+        var result = templates.renderPlannerPrompt(List.of(), List.of(), List.of(), List.of());
 
         assertTrue(result.contains("No agents configured"), "Expected no-agents indicator in: " + result);
-        assertTrue(result.contains("No toolkits connected"), "Expected no-toolkits indicator in: " + result);
+        assertTrue(result.contains("No tools connected"), "Expected no-tools indicator in: " + result);
     }
 
     @Test
     void renderPlannerPromptContainsPlanningProcess() {
 
-        var result = templates.renderPlannerPrompt(List.of(), List.of());
+        var result = templates.renderPlannerPrompt(List.of(), List.of(), List.of(), List.of());
 
         assertTrue(result.contains("planning-process"), "Expected planning-process section in: " + result);
     }
 
     @Test
-    void renderRefineAgentStepMessage() {
+    void renderRefinePlanMessage() {
 
-        var step = new PlanStepAgent("my-step", "my-agent", "Do the thing", List.of(), false, List.of(), List.of());
+        var planJson = "{\"steps\":[{\"name\":\"my-step\"}]}";
 
-        var result = templates.renderRefineAgentStepMessage(step, "Expert analyst", List.of());
+        var result = templates.renderRefinePlanMessage(planJson, List.of(), List.of(), List.of());
 
-        assertTrue(result.contains("my-step"), "Expected step name in: " + result);
-        assertTrue(result.contains("Expert analyst"), "Expected agent role in: " + result);
-        assertTrue(result.contains("Do the thing"), "Expected instructions in: " + result);
+        assertTrue(result.contains("my-step"), "Expected plan JSON to be rendered in: " + result);
+        assertTrue(result.contains("initial-plan"), "Expected <initial-plan> tag in: " + result);
     }
 }

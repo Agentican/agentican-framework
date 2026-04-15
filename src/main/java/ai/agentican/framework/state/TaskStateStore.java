@@ -4,6 +4,7 @@ import ai.agentican.framework.hitl.HitlCheckpoint;
 import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.llm.LlmRequest;
 import ai.agentican.framework.llm.LlmResponse;
+import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.llm.ToolCall;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
@@ -16,11 +17,16 @@ public interface TaskStateStore {
 
     void taskStarted(String taskId, String taskName, Plan plan, Map<String, String> params);
 
+    void taskStarted(String taskId, String taskName, Plan plan, Map<String, String> params,
+                     String parentTaskId, String parentStepId, int iterationIndex);
+
     void taskCompleted(String taskId, TaskStatus status);
 
     void stepStarted(String taskId, String stepId, String stepName);
 
     void stepCompleted(String taskId, String stepId, TaskStatus status, String output);
+
+    void stepTokenUsageAggregated(String taskId, String stepId, TokenUsage usage);
 
     void runStarted(String taskId, String stepId, String runId, String agentName);
 

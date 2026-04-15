@@ -5,16 +5,6 @@ import ai.agentican.framework.llm.TokenUsage;
 
 import java.util.List;
 
-/**
- * Result of executing a single task step. When a step fails with an exception,
- * {@code cause} carries the original throwable for observability.
- *
- * @param stepName      the step that was executed
- * @param status        terminal status
- * @param output        step output text
- * @param agentResults  per-agent-run results
- * @param cause         the original exception on failure, or {@code null} on success
- */
 public record TaskStepResult(
         String stepName,
         TaskStatus status,

@@ -8,8 +8,8 @@ import java.util.Map;
 
 public record ComposioTool(
         String name,
-        String displayName,   // short name from Composio API (e.g., "Create issue")
-        String description,   // long description for LLM context
+        String displayName,
+        String description,
         Map<String, Object> properties,
         List<String> required,
         HitlType hitlType,

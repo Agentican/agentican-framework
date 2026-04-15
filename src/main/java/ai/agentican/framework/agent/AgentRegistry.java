@@ -1,37 +1,26 @@
 package ai.agentican.framework.agent;
 
+import ai.agentican.framework.config.AgentConfig;
+
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
 
-public class AgentRegistry {
+public interface AgentRegistry {
 
-    private final ConcurrentMap<String, Agent> agents = new ConcurrentHashMap<>();
+    void register(Agent agent);
 
-    public void register(Agent agent) {
+    boolean isRegistered(String id);
 
-        agents.put(agent.name(), agent);
-    }
+    boolean isRegisteredByName(String name);
 
-    public boolean isRegistered(String name) {
+    Agent get(String id);
 
-        return agents.containsKey(name);
-    }
+    Agent getByName(String name);
 
-    public Agent get(String name) {
+    Collection<Agent> getAll();
 
-        return agents.get(name);
-    }
+    Map<String, Agent> asMap();
 
-    public Collection<Agent> getAll() {
-
-        return Collections.unmodifiableCollection(agents.values());
-    }
-
-    public Map<String, Agent> asMap() {
-
-        return Collections.unmodifiableMap(agents);
-    }
+    default void seed(Function<AgentConfig, Agent> factory) { }
 }

@@ -6,6 +6,7 @@ import java.util.List;
 
 public record LlmRequest(
         String systemPrompt,
+        String userTask,
         String userMessage,
         List<ToolDefinition> tools,
         int iteration,
@@ -18,15 +19,15 @@ public record LlmRequest(
         if (systemPrompt == null || systemPrompt.isBlank())
             throw new IllegalArgumentException("System prompt is required");
 
-        if (userMessage == null || userMessage.isBlank())
-            throw new IllegalArgumentException("User message is required");
+        var hasUserContent = (userMessage != null && !userMessage.isBlank())
+                || (userTask != null && !userTask.isBlank());
+
+        if (!hasUserContent)
+            throw new IllegalArgumentException("User task or user message is required");
+
+        if (userMessage == null) userMessage = "";
 
         if (tools == null)
             tools = List.of();
-    }
-
-    public LlmRequest(String systemPrompt, String userMessage, List<ToolDefinition> tools, int iteration) {
-
-        this(systemPrompt, userMessage, tools, iteration, null, null, null);
     }
 }

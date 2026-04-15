@@ -2,7 +2,7 @@ package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.MockLlmClient;
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.AgentRegistry;
+import ai.agentican.framework.agent.InMemoryAgentRegistry;
 import ai.agentican.framework.agent.SmacAgentRunner;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
@@ -11,8 +11,6 @@ import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
 import ai.agentican.framework.tools.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static ai.agentican.framework.MockLlmClient.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,7 +30,7 @@ class TaskRunnerLoopTest {
                 .maxIterations(5)
                 .build();
 
-        return new Agent(name, "Test agent for " + name, List.of(), runner);
+        return Agent.of(name, "Test agent for " + name, runner);
     }
 
     @Test
@@ -45,7 +43,7 @@ class TaskRunnerLoopTest {
                 .onSend("Alice", endTurn("Processed Alice"))
                 .onSend("Bob", endTurn("Processed Bob"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
@@ -75,7 +73,7 @@ class TaskRunnerLoopTest {
         var producerLlm = new MockLlmClient()
                 .onSend("", endTurn("[]"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", new MockLlmClient()));
 
@@ -106,7 +104,7 @@ class TaskRunnerLoopTest {
         var bodyLlm = new MockLlmClient()
                 .onSend("Process item 123", endTurn("Done with 123"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
@@ -136,7 +134,7 @@ class TaskRunnerLoopTest {
                 .onSend("item 1", endTurn("Result for item 1"))
                 .onSend("item 2", endTurn("Result for item 2"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
@@ -162,11 +160,10 @@ class TaskRunnerLoopTest {
     @Test
     void loopMissingUpstreamOutput() {
 
-        // Producer returns some output, but the loop references a nonexistent step
         var producerLlm = new MockLlmClient()
                 .onSend("", endTurn("some output"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", new MockLlmClient()));
 

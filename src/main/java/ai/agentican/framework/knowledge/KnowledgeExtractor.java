@@ -4,5 +4,5 @@ import java.util.List;
 
 public interface KnowledgeExtractor {
 
-    List<KnowledgeFact> extractFacts(String text);
+    KnowledgeExtraction extract(String input, String output, List<KnowledgeEntrySummary> existingEntries);
 }

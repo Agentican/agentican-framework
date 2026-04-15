@@ -1,0 +1,12 @@
+* text=auto
+
+*.sh text eol=lf
+*.yml text eol=lf
+*.xml text eol=lf
+*.java text eol=lf
+*.md text eol=lf
+
+*.jar binary
+*.class binary
+*.png binary
+*.jpg binary

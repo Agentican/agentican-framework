@@ -78,7 +78,6 @@ class PatchedStreamableHttpTransport implements McpClientTransport {
 
                 int status = response.statusCode();
 
-                // THE FIX: 202 Accepted = notification acknowledged, no body — complete immediately
                 if (status == 202) {
                     LOG.debug("MCP 202 Accepted — completing immediately");
                     return Mono.<Void>empty();

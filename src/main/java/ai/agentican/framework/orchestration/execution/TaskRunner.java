@@ -32,16 +32,15 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
-
 public class TaskRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(TaskRunner.class);
 
-    private static final InheritableThreadLocal<ScratchpadToolkit> TASK_SCRATCHPAD = new InheritableThreadLocal<>();
+    private static final InheritableThreadLocal<ScratchpadToolkit> SHARED_SCRATCHPAD = new InheritableThreadLocal<>();
     private static final InheritableThreadLocal<TaskDecorator> STEP_DECORATOR = new InheritableThreadLocal<>();
 
-    public static ScratchpadToolkit taskScratchpad() {
-        return TASK_SCRATCHPAD.get();
+    public static ScratchpadToolkit sharedScratchpad() {
+        return SHARED_SCRATCHPAD.get();
     }
 
     private final int maxStepRetries;
@@ -83,14 +82,14 @@ public class TaskRunner {
         this.taskDecorator = taskDecorator;
         this.stepAgentRunner = new StepAgentRunner(agentRegistry, toolkitRegistry);
 
-        // Sub-plan runners for loops/branches. Wrap with the task decorator so
-        // OTel context propagates from the parent step's thread to the sub-task's threads.
         this.stepLoopRunner = new StepLoopRunner(
-                (subPlan, subParams, subCancelled, subOutputs) ->
-                        wrapSubTask(() -> run(subPlan, newTaskId(), subParams, subCancelled, subOutputs)));
+                (subPlan, subParams, subCancelled, subOutputs, parentTaskId, parentStepId, iterationIndex) ->
+                        wrapSubTask(() -> run(subPlan, newTaskId(), parentTaskId, parentStepId, iterationIndex,
+                                subParams, subCancelled, subOutputs)));
         this.stepBranchRunner = new StepBranchRunner(
-                (subPlan, subParams, subCancelled, subOutputs) ->
-                        wrapSubTask(() -> run(subPlan, newTaskId(), subParams, subCancelled, subOutputs)));
+                (subPlan, subParams, subCancelled, subOutputs, parentTaskId, parentStepId, iterationIndex) ->
+                        wrapSubTask(() -> run(subPlan, newTaskId(), parentTaskId, parentStepId, iterationIndex,
+                                subParams, subCancelled, subOutputs)));
     }
 
     private TaskResult wrapSubTask(java.util.function.Supplier<TaskResult> subTask) {
@@ -123,28 +122,26 @@ public class TaskRunner {
 
         var taskParams = setTaskParameters(plan, taskInputs);
 
-        return run(plan, taskId, taskParams, taskCancelled, Map.of());
+        return run(plan, taskId, null, null, 0, taskParams, taskCancelled, Map.of());
     }
 
-    private TaskResult run(Plan plan, String taskId, Map<String, String> taskParams, AtomicBoolean taskCancelled,
+    private TaskResult run(Plan plan, String taskId, String parentTaskId, String parentStepId, int iterationIndex,
+                           Map<String, String> taskParams, AtomicBoolean taskCancelled,
                            Map<String, String> parentStepOutputs) {
 
         var taskName = plan.name();
 
         LOG.info(Logs.RUNNER_TASK_RUNNING, taskName);
 
-        taskStateStore.taskStarted(taskId, taskName, plan, taskParams);
+        taskStateStore.taskStarted(taskId, taskName, plan, taskParams,
+                parentTaskId, parentStepId, iterationIndex);
 
-        // Capture context snapshot for step dispatches. Called here (inside the task span
-        // scope from TracedTaskDecorator) so all steps inherit the same trace context.
-        // Stored in InheritableThreadLocal so sub-tasks (loops/branches) also inherit it.
         if (taskDecorator != null)
             STEP_DECORATOR.set(taskDecorator.snapshot());
 
-        // Create shared scratchpad for the task. Sub-tasks inherit via InheritableThreadLocal.
-        var isTopLevel = TASK_SCRATCHPAD.get() == null;
+        var isTopLevel = SHARED_SCRATCHPAD.get() == null;
         if (isTopLevel) {
-            TASK_SCRATCHPAD.set(new ScratchpadToolkit());
+            SHARED_SCRATCHPAD.set(new ScratchpadToolkit(ScratchpadToolkit.Scope.SHARED));
         }
 
         try {
@@ -160,7 +157,6 @@ public class TaskRunner {
         var taskStepIds = new ConcurrentHashMap<String, String>();
         var stepNameToStepId = new ConcurrentHashMap<String, String>();
 
-        // Pre-decrement counters for any parent step outputs already present (sub-task case)
         for (var parentStep : parentStepOutputs.keySet()) {
             for (var dep : depGraph.dependents.getOrDefault(parentStep, Set.of())) {
                 depGraph.remainingDeps.merge(dep, -1, Integer::sum);
@@ -181,7 +177,6 @@ public class TaskRunner {
 
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
 
-            // Dispatch all steps with zero remaining dependencies
             for (var step : plan.steps()) {
 
                 if (depGraph.remainingDeps.getOrDefault(step.name(), 0) <= 0) {
@@ -207,14 +202,12 @@ public class TaskRunner {
 
             while (taskStepsRunning > 0 || taskStepsSuspended > 0) {
 
-                // Check task timeout
                 if (taskTimeout != null && java.time.Instant.now().isAfter(taskStart.plus(taskTimeout))) {
 
                     LOG.error("Task timed out after {}", taskTimeout);
                     return completeTask.apply(TaskStatus.FAILED);
                 }
 
-                // If nothing running but stepConfigs suspended — handle HITL
                 if (taskStepsRunning == 0) {
 
                     var hitlResult = awaitAndHandleHitl(plan, depGraph, suspendedResults, taskStepOutputs, taskParams, taskCancelled, taskId, stepNameToStepId);
@@ -243,7 +236,6 @@ public class TaskRunner {
                     continue;
                 }
 
-                // Poll for finished stepConfigs
                 TaskStepResult taskStepResult;
 
                 try {
@@ -266,7 +258,6 @@ public class TaskRunner {
 
                 taskStepsRunning--;
 
-                // Handle suspended step — track it, don't dispatch dependents
                 if (taskStepResult.status() == TaskStatus.SUSPENDED) {
 
                     logStep(taskStepIds, taskStepResult.stepName(),
@@ -280,10 +271,8 @@ public class TaskRunner {
                     continue;
                 }
 
-                // Record completion
                 recordStepCompletion(taskStepResult, taskStepResults, taskId, stepNameToStepId);
 
-                // Handle failure — drain remaining stepConfigs and return
                 if (taskStepResult.status() != TaskStatus.COMPLETED) {
 
                     LOG.error(Logs.RUNNER_STEP_FAILED);
@@ -291,7 +280,6 @@ public class TaskRunner {
                     return completeTask.apply(TaskStatus.FAILED);
                 }
 
-                // Step completed — store output and dispatch dependents
                 taskStepOutputs.put(taskStepResult.stepName(),
                         taskStepResult.output() != null ? taskStepResult.output() : "");
 
@@ -300,7 +288,6 @@ public class TaskRunner {
             }
         }
 
-        // Check if all stepConfigs have been started
         if (dispatchedTaskSteps.size() < plan.steps().size()) {
 
             var missing = plan.steps().stream()
@@ -317,7 +304,7 @@ public class TaskRunner {
 
         } finally {
             if (isTopLevel) {
-                TASK_SCRATCHPAD.remove();
+                SHARED_SCRATCHPAD.remove();
                 STEP_DECORATOR.remove();
             }
         }
@@ -330,6 +317,7 @@ public class TaskRunner {
 
         var stepId = stepNameToStepId.get(result.stepName());
         taskStateStore.stepCompleted(taskId, stepId, result.status(), result.output());
+        taskStateStore.stepTokenUsageAggregated(taskId, stepId, result.tokenUsage());
 
         LOG.info(Logs.RUNNER_STEP_FINISHED, result.stepName(), result.status());
     }
@@ -359,7 +347,7 @@ public class TaskRunner {
                         LOG.info("Step '{}': conditions not met, skipping", dependent);
                         dispatchedTaskSteps.add(dependent);
                         taskStepOutputs.put(dependent, "");
-                        // Recursively dispatch dependents of the skipped step
+
                         dispatched += dispatchDependentsOf(dependent, depGraph,
                                 dispatchedTaskSteps, taskStepOutputs, taskParams, finishedTaskSteps,
                                 pool, taskCancelled, taskStepIds, taskId, stepNameToStepId);
@@ -399,7 +387,6 @@ public class TaskRunner {
 
                 var taskStepResult = runTaskStep(taskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
 
-                // If step requires approval and completed, mark as SUSPENDED for main loop
                 if (hitlManager != null && taskStep.hitl()
                         && taskStepResult.status() == TaskStatus.COMPLETED) {
 
@@ -435,8 +422,6 @@ public class TaskRunner {
 
         MDC.remove("stepId");
 
-        // Wrap with the captured context snapshot so OTel trace context propagates
-        // from the task thread to the step's virtual thread.
         var stepDec = STEP_DECORATOR.get();
 
         pool.submit(stepDec != null ? stepDec.decorate(taskStepRunner) : taskStepRunner);
@@ -449,12 +434,10 @@ public class TaskRunner {
         return switch (taskStep) {
 
             case PlanStepAgent agentTaskStep -> stepAgentRunner.run(agentTaskStep, parentStepOutputs, taskParams, taskId, stepId);
-            case PlanStepLoop loopTaskStep -> stepLoopRunner.run(loopTaskStep, parentStepOutputs, taskParams, taskCancelled);
-            case PlanStepBranch branchTaskStep -> stepBranchRunner.run(branchTaskStep, parentStepOutputs, taskParams, taskCancelled);
+            case PlanStepLoop loopTaskStep -> stepLoopRunner.run(loopTaskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
+            case PlanStepBranch branchTaskStep -> stepBranchRunner.run(branchTaskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
         };
     }
-
-    // --- HITL ---
 
     private TaskStepResult awaitAndHandleHitl(Plan plan, DependencyGraph depGraph,
                                               Map<String, TaskStepResult> suspendedResults,
@@ -503,7 +486,6 @@ public class TaskRunner {
 
         var checkpointType = checkpoint.type();
 
-        // Step approval
         if (checkpointType == HitlCheckpointType.STEP_OUTPUT) {
 
             if (response.approved()) {
@@ -518,7 +500,6 @@ public class TaskRunner {
 
             var attempts = suspendedResult.agentResults().size();
 
-            // Per-step maxRetries overrides global if set
             var effectiveMaxRetries = (taskStep instanceof PlanStepAgent agent && agent.maxRetries() > 0)
                     ? agent.maxRetries() : maxStepRetries;
 
@@ -538,10 +519,10 @@ public class TaskRunner {
             return retryTaskStep(taskStep, parentStepOutputs, taskParams, taskCancelled, feedback, taskId, stepId);
         }
 
-        // Tool approval or ask_user — resume the agent
         if (taskStep instanceof PlanStepAgent agentStep) {
 
-            var agent = agentRegistry.get(agentStep.agentName());
+            var agent = agentRegistry.get(agentStep.agentId());
+            if (agent == null) agent = agentRegistry.getByName(agentStep.agentId());
 
             if (agent != null) {
 
@@ -554,7 +535,7 @@ public class TaskRunner {
                 if (savedRun != null) {
 
                     var hitlToolResults = buildHitlToolResults(checkpoint, response);
-                    var scopedToolkits = toolkitRegistry.scopeForStep(agentStep.toolkits());
+                    var scopedToolkits = toolkitRegistry.scopeForStep(agentStep.tools());
 
                     var resolvedTask = Placeholders.resolveStepOutputs(
                             Placeholders.resolveParams(agentStep.instructions(), taskParams), parentStepOutputs);
@@ -590,8 +571,8 @@ public class TaskRunner {
         var modifiedTaskStep = switch (taskStep) {
 
             case PlanStepAgent s -> new PlanStepAgent(
-                    s.name(), s.agentName(), s.instructions() + feedbackSuffix,
-                    s.dependencies(), s.hitl(), s.skills(), s.toolkits());
+                    s.name(), s.agentId(), s.instructions() + feedbackSuffix,
+                    s.dependencies(), s.hitl(), s.skills(), s.tools());
             case PlanStepLoop s -> s;
             case PlanStepBranch s -> s;
         };
@@ -633,19 +614,11 @@ public class TaskRunner {
         }
     }
 
-    /**
-     * Immutable dependency data computed once per Plan and cached. Contains the forward
-     * and reverse dependency graphs plus the name→step lookup.
-     */
     private record ImmutableDeps(
             Map<String, Set<String>> forwardDeps,
             Map<String, Set<String>> dependents,
             Map<String, PlanStep> stepsByName) {}
 
-    /**
-     * Per-run dependency state. Contains a reference to the immutable deps plus mutable
-     * countdown counters that get decremented as steps complete.
-     */
     private record DependencyGraph(
             Map<String, Set<String>> forwardDeps,
             Map<String, Set<String>> dependents,
@@ -656,7 +629,6 @@ public class TaskRunner {
 
         var immutable = depsCache.computeIfAbsent(plan, TaskRunner::computeImmutableDeps);
 
-        // Fresh counters for this run
         var remainingDeps = new HashMap<String, Integer>();
         immutable.forwardDeps.forEach((name, deps) -> remainingDeps.put(name, deps.size()));
 
@@ -698,7 +670,6 @@ public class TaskRunner {
             }
         }
 
-        // Make dependents immutable
         var immutableDependents = new HashMap<String, Set<String>>();
         dependents.forEach((k, v) -> immutableDependents.put(k, Set.copyOf(v)));
 
@@ -707,8 +678,6 @@ public class TaskRunner {
                 Map.copyOf(immutableDependents),
                 Map.copyOf(stepsByName));
     }
-
-    // --- Condition evaluation ---
 
     private boolean evaluateConditions(PlanStep step, Map<String, String> stepOutputs, Map<String, String> taskParams) {
 
@@ -755,8 +724,6 @@ public class TaskRunner {
         };
     }
 
-    // --- Cycle validation ---
-
     private void validateNoCycles(Map<String, Set<String>> graph, List<PlanStep> steps) {
 
         var visited = new HashSet<String>();
@@ -789,8 +756,6 @@ public class TaskRunner {
         inStack.remove(node);
         return false;
     }
-
-    // --- Helpers ---
 
     private void drainRemainingSteps(LinkedBlockingQueue<TaskStepResult> finishedTaskSteps,
                                      List<TaskStepResult> taskStepResults, int remaining) {

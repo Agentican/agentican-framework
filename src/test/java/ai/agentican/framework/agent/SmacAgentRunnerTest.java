@@ -44,7 +44,7 @@ class SmacAgentRunnerTest {
 
     private Agent agent(SmacAgentRunner runner) {
 
-        return new Agent("test-agent", "Test role", List.of(), runner);
+        return Agent.of("test-agent", "Test role", runner);
     }
 
     private Map<String, Toolkit> toolkitMap(MockToolkit toolkit) {
@@ -82,7 +82,7 @@ class SmacAgentRunnerTest {
 
         var mockLlm = new MockLlmClient()
                 .onSend("", toolUse("thinking", "MY_TOOL", Map.of("q", "test")))
-                .onSend("tool-result-MY_TOOL", endTurn("Done"));
+                .onSend("<name>MY_TOOL</name>", endTurn("Done"));
 
         var toolkit = new MockToolkit(List.of(
                 new ToolDefinition("MY_TOOL", "A test tool", Map.of())))
@@ -157,7 +157,6 @@ class SmacAgentRunnerTest {
     @Test
     void executesNonHitlToolsBeforeSuspending() {
 
-        // Create a response with two tool calls: one normal, one HITL
         var response = new LlmResponse("processing", List.of(
                 new ToolCall("call-normal", "NORMAL_TOOL", Map.of()),
                 new ToolCall("call-hitl", "HITL_TOOL", Map.of())),
@@ -192,7 +191,7 @@ class SmacAgentRunnerTest {
 
         var mockLlm = new MockLlmClient()
                 .onSend("", toolUse("calling", "HITL_TOOL", Map.of()))
-                .onSend("tool-result-HITL_TOOL", endTurn("Resumed successfully"));
+                .onSend("<name>HITL_TOOL</name>", endTurn("Resumed successfully"));
 
         var toolkit = new MockToolkit(List.of(
                 new ToolDefinition("HITL_TOOL", "Requires approval", Map.of())))
@@ -362,7 +361,7 @@ class SmacAgentRunnerTest {
                 .onSend("Customer Pricing Data",
                         toolUse("recalling", KnowledgeToolkit.TOOL_NAME,
                                 Map.of("entry_ids", List.of("k1"))))
-                .onSend("tool-result-" + KnowledgeToolkit.TOOL_NAME, endTurn("got the facts"));
+                .onSend("<name>" + KnowledgeToolkit.TOOL_NAME + "</name>", endTurn("got the facts"));
 
         var runner = SmacAgentRunner.builder()
                 .llmClient(mockLlm.toLlmClient())

@@ -2,7 +2,7 @@ package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.MockLlmClient;
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.AgentRegistry;
+import ai.agentican.framework.agent.InMemoryAgentRegistry;
 import ai.agentican.framework.agent.SmacAgentRunner;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
@@ -42,7 +42,7 @@ class TaskRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        return new Agent(name, "Test agent for " + name, List.of(), runner);
+        return Agent.of(name, "Test agent for " + name, runner);
     }
 
     @Test
@@ -51,7 +51,7 @@ class TaskRunnerTest {
         var mockLlm = new MockLlmClient()
                 .onSend("", endTurn("output text"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("agent-a", mockLlm));
 
         var taskStateStore = new MemTaskStateStore();
@@ -78,7 +78,7 @@ class TaskRunnerTest {
         var mockLlmB = new MockLlmClient()
                 .onSend("step-a-output", endTurn("step-b-done"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
@@ -107,7 +107,7 @@ class TaskRunnerTest {
         var mockLlmB = new MockLlmClient()
                 .onSend("", endTurn("parallel-b-output"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
@@ -129,12 +129,9 @@ class TaskRunnerTest {
     @Test
     void stepFailureStopsTask() {
 
-        // Agent that returns a tool use but there's no matching tool, leading to an error,
-        // but more straightforwardly: an agent for which no agent is registered
         var mockLlm = new MockLlmClient();
 
-        var registry = new AgentRegistry();
-        // Don't register "missing-agent" — StepAgentRunner will return FAILED
+        var registry = new InMemoryAgentRegistry();
 
         var taskStateStore = new MemTaskStateStore();
 
@@ -152,18 +149,15 @@ class TaskRunnerTest {
     @Test
     void taskCancellation() {
 
-        // Step-a completes quickly. We set cancelled before step-b can run.
-        // The cancelled flag is checked in the poll loop after step-a finishes.
         var cancelled = new AtomicBoolean(false);
 
         var mockLlmA = new MockLlmClient()
                 .onSend("", endTurn("step-a-done"));
 
-        // Step-b would need this if it ran, but it shouldn't
         var mockLlmB = new MockLlmClient()
                 .onSend("", endTurn("step-b-done"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
@@ -177,7 +171,6 @@ class TaskRunnerTest {
                         List.of("step-a"), false, null, null))
                 .build();
 
-        // Cancel after a brief delay so step-a completes but step-b doesn't start
         Thread.startVirtualThread(() -> {
             try { Thread.sleep(50); } catch (InterruptedException _) {}
             cancelled.set(true);
@@ -185,8 +178,6 @@ class TaskRunnerTest {
 
         var result = runner.run(task, cancelled);
 
-        // Step-a may or may not complete before cancellation is detected.
-        // The key assertion: the task did not fully complete with all stepConfigs.
         assertTrue(result.status() == TaskStatus.CANCELLED
                         || (result.status() == TaskStatus.COMPLETED && result.stepResults().size() <= 2),
                 "Expected CANCELLED or partial COMPLETED but got " + result.status());
@@ -198,7 +189,7 @@ class TaskRunnerTest {
         var mockLlm = new MockLlmClient()
                 .onSend("", endTurn("draft output"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("agent-a", mockLlm));
 
         var taskStateStore = new MemTaskStateStore();
@@ -218,14 +209,12 @@ class TaskRunnerTest {
     @Test
     void stepHitlRejectionRetry() {
 
-        // First attempt output, second attempt output
         var mockLlmFirst = new MockLlmClient()
                 .onSend("", endTurn("first draft"));
 
         var mockLlmRetry = new MockLlmClient()
                 .onSend("Reviewer Feedback", endTurn("revised draft"));
 
-        // Stateful notifier: reject first call, approve second
         var callCount = new AtomicInteger(0);
 
         var hitlManager = new HitlManager((mgr, cp) -> {
@@ -236,12 +225,11 @@ class TaskRunnerTest {
                 mgr.respond(cp.id(), HitlResponse.approve());
         });
 
-        // We need a single agent that handles both calls. Use a combined mock that matches on different patterns.
         var mockLlm = new MockLlmClient()
                 .onSend("Write a draft", endTurn("first draft"))
                 .onSend("Reviewer Feedback", endTurn("revised draft"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("agent-a", mockLlm, hitlManager));
 
         var taskStateStore = new MemTaskStateStore();
@@ -261,19 +249,9 @@ class TaskRunnerTest {
     @Test
     void stepHitlMaxRetries() {
 
-        // Always reject. The retry path doesn't re-apply the hitl gate, so
-        // the rejection count accumulates across the original dispatched step's
-        // agentResults. We need 3 rejections to trigger MAX_STEP_RETRIES.
-        // Each rejection causes a retry, which the task runner wraps with a new
-        // STEP_OUTPUT checkpoint (since hitl=true applies via dispatchTaskStep).
-        // But retryTaskStep calls runTaskStep directly, bypassing dispatchTaskStep's
-        // hitl wrapping. So only 1 rejection+retry happens per dispatch.
-        //
-        // Since the retry result is COMPLETED (not SUSPENDED), the task completes.
-        // This test verifies that after rejection the retry does complete the task.
         var callCount = new AtomicInteger(0);
         var hitlManager = new HitlManager((mgr, cp) -> {
-            // Reject first time, approve second (the retry)
+
             if (callCount.getAndIncrement() == 0)
                 mgr.respond(cp.id(), HitlResponse.reject("needs work"));
             else
@@ -284,7 +262,7 @@ class TaskRunnerTest {
                 .onSend("", endTurn("attempt 1"))
                 .onSend("Reviewer Feedback", endTurn("attempt 2"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("agent-a", mockLlm, hitlManager));
 
         var taskStateStore = new MemTaskStateStore();
@@ -297,7 +275,6 @@ class TaskRunnerTest {
 
         var result = runner.run(task);
 
-        // The retry completes without going through hitl gate again
         assertEquals(TaskStatus.COMPLETED, result.status());
         assertEquals("attempt 2", result.stepResults().getFirst().output());
     }
@@ -307,7 +284,7 @@ class TaskRunnerTest {
 
         var mockLlm = new MockLlmClient();
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("agent-a", mockLlm));
 
         var taskStateStore = new MemTaskStateStore();
@@ -330,7 +307,7 @@ class TaskRunnerTest {
         var mockLlmB = new MockLlmClient()
                 .onSend("step-a-done", endTurn("step-b-done"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
@@ -348,7 +325,6 @@ class TaskRunnerTest {
 
         assertEquals(TaskStatus.COMPLETED, result.status());
 
-        // Verify task log was saved
         var logs = taskStateStore.list();
         assertEquals(1, logs.size());
 
@@ -376,9 +352,9 @@ class TaskRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var agent = new Agent("agent-a", "Slow agent", List.of(), runner);
+        var agent = Agent.of("agent-a", "Slow agent", runner);
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(agent);
 
         var taskStateStore = new MemTaskStateStore();
@@ -391,10 +367,6 @@ class TaskRunnerTest {
 
         var result = taskRunner.run(task);
 
-        // The agent takes 200ms but the task timeout is 50ms.
-        // However, the timeout is checked in the poll loop after step dispatch,
-        // so the step may complete before the timeout is checked.
-        // Either FAILED (timeout detected) or COMPLETED (step finished first) is valid.
         assertTrue(result.status() == TaskStatus.FAILED || result.status() == TaskStatus.COMPLETED,
                 "Expected FAILED or COMPLETED but got " + result.status());
     }
@@ -405,7 +377,7 @@ class TaskRunnerTest {
         var mockLlm = new MockLlmClient()
                 .onSend("Process 5 items", endTurn("processed"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("agent-a", mockLlm));
 
         var taskStateStore = new MemTaskStateStore();
@@ -427,7 +399,7 @@ class TaskRunnerTest {
 
         var mockLlm = new MockLlmClient();
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("agent-a", mockLlm));
 
         var taskStateStore = new MemTaskStateStore();

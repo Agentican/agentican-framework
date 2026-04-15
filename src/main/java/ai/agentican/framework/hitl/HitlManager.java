@@ -1,6 +1,7 @@
 package ai.agentican.framework.hitl;
 
 import ai.agentican.framework.llm.ToolCall;
+import ai.agentican.framework.util.Ids;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.*;
 
 public class HitlManager {
@@ -39,26 +39,22 @@ public class HitlManager {
 
     public HitlCheckpoint createToolApprovalCheckpoint(ToolCall call, String stepName) {
 
-        var checkpointId = "tool-" + call.toolName() + "-" + UUID.randomUUID();
         var description = "Tool call: " + call.toolName();
         var toolArgs = call.args().toString();
 
-        return createCheckpoint(checkpointId, HitlCheckpointType.TOOL_CALL, stepName, description, toolArgs);
+        return createCheckpoint(Ids.generate(), HitlCheckpointType.TOOL_CALL, stepName, description, toolArgs);
     }
 
     public HitlCheckpoint createStepApprovalCheckpoint(String stepName, String output) {
 
-        var checkpointId = "step-" + stepName + "-" + UUID.randomUUID();
         var description = "Step output: " + stepName;
 
-        return createCheckpoint(checkpointId, HitlCheckpointType.STEP_OUTPUT, stepName, description, output);
+        return createCheckpoint(Ids.generate(), HitlCheckpointType.STEP_OUTPUT, stepName, description, output);
     }
 
     public HitlCheckpoint createQuestionCheckpoint(String question, String context, String stepName) {
 
-        var checkpointId = "question-" + UUID.randomUUID();
-
-        return createCheckpoint(checkpointId, HitlCheckpointType.QUESTION, stepName, question, context);
+        return createCheckpoint(Ids.generate(), HitlCheckpointType.QUESTION, stepName, question, context);
     }
 
     public HitlResponse awaitResponse(String checkpointId) {

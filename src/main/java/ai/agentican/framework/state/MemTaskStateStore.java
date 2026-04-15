@@ -44,6 +44,14 @@ public class MemTaskStateStore implements TaskStateStore {
     }
 
     @Override
+    public void taskStarted(String taskId, String taskName, Plan plan, Map<String, String> params,
+                            String parentTaskId, String parentStepId, int iterationIndex) {
+
+        logs.put(taskId, new TaskLog(taskId, taskName, plan, params,
+                parentTaskId, parentStepId, iterationIndex));
+    }
+
+    @Override
     public void taskCompleted(String taskId, TaskStatus status) {
 
         var log = requireLog(taskId);
@@ -72,6 +80,15 @@ public class MemTaskStateStore implements TaskStateStore {
             stepLog.setOutput(output);
             stepLog.setCompletedAt(java.time.Instant.now());
         }
+    }
+
+    @Override
+    public void stepTokenUsageAggregated(String taskId, String stepId, ai.agentican.framework.llm.TokenUsage usage) {
+
+        var stepLog = requireLog(taskId).findStepById(stepId);
+
+        if (stepLog != null && usage != null)
+            stepLog.setAggregateTokenUsage(usage);
     }
 
     @Override
@@ -126,7 +143,6 @@ public class MemTaskStateStore implements TaskStateStore {
 
     @Override
     public void toolCallStarted(String taskId, String turnId, ToolCall toolCall) {
-
 
     }
 

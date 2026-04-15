@@ -32,6 +32,14 @@ public class NotifyingTaskStateStore implements TaskStateStore {
     }
 
     @Override
+    public void taskStarted(String taskId, String taskName, Plan plan, Map<String, String> params,
+                            String parentTaskId, String parentStepId, int iterationIndex) {
+
+        delegate.taskStarted(taskId, taskName, plan, params, parentTaskId, parentStepId, iterationIndex);
+        listener.onTaskStarted(taskId);
+    }
+
+    @Override
     public void taskCompleted(String taskId, TaskStatus status) {
 
         delegate.taskCompleted(taskId, status);
@@ -50,6 +58,12 @@ public class NotifyingTaskStateStore implements TaskStateStore {
 
         delegate.stepCompleted(taskId, stepId, status, output);
         listener.onStepCompleted(taskId, stepId);
+    }
+
+    @Override
+    public void stepTokenUsageAggregated(String taskId, String stepId, ai.agentican.framework.llm.TokenUsage usage) {
+
+        delegate.stepTokenUsageAggregated(taskId, stepId, usage);
     }
 
     @Override

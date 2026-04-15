@@ -29,25 +29,28 @@ class StepAgentRunner {
     TaskStepResult run(PlanStepAgent taskStep, Map<String, String> parentStepOutputs, Map<String, String> taskParams,
                        String taskId, String stepId) {
 
-        var agent = agentRegistry.get(taskStep.agentName());
+        var agentRef = taskStep.agentId();
+
+        var agent = agentRegistry.get(agentRef);
+
+        if (agent == null) agent = agentRegistry.getByName(agentRef);
 
         if (agent == null) {
 
-            LOG.error("No agent found with name '{}'", taskStep.agentName());
+            LOG.error("No agent found for ref '{}'", agentRef);
 
             return new TaskStepResult(taskStep.name(), TaskStatus.FAILED,
-                    "No agent found with name: " + taskStep.agentName(), List.of());
+                    "No agent found for ref: " + agentRef, List.of());
         }
 
         var rawInstructions = taskStep.instructions();
 
         var instructions = Placeholders.resolveStepOutputs(Placeholders.resolveParams(rawInstructions, taskParams), parentStepOutputs);
 
-        var taskStepToolkits = toolkitRegistry.scopeForStep(taskStep.toolkits());
+        var taskStepToolkits = toolkitRegistry.scopeForStep(taskStep.tools());
 
         LOG.info(Logs.RUNNER_RUN_AGENT_STEP, taskStep.name());
 
-        // Apply per-step timeout if set
         var runner = taskStep.timeout() != null
                 ? agent.runner().withTimeout(taskStep.timeout())
                 : agent.runner();

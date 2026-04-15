@@ -23,7 +23,8 @@ class StepLoopRunner {
     @FunctionalInterface
     interface SubPlanRunner {
 
-        TaskResult run(Plan plan, Map<String, String> params, AtomicBoolean cancelled, Map<String, String> outputs);
+        TaskResult run(Plan plan, Map<String, String> params, AtomicBoolean cancelled, Map<String, String> outputs,
+                       String parentTaskId, String parentStepId, int iterationIndex);
     }
 
     private final SubPlanRunner subPlanRunner;
@@ -34,7 +35,7 @@ class StepLoopRunner {
     }
 
     TaskStepResult run(PlanStepLoop step, Map<String, String> outputs, Map<String, String> params,
-                       AtomicBoolean cancelled) {
+                       AtomicBoolean cancelled, String parentTaskId, String parentStepId) {
 
         var upstreamOutput = outputs.get(step.over());
 
@@ -72,7 +73,8 @@ class StepLoopRunner {
 
             LOG.info(Logs.RUNNER_RUN_LOOP_STEP_ITEM, step.name(), indexed.index() + 1);
 
-            return subPlanRunner.run(subPlan, params, cancelled, outputs);
+            return subPlanRunner.run(subPlan, params, cancelled, outputs,
+                    parentTaskId, parentStepId, indexed.index());
         });
 
         var iterationResults = new LinkedHashMap<Integer, TaskResult>();
@@ -115,16 +117,14 @@ class StepLoopRunner {
         return new TaskStepResult(stepName, status, aggregated.toString(), allAgentResults);
     }
 
-    // --- Item/Loop Body Resolution ---
-
     List<PlanStep> resolveLoopBody(List<PlanStep> body, String item, Map<String, String> params) {
 
         return body.stream().map(step -> (PlanStep) switch (step) {
 
             case PlanStepAgent s -> new PlanStepAgent(
-                    s.name(), s.agentName(),
+                    s.name(), s.agentId(),
                     Placeholders.resolveParams(Placeholders.resolveItem(s.instructions(), item), params),
-                    s.dependencies(), s.hitl(), s.skills(), s.toolkits());
+                    s.dependencies(), s.hitl(), s.skills(), s.tools());
 
             case PlanStepLoop s -> new PlanStepLoop(
                     s.name(), s.over(),

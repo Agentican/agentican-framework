@@ -3,25 +3,24 @@ package ai.agentican.framework.orchestration.planning;
 import ai.agentican.framework.agent.Agent;
 import ai.agentican.framework.agent.AgentRegistry;
 import ai.agentican.framework.config.AgentConfig;
+import ai.agentican.framework.config.PlanConfig;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmRequest;
+import ai.agentican.framework.orchestration.PlanRegistry;
 import ai.agentican.framework.orchestration.model.*;
+import ai.agentican.framework.skill.SkillRegistry;
 import ai.agentican.framework.tools.ToolkitRegistry;
 import ai.agentican.framework.util.Json;
 import ai.agentican.framework.util.Logs;
-import ai.agentican.framework.util.Parallel;
 import ai.agentican.framework.util.Templates;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 public class PlannerAgent {
 
@@ -33,288 +32,238 @@ public class PlannerAgent {
 
     private final AgentRegistry agentRegistry;
     private final ToolkitRegistry toolkitRegistry;
+    private final SkillRegistry skillRegistry;
+    private final PlanRegistry planRegistry;
 
     private final Function<AgentConfig, Agent> agentFactory;
 
     public PlannerAgent(LlmClient llm, AgentRegistry agentRegistry, ToolkitRegistry toolkitRegistry,
+                            SkillRegistry skillRegistry, PlanRegistry planRegistry,
                             Function<AgentConfig, Agent> agentFactory) {
 
         if (llm == null) throw new IllegalArgumentException("LLM client is required");
         if (agentRegistry == null) throw new IllegalArgumentException("AgentRegistry is required");
         if (toolkitRegistry == null) throw new IllegalArgumentException("ToolkitRegistry is required");
+        if (skillRegistry == null) throw new IllegalArgumentException("SkillRegistry is required");
+        if (planRegistry == null) throw new IllegalArgumentException("PlanRegistry is required");
         if (agentFactory == null) throw new IllegalArgumentException("Agent factory is required");
 
         this.llm = llm;
         this.agentRegistry = agentRegistry;
         this.toolkitRegistry = toolkitRegistry;
+        this.skillRegistry = skillRegistry;
+        this.planRegistry = planRegistry;
         this.agentFactory = agentFactory;
     }
 
-    public Plan plan(String taskDescription) {
+    public PlanningResult plan(String taskDescription) {
 
         if (taskDescription == null || taskDescription.isBlank())
             throw new IllegalArgumentException("Task is required");
 
-        var plannerResult = createInitialPlan(taskDescription);
+        var decision = decide(taskDescription);
+
+        if (decision instanceof ReuseExisting reuse) {
+
+            var reused = planRegistry.getById(reuse.planRef());
+
+            if (reused != null) {
+                LOG.info("Planner reused existing plan '{}' ({})", reused.name(), reused.id());
+                return new PlanningResult(reused, reuse.inputs());
+            }
+
+            LOG.warn("Planner referenced plan '{}' which does not exist in the catalog; falling back to create",
+                    reuse.planRef());
+
+            decision = forceCreate(taskDescription);
+        }
+
+        if (!(decision instanceof PlannerOutput output))
+            throw new IllegalStateException("Planner did not return a create decision on fallback");
+
+        var plannerResult = output.toPlannerResult();
+
+        LOG.info(Logs.PLANNER_PLAN_CREATED, plannerResult.plan().steps().size(),
+                plannerResult.agents().size(), plannerResult.skills().size());
+        LOG.debug(Logs.PLANNER_PLAN, Json.pretty(plannerResult));
+
+        plannerResult.skills().forEach(skillRegistry::registerIfAbsent);
 
         plannerResult.agents().stream()
-                .filter(agentConfig -> !agentRegistry.isRegistered(agentConfig.name()))
+                .filter(agentConfig -> !agentRegistry.isRegistered(agentConfig.id()))
                 .map(agentFactory)
                 .forEach(agentRegistry::register);
 
-        var refined = refineAgentSteps(plannerResult.plan());
+        var refined = refinePlan(plannerResult.plan());
 
-        return refineLoopSteps(refined);
+        return new PlanningResult(reconcileReferences(refined), Map.of());
     }
 
-    private PlannerResult createInitialPlan(String taskDescription) {
+    private PlannerDecision decide(String taskDescription) {
 
         LOG.info(Logs.PLANNER_CREATING);
 
-        var systemPrompt = TEMPLATES.renderPlannerPrompt(agentRegistry.asMap().values(), toolkitRegistry.slugs());
+        var systemPrompt = TEMPLATES.renderPlannerPrompt(
+                agentRegistry.asMap().values(),
+                skillRegistry.getAll(),
+                toolkitRegistry.allToolNames(),
+                planRegistry.getAll());
 
-        var llmResponse = llm.send(new LlmRequest(systemPrompt, taskDescription, List.of(), 0));
+        var llmResponse = llm.send(new LlmRequest(systemPrompt, null, taskDescription, List.of(), 0, null, null, null));
 
         LOG.info(Logs.PLANNER_RECD_LLM);
 
-        var plannerOutput = Json.findObject(llmResponse.text(), PlannerOutput.class);
-        var plannerResult = plannerOutput.toPlannerResult();
-
-        LOG.info(Logs.PLANNER_PLAN_CREATED, plannerResult.plan().steps().size(), plannerResult.agents().size());
-        LOG.debug(Logs.PLANNER_PLAN, Json.pretty(plannerResult));
-
-        return plannerResult;
+        return Json.findObject(llmResponse.text(), PlannerDecision.class);
     }
 
-    private Plan refineAgentSteps(Plan plan) {
+    private PlannerOutput forceCreate(String taskDescription) {
 
-        var refinedAgentSteps = Parallel.map(plan.steps(), this::refineStep);
+        var systemPrompt = TEMPLATES.renderPlannerPrompt(
+                agentRegistry.asMap().values(),
+                skillRegistry.getAll(),
+                toolkitRegistry.allToolNames(),
+                List.of());
 
-        return new Plan(plan.id(), plan.name(), plan.description(), plan.params(), refinedAgentSteps);
+        var llmResponse = llm.send(new LlmRequest(systemPrompt, null, taskDescription, List.of(), 0, null, null, null));
+
+        var decision = Json.findObject(llmResponse.text(), PlannerDecision.class);
+
+        if (decision instanceof PlannerOutput output)
+            return output;
+
+        throw new IllegalStateException("Planner returned a non-create decision after fallback retry");
     }
 
-    private PlanStep refineStep(PlanStep step) {
+    private Plan refinePlan(Plan initial) {
+
+        var toolNames = collectToolNames(initial.steps());
+
+        if (toolNames.isEmpty()) {
+            LOG.info("Plan uses no tools; skipping refinement pass");
+            return initial;
+        }
+
+        var toolDefs = toolkitRegistry.toolDefinitions(List.copyOf(toolNames));
+
+        if (toolDefs.isEmpty()) {
+            LOG.warn("Plan references tools but none resolved from the registry; skipping refinement");
+            return initial;
+        }
+
+        LOG.info("Refining plan: {} steps, {} tool schema(s)", initial.steps().size(), toolDefs.size());
+
+        try {
+
+            var planJson = Json.pretty(initial);
+
+            var userMessage = TEMPLATES.renderRefinePlanMessage(
+                    planJson,
+                    agentRegistry.asMap().values(),
+                    skillRegistry.getAll(),
+                    ToolView.fromAll(toolDefs));
+
+            var llmResponse = llm.send(new LlmRequest(TEMPLATES.refinePlanPrompt(), null, userMessage, List.of(), 0, null, null, null));
+
+            var refinement = Json.findObject(llmResponse.text(), RefinedPlan.class);
+
+            if (refinement == null || refinement.stepConfigs == null || refinement.stepConfigs.isEmpty()) {
+                LOG.warn("Refinement returned empty plan; using initial plan");
+                return initial;
+            }
+
+            var params = refinement.paramConfigs != null
+                    ? refinement.paramConfigs.stream().map(pc ->
+                            PlanParam.of(pc.name(), pc.description(), pc.defaultValue(), pc.required())).toList()
+                    : initial.params();
+
+            var steps = refinement.stepConfigs.stream().map(PlanConfig.PlanStepConfig::toPlanStep).toList();
+
+            return new Plan(initial.id(), initial.name(), initial.description(), params, steps);
+        }
+        catch (Exception e) {
+
+            LOG.warn("Plan refinement failed: {}; using initial plan", e.getMessage(), e);
+            return initial;
+        }
+    }
+
+    private Set<String> collectToolNames(List<PlanStep> steps) {
+
+        var tools = new LinkedHashSet<String>();
+
+        for (var step : steps) {
+            switch (step) {
+                case PlanStepAgent s -> tools.addAll(s.tools());
+                case PlanStepLoop s -> tools.addAll(collectToolNames(s.body()));
+                case PlanStepBranch s -> s.paths().forEach(p -> tools.addAll(collectToolNames(p.body())));
+            }
+        }
+
+        return tools;
+    }
+
+    private Plan reconcileReferences(Plan plan) {
+
+        var reconciledSteps = plan.steps().stream().map(this::reconcileStep).toList();
+
+        return new Plan(plan.id(), plan.name(), plan.description(), plan.params(), reconciledSteps);
+    }
+
+    private PlanStep reconcileStep(PlanStep step) {
 
         return switch (step) {
-            case PlanStepAgent s -> refineAgentStep(s);
-            case PlanStepLoop s -> refineLoopBodySteps(s);
-            case PlanStepBranch s -> refineBranchBodySteps(s);
+
+            case PlanStepAgent s -> reconcileAgentStep(s);
+
+            case PlanStepLoop s -> new PlanStepLoop(s.name(), s.over(),
+                    s.body().stream().map(this::reconcileStep).toList(),
+                    s.dependencies(), s.hitl());
+
+            case PlanStepBranch s -> new PlanStepBranch(s.name(), s.from(),
+                    s.paths().stream().map(p -> new PlanStepBranch.Path(p.pathName(),
+                            p.body().stream().map(this::reconcileStep).toList())).toList(),
+                    s.defaultPath(), s.dependencies(), s.hitl());
         };
     }
 
-    private PlanStepAgent refineAgentStep(PlanStepAgent step) {
+    private PlanStepAgent reconcileAgentStep(PlanStepAgent step) {
 
-        if (step.toolkits().isEmpty())
-            return step;
+        var resolvedAgentId = resolveAgentRef(step.agentId());
+        var resolvedSkills = step.skills().stream().map(this::resolveSkillRef).toList();
 
-        var toolDefs = toolkitRegistry.toolDefinitions(step.toolkits());
-
-        if (toolDefs.isEmpty())
-            return step;
-
-        var agent = agentRegistry.get(step.agentName());
-        var agentRole = agent != null ? agent.role() : step.agentName();
-
-        LOG.info(Logs.PLANNER_REFINE_STEP, "agent", step.name(), step.toolkits().size(), toolDefs.size());
-
-        try {
-
-            var userMessage = TEMPLATES.renderRefineAgentStepMessage(step, agentRole, ToolView.fromAll(toolDefs));
-
-            var llmResponse = llm.send(new LlmRequest(TEMPLATES.refineAgentStepPrompt(), userMessage, List.of(), 0));
-
-            return new PlanStepAgent(step.name(), step.agentName(), llmResponse.text().strip(),
-                    step.dependencies(), step.hitl(), step.skills(), step.toolkits());
-        }
-        catch (Exception e) {
-
-            LOG.warn("Failed to refine agent step '{}', using original: {}", step.name(), e.getMessage());
-            return step;
-        }
+        return new PlanStepAgent(step.name(), resolvedAgentId, step.instructions(),
+                step.dependencies(), step.hitl(), resolvedSkills, step.tools(),
+                step.maxRetries(), step.timeout(), step.conditions(), step.conditionMode());
     }
 
-    private PlanStepLoop refineLoopBodySteps(PlanStepLoop step) {
+    private String resolveAgentRef(String ref) {
 
-        var refinedBody = Parallel.map(step.body(), this::refineStep);
+        if (ref == null) return null;
+        if (agentRegistry.isRegistered(ref)) return ref;
 
-        return new PlanStepLoop(step.name(), step.over(), refinedBody, step.dependencies(), step.hitl());
+        var agent = agentRegistry.getByName(ref);
+
+        if (agent != null) return agent.id();
+
+        LOG.warn("Step references unknown agent '{}'; leaving as-is", ref);
+        return ref;
     }
 
-    private PlanStepBranch refineBranchBodySteps(PlanStepBranch step) {
+    private String resolveSkillRef(String ref) {
 
-        var refinedPaths = Parallel.map(step.paths(), path ->
-                new PlanStepBranch.Path(path.pathName(), Parallel.map(path.body(), this::refineStep)));
+        if (ref == null) return null;
+        if (skillRegistry.isRegistered(ref)) return ref;
 
-        return new PlanStepBranch(step.name(), step.from(), refinedPaths, step.defaultPath(),
-                step.dependencies(), step.hitl());
+        var skill = skillRegistry.getByName(ref);
+
+        if (skill != null) return skill.id();
+
+        LOG.warn("Step references unknown skill '{}'; leaving as-is", ref);
+        return ref;
     }
-
-    private Plan refineLoopSteps(Plan plan) {
-
-        var nodes = plan.steps();
-
-        var loopSteps = nodes.stream()
-                .filter(n -> n instanceof PlanStepLoop)
-                .map(n -> (PlanStepLoop) n)
-                .toList();
-
-        if (loopSteps.isEmpty())
-            return plan;
-
-        var refinements = Parallel.map(loopSteps, loop ->
-                Map.entry(loop.name(), refineLoopStep(loop, nodes)));
-
-        var refinementMap = new LinkedHashMap<String, LoopRefinement>();
-
-        for (var entry : refinements)
-            if (entry.getValue() != null)
-                refinementMap.put(entry.getKey(), entry.getValue());
-
-        if (refinementMap.isEmpty())
-            return plan;
-
-        var refinedNodes = new ArrayList<PlanStep>();
-
-        for (var node : nodes) {
-
-            var refinement = node instanceof PlanStepLoop ? refinementMap.get(node.name()) : null;
-
-            if (refinement != null) {
-
-                if (refinement.setupStep() != null)
-                    refinedNodes.add(refinement.setupStep());
-
-                refinedNodes.add(refinement.loop());
-            }
-            else {
-                refinedNodes.add(node);
-            }
-        }
-
-        return new Plan(plan.id(), plan.name(), plan.description(), plan.params(), refinedNodes);
-    }
-
-    private LoopRefinement refineLoopStep(PlanStepLoop loop, List<PlanStep> allSteps) {
-
-        var bodyToolkitSlugs = collectToolkitSlugs(loop.body());
-
-        if (bodyToolkitSlugs.isEmpty())
-            return null;
-
-        var toolDefs = toolkitRegistry.toolDefinitions(List.copyOf(bodyToolkitSlugs));
-
-        if (toolDefs.isEmpty())
-            return null;
-
-        var producerStep = allSteps.stream()
-                .filter(s -> s.name().equals(loop.over()))
-                .findFirst()
-                .orElse(null);
-
-        LOG.info(Logs.PLANNER_REFINE_STEP, "loop", loop.name(), bodyToolkitSlugs.size(), toolDefs.size());
-
-        var producer = producerStep instanceof PlanStepAgent p ? p : null;
-
-        try {
-
-            var userMessage = TEMPLATES.renderRefineControlStepMessage(
-                    loop, producer, ToolView.fromAll(toolDefs), agentRegistry.asMap().values());
-
-            var llmResponse = llm.send(new LlmRequest(TEMPLATES.refineControlStepPrompt(), userMessage, List.of(), 0));
-
-            var refinement = Json.findObject(llmResponse.text(), ControlStepRefinement.class);
-
-            return applyRefinement(loop, refinement);
-        }
-        catch (Exception e) {
-
-            LOG.warn("Failed to refine loop step '{}', using original: {}", loop.name(), e.getMessage());
-            return null;
-        }
-    }
-
-    private Set<String> collectToolkitSlugs(List<PlanStep> steps) {
-
-        var slugs = new LinkedHashSet<String>();
-
-        for (var step : steps) {
-
-            switch (step) {
-                case PlanStepAgent s -> slugs.addAll(s.toolkits());
-                case PlanStepLoop s -> slugs.addAll(collectToolkitSlugs(s.body()));
-                case PlanStepBranch s -> s.paths().forEach(p -> slugs.addAll(collectToolkitSlugs(p.body())));
-            }
-        }
-
-        return slugs;
-    }
-
-    private LoopRefinement applyRefinement(PlanStepLoop loop, ControlStepRefinement refinement) {
-
-        var refinedBody = loop.body();
-
-        if (refinement.bodySteps != null && !refinement.bodySteps.isEmpty()) {
-
-            var refinedMap = refinement.bodySteps.stream()
-                    .collect(Collectors.toMap(bs -> bs.name, bs -> bs.instructions, (a, _) -> a));
-
-            refinedBody = loop.body().stream()
-                    .map(step -> {
-
-                        if (step instanceof PlanStepAgent s && refinedMap.containsKey(s.name()))
-                            return (PlanStep) new PlanStepAgent(
-                                    s.name(), s.agentName(), refinedMap.get(s.name()),
-                                    s.dependencies(), s.hitl(), s.skills(), s.toolkits());
-
-                        return step;
-                    })
-                    .toList();
-        }
-
-        var loopOver = refinement.loopOver != null ? refinement.loopOver : loop.over();
-
-        var refinedLoop = new PlanStepLoop(loop.name(), loopOver, refinedBody,
-                loop.dependencies(), loop.hitl());
-
-        PlanStepAgent setupStep = null;
-
-        if (refinement.setupStep != null) {
-
-            if (!agentRegistry.isRegistered(refinement.setupStep.agent)) {
-
-                LOG.warn("Pass 3: setup step references unknown agent '{}', skipping setup", refinement.setupStep.agent);
-            }
-            else {
-
-                setupStep = new PlanStepAgent(
-                        refinement.setupStep.name,
-                        refinement.setupStep.agent,
-                        refinement.setupStep.instructions,
-                        refinement.setupStep.dependencies != null ? refinement.setupStep.dependencies : List.of(loop.over()),
-                        false,
-                        List.of(),
-                        refinement.setupStep.toolkits != null ? refinement.setupStep.toolkits : List.of());
-            }
-        }
-
-        return new LoopRefinement(refinedLoop, setupStep);
-    }
-
-    private record LoopRefinement(PlanStepLoop loop, PlanStepAgent setupStep) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    private record ControlStepRefinement(
-            SetupStepDef setupStep,
-            List<BodyStepRef> bodySteps,
-            String loopOver) {
-
-        @JsonIgnoreProperties(ignoreUnknown = true)
-        @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-        record SetupStepDef(String name, String agent, String instructions,
-                            List<String> toolkits, List<String> dependencies) {}
-
-        @JsonIgnoreProperties(ignoreUnknown = true)
-        record BodyStepRef(String name, String instructions) {}
-    }
+    private record RefinedPlan(
+            List<PlanConfig.PlanParamConfig> paramConfigs,
+            List<PlanConfig.PlanStepConfig> stepConfigs) {}
 }

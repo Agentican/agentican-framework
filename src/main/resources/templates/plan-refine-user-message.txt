@@ -1,0 +1,30 @@
+<initial-plan>
+{planJson}
+</initial-plan>
+
+<registered-agents>{#for agent in agents}
+  <agent>
+    <id>{agent.id}</id>
+    <name>{agent.name}</name>
+    <role>{agent.role}</role>
+  </agent>{/for}{#if agents.isEmpty}
+  <none/>{/if}
+</registered-agents>
+
+<registered-skills>{#for skill in skills}
+  <skill>
+    <id>{skill.id}</id>
+    <name>{skill.name}</name>
+    <instructions>{skill.instructions}</instructions>
+  </skill>{/for}{#if skills.isEmpty}
+  <none/>{/if}
+</registered-skills>
+
+<tool-schemas>{#for tool in tools}
+  <tool>
+    <name>{tool.name}</name>
+    <description>{tool.description}</description>
+    <input-schema>{tool.schema}</input-schema>
+  </tool>{/for}{#if tools.isEmpty}
+  <none>The initial plan referenced no tools; no refinement of tool-specific detail is required.</none>{/if}
+</tool-schemas>

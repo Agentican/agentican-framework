@@ -43,6 +43,21 @@ public class TurnLog {
         this.completedAt = completedAt;
     }
 
+    public TurnLog(String id, int index, String messageId, LlmRequest request,
+                   String responseId, LlmResponse response, List<ToolResult> toolResults,
+                   Instant startedAt, Instant completedAt) {
+
+        this.id = id;
+        this.index = index;
+        this.messageId = messageId;
+        this.request = request;
+        this.responseId = responseId;
+        this.response = response;
+        this.toolResults = new CopyOnWriteArrayList<>(toolResults != null ? toolResults : List.of());
+        this.startedAt = startedAt != null ? startedAt : Instant.now();
+        this.completedAt = completedAt;
+    }
+
     public void setRequest(LlmRequest request) {
         this.messageId = Ids.generate();
         this.request = request;

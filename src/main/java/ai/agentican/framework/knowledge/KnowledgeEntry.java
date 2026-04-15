@@ -21,6 +21,12 @@ public class KnowledgeEntry {
 
     public KnowledgeEntry(String id, String name, String description) {
 
+        this(id, name, description, KnowledgeStatus.INDEXING, Instant.now(), null);
+    }
+
+    public KnowledgeEntry(String id, String name, String description, KnowledgeStatus status,
+                          Instant created, Instant updated) {
+
         if (id == null || id.isBlank())
             throw new IllegalArgumentException("Entry id is required");
 
@@ -30,9 +36,9 @@ public class KnowledgeEntry {
         this.id = id;
         this.name = name;
         this.description = description != null ? description : "";
-        this.status = KnowledgeStatus.INDEXING;
-        this.created = Instant.now();
-        this.updated = this.created;
+        this.status = status != null ? status : KnowledgeStatus.INDEXING;
+        this.created = created != null ? created : Instant.now();
+        this.updated = updated != null ? updated : this.created;
     }
 
     public static KnowledgeEntry of(String name, String description) {

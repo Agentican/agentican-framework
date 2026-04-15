@@ -25,7 +25,7 @@ class StepBranchRunner {
     }
 
     TaskStepResult run(PlanStepBranch step, Map<String, String> outputs, Map<String, String> params,
-                       AtomicBoolean cancelled) {
+                       AtomicBoolean cancelled, String parentTaskId, String parentStepId) {
 
         var upstreamOutput = outputs.get(step.from());
 
@@ -48,7 +48,8 @@ class StepBranchRunner {
         var subPlan = new Plan(
                 null, step.name() + "-" + selectedPath.pathName(), "", List.of(), selectedPath.body());
 
-        var subResult = subPlanRunner.run(subPlan, params, cancelled, outputs);
+        var subResult = subPlanRunner.run(subPlan, params, cancelled, outputs,
+                parentTaskId, parentStepId, 0);
 
         var allAgentResults = subResult.stepResults().stream()
                 .flatMap(sr -> sr.agentResults().stream())
@@ -65,21 +66,18 @@ class StepBranchRunner {
 
         var trimmed = upstreamOutput.strip().toLowerCase();
 
-        // Try exact match first
         for (var path : step.paths()) {
 
             if (trimmed.equals(path.pathName().toLowerCase()))
                 return path;
         }
 
-        // Try contains match
         for (var path : step.paths()) {
 
             if (trimmed.contains(path.pathName().toLowerCase()))
                 return path;
         }
 
-        // Try JSON array parsing (e.g. ["technical"])
         try {
 
             int start = upstreamOutput.indexOf('[');
@@ -104,7 +102,6 @@ class StepBranchRunner {
         }
         catch (Exception _) {}
 
-        // Fall back to default
         if (step.defaultPath() != null) {
 
             for (var path : step.paths()) {

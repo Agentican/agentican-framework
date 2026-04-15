@@ -2,7 +2,7 @@ package ai.agentican.framework.tools;
 
 import ai.agentican.framework.MockToolkit;
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.AgentRegistry;
+import ai.agentican.framework.agent.InMemoryAgentRegistry;
 import ai.agentican.framework.agent.AgentRunner;
 import ai.agentican.framework.hitl.AskQuestionToolkit;
 import org.junit.jupiter.api.Test;
@@ -19,31 +19,31 @@ class RegistryTest {
 
         AgentRunner runner = (agent, task, activeSkills, toolkits, taskId, stepId, stepName) -> null;
 
-        return new Agent(name, "Role for " + name, List.of(), runner);
+        return Agent.of(name, "Role for " + name, runner);
     }
 
     @Test
     void agentRegistryRegisterAndGet() {
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
 
         var agent = dummyAgent("agent-1");
 
         registry.register(agent);
 
-        assertSame(agent, registry.get("agent-1"));
+        assertSame(agent, registry.getByName("agent-1"));
     }
 
     @Test
     void agentRegistryHasAndAll() {
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
 
         registry.register(dummyAgent("agent-1"));
         registry.register(dummyAgent("agent-2"));
 
-        assertTrue(registry.isRegistered("agent-1"));
-        assertFalse(registry.isRegistered("unknown"));
+        assertTrue(registry.isRegisteredByName("agent-1"));
+        assertFalse(registry.isRegisteredByName("unknown"));
         assertEquals(2, registry.asMap().size());
     }
 
@@ -58,7 +58,7 @@ class RegistryTest {
 
         registry.register("notion", toolkit);
 
-        var scoped = registry.scopeForStep(List.of("notion"));
+        var scoped = registry.scopeForStep(List.of("tool-a", "tool-b"));
 
         assertEquals(2, scoped.size());
         assertTrue(scoped.containsKey("tool-a"));
@@ -82,7 +82,7 @@ class RegistryTest {
         registry.register("toolkit-a", toolkitA);
         registry.register("toolkit-b", toolkitB);
 
-        var defs = registry.toolDefinitions(List.of("toolkit-a", "toolkit-b"));
+        var defs = registry.toolDefinitions(List.of("tool-1", "tool-2", "tool-3"));
 
         assertEquals(3, defs.size());
         assertEquals("tool-1", defs.get(0).name());

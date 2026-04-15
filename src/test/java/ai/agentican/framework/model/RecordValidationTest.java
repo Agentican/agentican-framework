@@ -18,13 +18,13 @@ class RecordValidationTest {
     @Test
     void agentRequiresName() {
 
-        assertThrows(IllegalArgumentException.class, () -> new Agent(null, "role", List.of(), dummyRunner));
+        assertThrows(IllegalArgumentException.class, () -> Agent.of(null, "role", dummyRunner));
     }
 
     @Test
     void agentRequiresRole() {
 
-        assertThrows(IllegalArgumentException.class, () -> new Agent("name", null, List.of(), dummyRunner));
+        assertThrows(IllegalArgumentException.class, () -> Agent.of("name", null, dummyRunner));
     }
 
     @Test

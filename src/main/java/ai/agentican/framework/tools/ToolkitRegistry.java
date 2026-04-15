@@ -21,43 +21,53 @@ public class ToolkitRegistry implements AutoCloseable {
         return List.copyOf(toolkits.keySet());
     }
 
-    public List<ToolDefinition> toolDefinitions(List<String> slugs) {
+    public List<String> allToolNames() {
 
-        return slugs.stream()
-                .map(toolkits::get)
-                .filter(Objects::nonNull)
-                .flatMap(tk -> tk.toolDefinitions().stream())
-                .toList();
+        var names = new ArrayList<String>();
+
+        for (var toolkit : toolkits.values())
+            for (var td : toolkit.toolDefinitions())
+                names.add(td.name());
+
+        return names;
     }
 
-    public Map<String, Toolkit> scopeForStep(List<String> slugs) {
+    public List<ToolDefinition> allToolDefinitions() {
 
-        if (slugs == null || slugs.isEmpty())
-            return Map.of();
+        var defs = new ArrayList<ToolDefinition>();
 
+        for (var toolkit : toolkits.values())
+            defs.addAll(toolkit.toolDefinitions());
+
+        return defs;
+    }
+
+    public List<ToolDefinition> toolDefinitions(List<String> toolNames) {
+
+        if (toolNames == null || toolNames.isEmpty()) return List.of();
+
+        var wanted = new LinkedHashSet<>(toolNames);
+        var result = new ArrayList<ToolDefinition>();
+
+        for (var toolkit : toolkits.values())
+            for (var td : toolkit.toolDefinitions())
+                if (wanted.contains(td.name()))
+                    result.add(td);
+
+        return result;
+    }
+
+    public Map<String, Toolkit> scopeForStep(List<String> toolNames) {
+
+        if (toolNames == null || toolNames.isEmpty()) return Map.of();
+
+        var wanted = new LinkedHashSet<>(toolNames);
         var scoped = new LinkedHashMap<String, Toolkit>();
-        var toolOwners = new LinkedHashMap<String, String>(); // tool name → slug that owns it
 
-        for (var slug : slugs) {
-
-            var toolkit = toolkits.get(slug);
-
-            if (toolkit == null) continue;
-
-            for (var td : toolkit.toolDefinitions()) {
-
-                var existingSlug = toolOwners.get(td.name());
-
-                if (existingSlug != null)
-                    throw new IllegalStateException(
-                            "Tool name '" + td.name() + "' is defined by both toolkit '" + existingSlug
-                                    + "' and toolkit '" + slug + "'. "
-                                    + "Scope them to different steps or rename the conflicting tool.");
-
-                scoped.put(td.name(), toolkit);
-                toolOwners.put(td.name(), slug);
-            }
-        }
+        for (var toolkit : toolkits.values())
+            for (var td : toolkit.toolDefinitions())
+                if (wanted.contains(td.name()) && !scoped.containsKey(td.name()))
+                    scoped.put(td.name(), toolkit);
 
         return scoped;
     }

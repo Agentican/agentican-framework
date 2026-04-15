@@ -19,6 +19,7 @@ public record RuntimeConfig(
         ComposioConfig composio,
         WorkerConfig agentRunner,
         List<AgentConfig> agents,
+        List<SkillConfig> skills,
         List<PlanConfig> plans) {
 
     private static final Pattern ENV_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
@@ -32,6 +33,7 @@ public record RuntimeConfig(
         if (mcp == null) mcp = List.of();
         if (agentRunner == null) agentRunner = new WorkerConfig(0, null);
         if (agents == null) agents = List.of();
+        if (skills == null) skills = List.of();
         if (plans == null) plans = List.of();
     }
 
@@ -54,6 +56,7 @@ public record RuntimeConfig(
         private final List<LlmConfig> llm = new ArrayList<>();
         private final List<McpConfig> mcp = new ArrayList<>();
         private final List<AgentConfig> agents = new ArrayList<>();
+        private final List<SkillConfig> skills = new ArrayList<>();
         private final List<PlanConfig> plans = new ArrayList<>();
 
         private ComposioConfig composio;
@@ -64,11 +67,12 @@ public record RuntimeConfig(
         public RuntimeConfigBuilder worker(WorkerConfig worker) { this.worker = worker; return this; }
         public RuntimeConfigBuilder mcp(McpConfig mcp) { this.mcp.add(mcp); return this; }
         public RuntimeConfigBuilder agent(AgentConfig agent) { this.agents.add(agent); return this; }
+        public RuntimeConfigBuilder skill(SkillConfig skill) { this.skills.add(skill); return this; }
         public RuntimeConfigBuilder plan(PlanConfig plan) { this.plans.add(plan); return this; }
 
         public RuntimeConfig build() {
 
-            return new RuntimeConfig(llm, mcp, composio, worker, agents, plans);
+            return new RuntimeConfig(llm, mcp, composio, worker, agents, skills, plans);
         }
     }
 

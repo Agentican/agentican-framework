@@ -13,13 +13,15 @@ record AgentContext(
         String systemPrompt,
         Map<String, Toolkit> toolkits,
         List<ToolDefinition> toolDefs,
-        ScratchpadToolkit scratchpad,
+        ScratchpadToolkit localScratchpad,
+        ScratchpadToolkit sharedScratchpad,
         List<KnowledgeEntry> knowledgeIndex,
         Map<String, KnowledgeEntry> recalledKnowledge) {
 
     AgentContext(String systemPrompt, Map<String, Toolkit> toolkits, List<ToolDefinition> toolDefs,
-                 ScratchpadToolkit scratchpad, List<KnowledgeEntry> knowledgeIndex) {
+                 ScratchpadToolkit localScratchpad, ScratchpadToolkit sharedScratchpad,
+                 List<KnowledgeEntry> knowledgeIndex) {
 
-        this(systemPrompt, toolkits, toolDefs, scratchpad, knowledgeIndex, new LinkedHashMap<>());
+        this(systemPrompt, toolkits, toolDefs, localScratchpad, sharedScratchpad, knowledgeIndex, new LinkedHashMap<>());
     }
 }

@@ -1,12 +1,12 @@
 package ai.agentican.framework.util;
 
 import ai.agentican.framework.agent.Agent;
+import ai.agentican.framework.agent.ProgressEntry;
 import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.orchestration.model.PlanStepLoop;
+import ai.agentican.framework.knowledge.KnowledgeEntrySummary;
+import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.planning.ToolView;
-import ai.agentican.framework.tools.ToolResult;
 import ai.agentican.framework.tools.scratchpad.ScratchpadEntry;
 
 import io.quarkus.qute.Engine;
@@ -25,22 +25,18 @@ public class Templates {
     private final Template userMessageTemplate;
     private final Template systemPromptTemplate;
     private final Template plannerPromptTemplate;
-    private final Template refineAgentStepMessageTemplate;
-    private final Template refineControlStepMessageTemplate;
-    private final String refineAgentStepPrompt;
-    private final String refineControlStepPrompt;
-    private final String factExtractionPrompt;
+    private final Template refinePlanMessageTemplate;
+    private final Template factExtractionPromptTemplate;
+    private final String refinePlanPrompt;
 
     public Templates() {
 
         this.userMessageTemplate = loadClasspathTemplate("templates/agent-user-message.txt");
         this.systemPromptTemplate = loadClasspathTemplate("templates/agent-system-prompt.txt");
         this.plannerPromptTemplate = loadClasspathTemplate("templates/plan-initial-system-prompt.txt");
-        this.refineAgentStepMessageTemplate = loadClasspathTemplate("templates/plan-refine-agent-user-message.txt");
-        this.refineControlStepMessageTemplate = loadClasspathTemplate("templates/plan-refine-control-user-message.txt");
-        this.refineAgentStepPrompt = loadClasspathResource("templates/plan-refine-agent-system-prompt.txt");
-        this.refineControlStepPrompt = loadClasspathResource("templates/plan-refine-control-system-prompt.txt");
-        this.factExtractionPrompt = loadClasspathResource("templates/knowledge-system-prompt.txt");
+        this.refinePlanMessageTemplate = loadClasspathTemplate("templates/plan-refine-user-message.txt");
+        this.factExtractionPromptTemplate = loadClasspathTemplate("templates/knowledge-system-prompt.txt");
+        this.refinePlanPrompt = loadClasspathResource("templates/plan-refine-system-prompt.txt");
     }
 
     public String renderSystemPrompt(String agentName, String agentDescription) {
@@ -57,73 +53,61 @@ public class Templates {
                 .render();
     }
 
-    public String renderPlannerPrompt(Collection<Agent> agents, List<String> toolkits) {
+    public String renderPlannerPrompt(Collection<Agent> agents, Collection<SkillConfig> skills,
+                                      List<String> tools, Collection<Plan> existingPlans) {
 
         return plannerPromptTemplate
                 .data("agents", agents != null ? agents : List.of())
-                .data("toolkits", toolkits != null ? toolkits : List.of())
+                .data("skills", skills != null ? skills : List.of())
+                .data("tools", tools != null ? tools : List.of())
+                .data("existingPlans", existingPlans != null ? existingPlans : List.of())
                 .render();
     }
 
-    public String renderUserMessage(String task, int iteration,
-                                    List<ScratchpadEntry> scratchpadEntries, List<ToolResult> toolResults) {
+    public String renderTaskBlock(String task) {
 
-        return renderUserMessage(task, iteration, scratchpadEntries, toolResults, List.of(), List.of());
+        return "<task>\n  " + (task != null ? task : "") + "\n</task>\n";
     }
 
-    public String renderUserMessage(String task, int iteration,
-                                    List<ScratchpadEntry> scratchpadEntries, List<ToolResult> toolResults,
-                                    List<KnowledgeEntry> knowledgeIndex, List<KnowledgeEntry> recalledKnowledge) {
+    public String renderUserMessage(int iteration,
+                                    List<ScratchpadEntry> localScratchpadEntries,
+                                    List<ScratchpadEntry> sharedScratchpadEntries,
+                                    List<ProgressEntry> progress,
+                                    List<KnowledgeEntry> knowledgeIndex,
+                                    List<KnowledgeEntry> recalledKnowledge) {
 
         return userMessageTemplate
-                .data("task", task)
                 .data("iteration", iteration)
-                .data("scratchpadEntries", scratchpadEntries != null ? scratchpadEntries : List.of())
-                .data("toolResults", toolResults != null ? toolResults : List.of())
+                .data("localScratchpadEntries", localScratchpadEntries != null ? localScratchpadEntries : List.of())
+                .data("sharedScratchpadEntries", sharedScratchpadEntries != null ? sharedScratchpadEntries : List.of())
+                .data("progress", progress != null ? progress : List.of())
                 .data("knowledgeIndex", knowledgeIndex != null ? knowledgeIndex : List.of())
                 .data("recalledKnowledge", recalledKnowledge != null ? recalledKnowledge : List.of())
                 .render();
     }
 
-    public String refineAgentStepPrompt() {
+    public String refinePlanPrompt() {
 
-        return refineAgentStepPrompt;
+        return refinePlanPrompt;
     }
 
-    public String refineControlStepPrompt() {
+    public String renderFactExtractionPrompt(List<KnowledgeEntrySummary> existingEntries) {
 
-        return refineControlStepPrompt;
-    }
-
-    public String factExtractionPrompt() {
-
-        return factExtractionPrompt;
-    }
-
-    public String renderRefineAgentStepMessage(PlanStepAgent step, String agentRole, List<ToolView> tools) {
-
-        return refineAgentStepMessageTemplate
-                .data("step", step)
-                .data("agentRole", agentRole != null ? agentRole : "")
-                .data("tools", tools != null ? tools : List.of())
+        return factExtractionPromptTemplate
+                .data("existingEntries", existingEntries != null ? existingEntries : List.of())
                 .render();
     }
 
-    public String renderRefineControlStepMessage(PlanStepLoop loop, PlanStepAgent producer,
-                                                 List<ToolView> tools, Collection<Agent> agents) {
+    public String renderRefinePlanMessage(String planJson,
+                                          Collection<Agent> agents,
+                                          Collection<SkillConfig> skills,
+                                          List<ToolView> tools) {
 
-        // Extract body stepConfigs that are agent stepConfigs for the template
-        var bodySteps = loop.body().stream()
-                .filter(s -> s instanceof PlanStepAgent)
-                .map(s -> (PlanStepAgent) s)
-                .toList();
-
-        return refineControlStepMessageTemplate
-                .data("loop", loop)
-                .data("producer", producer)
-                .data("bodySteps", bodySteps)
-                .data("tools", tools != null ? tools : List.of())
+        return refinePlanMessageTemplate
+                .data("planJson", planJson != null ? planJson : "{}")
                 .data("agents", agents != null ? agents : List.of())
+                .data("skills", skills != null ? skills : List.of())
+                .data("tools", tools != null ? tools : List.of())
                 .render();
     }
 

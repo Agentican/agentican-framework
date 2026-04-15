@@ -16,7 +16,8 @@ public record PlanConfig(
         String name,
         String description,
         List<PlanParamConfig> paramConfigs,
-        List<PlanStepConfig> stepConfigs) {
+        List<PlanStepConfig> stepConfigs,
+        String externalId) {
 
     public PlanConfig {
 
@@ -28,6 +29,15 @@ public record PlanConfig(
 
         if (paramConfigs == null)
             paramConfigs = List.of();
+
+        if (externalId != null && externalId.isBlank())
+            externalId = null;
+    }
+
+    public PlanConfig(String name, String description, List<PlanParamConfig> paramConfigs,
+                      List<PlanStepConfig> stepConfigs) {
+
+        this(name, description, paramConfigs, stepConfigs, null);
     }
 
     public Plan toPlan() {
@@ -38,7 +48,7 @@ public record PlanConfig(
 
         var steps = stepConfigs.stream().map(PlanStepConfig::toPlanStep).toList();
 
-        return Plan.of(name, description, params, steps);
+        return Plan.withExternalId(externalId, name, description, params, steps);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -64,7 +74,7 @@ public record PlanConfig(
             List<String> dependencies,
             boolean hitl,
             List<String> skills,
-            List<String> toolkits,
+            List<String> tools,
             String over,
             String from,
             List<BranchPathConfig> pathConfigs,
@@ -85,8 +95,8 @@ public record PlanConfig(
             if (skills == null)
                 skills = List.of();
 
-            if (toolkits == null)
-                toolkits = List.of();
+            if (tools == null)
+                tools = List.of();
         }
 
         public PlanStep toPlanStep() {
@@ -105,7 +115,7 @@ public record PlanConfig(
 
                         var stepName = name + "-body";
 
-                        var step = PlanStepAgent.of(stepName, agent, instructions, List.of(), false, skills, toolkits);
+                        var step = PlanStepAgent.of(stepName, agent, instructions, List.of(), false, skills, tools);
 
                         steps = List.of(step);
                     }
@@ -122,7 +132,7 @@ public record PlanConfig(
                     yield PlanStepBranch.of(name, from, paths, defaultPath, dependencies, hitl);
                 }
 
-                default -> PlanStepAgent.of(name, agent, instructions, dependencies, hitl, skills, toolkits);
+                default -> PlanStepAgent.of(name, agent, instructions, dependencies, hitl, skills, tools);
             };
         }
     }
@@ -132,7 +142,7 @@ public record PlanConfig(
             String pathName,
             String agent,
             String instructions,
-            List<String> toolkits,
+            List<String> tools,
             List<PlanStepConfig> stepConfigs) {
 
         public BranchPathConfig {
@@ -140,8 +150,8 @@ public record PlanConfig(
             if (pathName == null || pathName.isBlank())
                 throw new IllegalArgumentException("Path name is required");
 
-            if (toolkits == null)
-                toolkits = List.of();
+            if (tools == null)
+                tools = List.of();
         }
 
         List<PlanStep> toPlanStep() {
@@ -152,7 +162,7 @@ public record PlanConfig(
             var stepName = pathName + "-body";
 
             var agentStep =
-                    PlanStepAgent.of(stepName, agent, instructions, List.of(), false, List.of(), toolkits);
+                    PlanStepAgent.of(stepName, agent, instructions, List.of(), false, List.of(), tools);
 
             return List.of(agentStep);
         }

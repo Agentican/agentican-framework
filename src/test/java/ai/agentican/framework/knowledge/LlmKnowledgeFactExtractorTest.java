@@ -5,33 +5,105 @@ import ai.agentican.framework.llm.LlmClient;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class LlmKnowledgeFactExtractorTest {
 
     @Test
-    void extractsFactsFromText() {
+    void extractsMultipleCreateEntries() {
 
         var json = """
-                {
-                  "facts": [
-                    {"name": "Pricing", "content": "Costs $10/month", "tags": ["pricing/saas"]},
-                    {"name": "Launch", "content": "Launched 2024", "tags": ["company/timeline"]}
-                  ]
-                }
+                {"entries": [
+                  {
+                    "action": "create",
+                    "name": "Claude Opus 4.6",
+                    "description": "Anthropic frontier model, Feb 2026.",
+                    "facts": [
+                      {"name": "GPQA", "content": "Scores 91.3% on GPQA Diamond.", "tags": ["anthropic/claude/opus-4-6/benchmarks"]},
+                      {"name": "Pricing", "content": "Input $15 / output $75 per million tokens.", "tags": ["anthropic/claude/opus-4-6/pricing"]}
+                    ]
+                  },
+                  {
+                    "action": "create",
+                    "name": "Gemini 3.1 Pro",
+                    "description": "Google frontier model.",
+                    "facts": [
+                      {"name": "Pricing", "content": "Input $2 / output $12 per million tokens.", "tags": ["google/gemini/3-1-pro/pricing"]}
+                    ]
+                  }
+                ]}
                 """;
 
         var mockLlm = new MockLlmClient().onSend("", json);
 
         var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
 
-        var facts = extractor.extractFacts("some text about a product");
+        var result = extractor.extract(null, "research text", List.of());
 
-        assertEquals(2, facts.size());
-        assertEquals("Pricing", facts.get(0).name());
-        assertEquals("Costs $10/month", facts.get(0).content());
-        assertEquals("Launch", facts.get(1).name());
-        assertEquals("Launched 2024", facts.get(1).content());
+        assertEquals(2, result.entries().size());
+        assertEquals(ExtractedEntry.Action.CREATE, result.entries().get(0).action());
+        assertEquals("Claude Opus 4.6", result.entries().get(0).name());
+        assertEquals(2, result.entries().get(0).facts().size());
+        assertEquals("Gemini 3.1 Pro", result.entries().get(1).name());
+    }
+
+    @Test
+    void parsesUpdateActionAgainstExistingEntry() {
+
+        var json = """
+                {"entries": [
+                  {
+                    "action": "update",
+                    "existingEntryId": "existing-123",
+                    "facts": [
+                      {"name": "New limit", "content": "New benchmark added.", "tags": ["domain/x"]}
+                    ]
+                  }
+                ]}
+                """;
+
+        var mockLlm = new MockLlmClient().onSend("", json);
+
+        var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
+
+        var existing = List.of(new KnowledgeEntrySummary("existing-123", "Topic X", "desc", 5));
+
+        var result = extractor.extract(null, "more findings", existing);
+
+        assertEquals(1, result.entries().size());
+        assertEquals(ExtractedEntry.Action.UPDATE, result.entries().getFirst().action());
+        assertEquals("existing-123", result.entries().getFirst().existingEntryId());
+        assertEquals(1, result.entries().getFirst().facts().size());
+    }
+
+    @Test
+    void updateWithoutIdIsSkipped() {
+
+        var json = """
+                {"entries": [
+                  {"action": "update", "facts": [{"name": "x", "content": "y", "tags": []}]}
+                ]}
+                """;
+
+        var mockLlm = new MockLlmClient().onSend("", json);
+
+        var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
+
+        var result = extractor.extract(null, "text", List.of());
+
+        assertTrue(result.entries().isEmpty());
+    }
+
+    @Test
+    void emptyEntriesArrayReturnsEmpty() {
+
+        var mockLlm = new MockLlmClient().onSend("", "{\"entries\": []}");
+
+        var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
+
+        assertTrue(extractor.extract(null, "anything", List.of()).entries().isEmpty());
     }
 
     @Test
@@ -39,21 +111,18 @@ class LlmKnowledgeFactExtractorTest {
 
         var extractor = new LlmKnowledgeExtractor(new MockLlmClient().toLlmClient());
 
-        assertTrue(extractor.extractFacts("").isEmpty());
-        assertTrue(extractor.extractFacts(null).isEmpty());
+        assertTrue(extractor.extract(null, "", List.of()).entries().isEmpty());
+        assertTrue(extractor.extract(null, null, List.of()).entries().isEmpty());
     }
 
     @Test
     void llmFailureReturnsEmpty() {
 
-        LlmClient throwingClient = request -> {
+        LlmClient throwing = request -> { throw new RuntimeException("down"); };
 
-            throw new RuntimeException("LLM is down");
-        };
+        var extractor = new LlmKnowledgeExtractor(throwing);
 
-        var extractor = new LlmKnowledgeExtractor(throwingClient);
-
-        assertTrue(extractor.extractFacts("some text").isEmpty());
+        assertTrue(extractor.extract(null, "some text", List.of()).entries().isEmpty());
     }
 
     @Test
@@ -63,6 +132,21 @@ class LlmKnowledgeFactExtractorTest {
 
         var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
 
-        assertTrue(extractor.extractFacts("some text").isEmpty());
+        assertTrue(extractor.extract(null, "some text", List.of()).entries().isEmpty());
+    }
+
+    @Test
+    void existingEntriesAreRenderedInPrompt() {
+
+        var json = "{\"entries\": []}";
+        var mockLlm = new MockLlmClient().onSend("existing-abc", json);
+
+        var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
+
+        var existing = List.of(new KnowledgeEntrySummary("existing-abc", "Topic", "Covers X", 3));
+
+        var result = extractor.extract(null, "source text", existing);
+
+        assertNotNull(result);
     }
 }

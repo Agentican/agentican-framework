@@ -1,16 +1,16 @@
 package ai.agentican.framework.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import ai.agentican.framework.util.Ids;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AgentConfig(
+        String id,
         String name,
         String role,
         String llm,
-        List<SkillConfig> skills) {
+        String externalId) {
 
     public AgentConfig {
 
@@ -20,16 +20,34 @@ public record AgentConfig(
         if (role == null || role.isBlank())
             throw new IllegalArgumentException("Agent role is required");
 
+        if (id == null || id.isBlank())
+            id = Ids.generate();
+
         if (llm == null || llm.isBlank())
             llm = LlmConfig.DEFAULT;
 
-        if (skills == null)
-            skills = List.of();
+        if (externalId != null && externalId.isBlank())
+            externalId = null;
     }
 
-    public static AgentConfig of(String name, String role, String llm, List<SkillConfig> skills) {
+    public AgentConfig(String id, String name, String role, String llm) {
 
-        return new AgentConfig(name, role, llm, skills);
+        this(id, name, role, llm, null);
+    }
+
+    public static AgentConfig of(String name, String role, String llm) {
+
+        return new AgentConfig(null, name, role, llm, null);
+    }
+
+    public static AgentConfig of(String id, String name, String role, String llm) {
+
+        return new AgentConfig(id, name, role, llm, null);
+    }
+
+    public static AgentConfig forCatalog(String externalId, String name, String role, String llm) {
+
+        return new AgentConfig(null, name, role, llm, externalId);
     }
 
     public static AgentConfigBuilder builder() {
@@ -39,28 +57,21 @@ public record AgentConfig(
 
     public static class AgentConfigBuilder {
 
+        private String id;
         private String name;
         private String role;
         private String llm;
+        private String externalId;
 
-        private final List<SkillConfig> skills = new ArrayList<>();
-
-        public AgentConfigBuilder skill(String name, String instructions) {
-
-            var skillConfig = SkillConfig.of(name, instructions);
-
-            return skill(skillConfig);
-        }
-
+        public AgentConfigBuilder id(String id) { this.id = id; return this; }
         public AgentConfigBuilder name(String name) { this.name = name; return this; }
         public AgentConfigBuilder role(String role) { this.role = role; return this; }
         public AgentConfigBuilder llm(String llm) { this.llm = llm; return this; }
-        public AgentConfigBuilder skill(SkillConfig skill) { this.skills.add(skill); return this; }
-        public AgentConfigBuilder skills(List<SkillConfig> skills) { this.skills.addAll(skills); return this; }
+        public AgentConfigBuilder externalId(String externalId) { this.externalId = externalId; return this; }
 
         public AgentConfig build() {
 
-            return AgentConfig.of(name, role, llm, skills);
+            return new AgentConfig(id, name, role, llm, externalId);
         }
     }
 }

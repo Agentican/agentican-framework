@@ -6,7 +6,6 @@ import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.core.JsonValue;
 import com.anthropic.models.messages.*;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,14 +57,26 @@ public class AnthropicLlmClient {
                 .cacheControl(CACHE_CONTROL)
                 .build();
 
-        var userMessageBlock = TextBlockParam.builder()
-                .text(request.userMessage())
-                .cacheControl(CACHE_CONTROL)
-                .build();
-
         var userBlocks = new ArrayList<ContentBlockParam>();
 
-        userBlocks.add(ContentBlockParam.ofText(userMessageBlock));
+        if (request.userTask() != null && !request.userTask().isBlank()) {
+
+            var userTaskBlock = TextBlockParam.builder()
+                    .text(request.userTask())
+                    .cacheControl(CACHE_CONTROL)
+                    .build();
+
+            userBlocks.add(ContentBlockParam.ofText(userTaskBlock));
+        }
+
+        if (request.userMessage() != null && !request.userMessage().isBlank()) {
+
+            var userMessageBlock = TextBlockParam.builder()
+                    .text(request.userMessage())
+                    .build();
+
+            userBlocks.add(ContentBlockParam.ofText(userMessageBlock));
+        }
 
         var userMessageParam = MessageParam.builder()
                 .role(MessageParam.Role.USER)
@@ -78,9 +89,11 @@ public class AnthropicLlmClient {
                 .systemOfTextBlockParams(List.of(systemPromptBlock))
                 .messages(List.of(userMessageParam));
 
+        var toolBuilders = new ArrayList<Tool.Builder>();
+
         if (request.tools() != null) {
 
-            request.tools().stream().map(tool -> {
+            request.tools().forEach(tool -> {
 
                 var schemaBuilder = Tool.InputSchema.builder().type(JsonValue.from("object"));
 
@@ -90,17 +103,18 @@ public class AnthropicLlmClient {
                 if (tool.required() != null && !tool.required().isEmpty())
                     schemaBuilder.required(JsonValue.from(tool.required()));
 
-                return Tool.builder()
+                toolBuilders.add(Tool.builder()
                         .name(tool.name())
                         .description(tool.description())
-                        .inputSchema(schemaBuilder.build())
-                        .build();
-
-            }).forEach(messageBuilder::addTool);
+                        .inputSchema(schemaBuilder.build()));
+            });
         }
 
+        for (var tb : toolBuilders) messageBuilder.addTool(tb.build());
+
         messageBuilder.addTool(WebSearchTool20250305.builder().build());
-        messageBuilder.addTool(WebFetchTool20250910.builder().build());
+
+        messageBuilder.addTool(WebFetchTool20250910.builder().cacheControl(CACHE_CONTROL).build());
 
         var response = client.messages().create(messageBuilder.build());
 

@@ -15,6 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class MockLlmClient {
 
     private final CopyOnWriteArrayList<MockEntry> entries = new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<MockEntry> repeated = new CopyOnWriteArrayList<>();
 
     public MockLlmClient onSend(String matchSubstring, String responseText) {
 
@@ -28,6 +29,12 @@ public class MockLlmClient {
         return this;
     }
 
+    public MockLlmClient onSendRepeated(String matchSubstring, LlmResponse response) {
+
+        repeated.add(new MockEntry(matchSubstring, response));
+        return this;
+    }
+
     public LlmClient toLlmClient() {
 
         return (LlmClient) this::send;
@@ -36,7 +43,12 @@ public class MockLlmClient {
     private synchronized LlmResponse send(LlmRequest request) {
 
         var fullText = (request.systemPrompt() != null ? request.systemPrompt() : "")
+                + " " + (request.userTask() != null ? request.userTask() : "")
                 + " " + request.userMessage();
+
+        for (var entry : repeated) {
+            if (fullText.contains(entry.match)) return entry.response;
+        }
 
         for (int i = 0; i < entries.size(); i++) {
 

@@ -2,7 +2,10 @@ package ai.agentican.framework.agent;
 
 import ai.agentican.framework.TaskListener;
 import ai.agentican.framework.config.SkillConfig;
+import ai.agentican.framework.hitl.AskQuestionToolkit;
 import ai.agentican.framework.hitl.HitlManager;
+import ai.agentican.framework.skill.InMemorySkillRegistry;
+import ai.agentican.framework.skill.SkillRegistry;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
 import ai.agentican.framework.knowledge.KnowledgeStore;
 import ai.agentican.framework.knowledge.KnowledgeToolkit;
@@ -49,16 +52,16 @@ public class SmacAgentRunner implements AgentRunner {
     private final KnowledgeStore knowledgeStore;
     private final TaskStateStore taskStateStore;
     private final TaskListener taskListener;
+    private final SkillRegistry skillRegistry;
     private final Duration timeout;
     private final int maxTurns;
 
     SmacAgentRunner(LlmClient llm, String llmName, String llmProvider, String llmModel, HitlManager hitlManager,
-                    KnowledgeStore knowledgeStore, TaskStateStore taskStateStore, int maxTurns, Duration timeout,
-                    TaskListener taskListener) {
+                    KnowledgeStore knowledgeStore, TaskStateStore taskStateStore, SkillRegistry skillRegistry,
+                    int maxTurns, Duration timeout, TaskListener taskListener) {
 
         this.llm = llm;
 
-        // may move these to LlmClient
         this.llmName = llmName;
         this.llmProvider = llmProvider;
         this.llmModel = llmModel;
@@ -67,6 +70,7 @@ public class SmacAgentRunner implements AgentRunner {
         this.taskListener = taskListener != null ? taskListener : NO_OP_LISTENER;
         this.hitlManager = hitlManager;
         this.knowledgeStore = knowledgeStore;
+        this.skillRegistry = skillRegistry != null ? skillRegistry : new InMemorySkillRegistry();
 
         this.timeout = timeout;
         this.maxTurns = maxTurns;
@@ -81,7 +85,7 @@ public class SmacAgentRunner implements AgentRunner {
     public AgentRunner withTimeout(Duration timeout) {
 
         return new SmacAgentRunner(llm, llmName, llmProvider, llmModel, hitlManager, knowledgeStore, taskStateStore,
-                maxTurns, timeout, taskListener);
+                skillRegistry, maxTurns, timeout, taskListener);
     }
 
     @Override
@@ -136,8 +140,7 @@ public class SmacAgentRunner implements AgentRunner {
 
         ensureTaskLog(taskId, stepId, stepName);
 
-        for (var turn : savedRun.turns())
-            storeToolResultsInScratchpad(ctx.scratchpad(), turn.toolResults());
+        rehydrateExplicitStores(ctx.localScratchpad(), savedRun);
 
         var lastTurn = savedRun.turns().getLast();
         var lastTurnId = lastTurn.id();
@@ -193,8 +196,6 @@ public class SmacAgentRunner implements AgentRunner {
             }
         }
 
-        storeToolResultsInScratchpad(ctx.scratchpad(), toolResults);
-
         taskStateStore.turnCompleted(taskId, lastTurnId);
 
         var runId = Ids.generate();
@@ -234,11 +235,15 @@ public class SmacAgentRunner implements AgentRunner {
 
             var recalledKnowledge = List.copyOf(ctx.recalledKnowledge().values());
 
-            var userMessage = TEMPLATES.renderUserMessage(task, turnIndex, ctx.scratchpad().entries(), toolResults,
-                    ctx.knowledgeIndex(), recalledKnowledge);
+            var progress = buildProgress(taskId, stepId);
 
-            var llmRequest = new LlmRequest(ctx.systemPrompt(), userMessage, ctx.toolDefs(), turnIndex, llmName,
-                    llmProvider, llmModel);
+            var userTask = TEMPLATES.renderTaskBlock(task);
+            var userMessage = TEMPLATES.renderUserMessage(turnIndex,
+                    ctx.localScratchpad().entries(), ctx.sharedScratchpad().entries(),
+                    progress, ctx.knowledgeIndex(), recalledKnowledge);
+
+            var llmRequest = new LlmRequest(ctx.systemPrompt(), userTask, userMessage, ctx.toolDefs(), turnIndex,
+                    llmName, llmProvider, llmModel);
 
             LOG.info(Logs.AGENT_SEND_LLM, turnIndex);
 
@@ -285,8 +290,6 @@ public class SmacAgentRunner implements AgentRunner {
                     : new ArrayList<>(executeToolCalls(normalToolCalls, ctx.toolkits(), cancelled, turnIndex,
                     taskId, turnId));
 
-            storeToolResultsInScratchpad(ctx.scratchpad(), currentToolResults);
-
             if (knowledgeStore != null) {
 
                 for (var toolCall : normalToolCalls) {
@@ -321,8 +324,6 @@ public class SmacAgentRunner implements AgentRunner {
 
                 var checkpoint = hitlManager.createQuestionCheckpoint(question, context, stepName);
 
-                taskStateStore.hitlNotified(taskId, stepId, checkpoint);
-
                 return new AgentResult(AgentStatus.SUSPENDED, getOrCreateRunLog(taskId, stepId), checkpoint);
             }
 
@@ -334,8 +335,6 @@ public class SmacAgentRunner implements AgentRunner {
                         turnIndex, pendingToolCall.toolName(), currentToolResults.size());
 
                 var checkpoint = hitlManager.createToolApprovalCheckpoint(pendingToolCall, stepName);
-
-                taskStateStore.hitlNotified(taskId, stepId, checkpoint);
 
                 return new AgentResult(AgentStatus.SUSPENDED, getOrCreateRunLog(taskId, stepId), checkpoint);
             }
@@ -453,10 +452,19 @@ public class SmacAgentRunner implements AgentRunner {
 
     private AgentContext buildContext(Agent agent, List<String> activeSkills, Map<String, Toolkit> toolkits) {
 
-        var skillMap = agent.skills().stream()
-                .collect(Collectors.toMap(SkillConfig::name, skillConfig -> skillConfig));
+        var activeSkillConfigs = new ArrayList<SkillConfig>();
 
-        var activeSkillConfigs = activeSkills.stream().map(skillMap::get).filter(Objects::nonNull).toList();
+        for (var skillId : activeSkills) {
+
+            var skillConfig = skillRegistry.get(skillId);
+
+            if (skillConfig == null) skillConfig = skillRegistry.getByName(skillId);
+
+            if (skillConfig != null)
+                activeSkillConfigs.add(skillConfig);
+            else
+                LOG.warn("Step for agent {} references unknown skill '{}' — dropping", agent.name(), skillId);
+        }
 
         var agentName = agent.name();
         var agentRole = agent.role();
@@ -465,11 +473,21 @@ public class SmacAgentRunner implements AgentRunner {
 
         var taskToolkits = new LinkedHashMap<>(toolkits);
 
-        var scratchpad = TaskRunner.taskScratchpad();
+        var localScratchpad = new ScratchpadToolkit(ScratchpadToolkit.Scope.LOCAL);
 
-        var taskScratchpad = scratchpad != null ? scratchpad : new ScratchpadToolkit();
+        ScratchpadToolkit.LOCAL_TOOL_NAMES.forEach(toolName -> taskToolkits.put(toolName, localScratchpad));
 
-        ScratchpadToolkit.TOOL_NAMES.forEach(toolName -> taskToolkits.put(toolName, taskScratchpad));
+        var sharedFromRunner = TaskRunner.sharedScratchpad();
+
+        var sharedScratchpad = sharedFromRunner != null
+                ? sharedFromRunner
+                : new ScratchpadToolkit(ScratchpadToolkit.Scope.SHARED);
+
+        ScratchpadToolkit.SHARED_TOOL_NAMES.forEach(toolName -> taskToolkits.put(toolName, sharedScratchpad));
+
+        var askQuestionToolkit = new AskQuestionToolkit();
+
+        taskToolkits.put(AskQuestionToolkit.TOOL_NAME, askQuestionToolkit);
 
         List<KnowledgeEntry> knowledgeIndex = List.of();
 
@@ -480,21 +498,85 @@ public class SmacAgentRunner implements AgentRunner {
             knowledgeIndex = knowledgeStore.indexed();
         }
 
-        var taskToolDefs = taskToolkits.values().stream()
-                .distinct()
-                .flatMap(toolkit -> toolkit.toolDefinitions().stream())
+        var taskToolDefs = taskToolkits.entrySet().stream()
+                .flatMap(e -> e.getValue().toolDefinitions().stream()
+                        .filter(td -> td.name().equals(e.getKey())))
                 .toList();
 
-        return new AgentContext(systemPrompt, taskToolkits, taskToolDefs, taskScratchpad, knowledgeIndex);
+        return new AgentContext(systemPrompt, taskToolkits, taskToolDefs,
+                localScratchpad, sharedScratchpad, knowledgeIndex);
     }
 
-    private static void storeToolResultsInScratchpad(ScratchpadToolkit scratchpad, List<ToolResult> toolResults) {
+    private List<ProgressEntry> buildProgress(String taskId, String stepId) {
 
-        for (var toolResult : toolResults) {
+        var taskLog = taskStateStore.load(taskId);
 
-            if (toolResult.content() != null && !toolResult.content().isBlank())
-                scratchpad.store("tool-result-" + toolResult.toolName(),
-                        "Result from " + toolResult.toolName(), toolResult.content());
+        if (taskLog == null) return List.of();
+
+        var stepLog = taskLog.findStepById(stepId);
+
+        if (stepLog == null) return List.of();
+
+        var progress = new ArrayList<ProgressEntry>();
+
+        for (var run : stepLog.runs()) {
+
+            for (var turn : run.turns()) {
+
+                var response = turn.response();
+
+                if (response == null) continue;
+
+                var callsById = new HashMap<String, ToolCall>();
+
+                for (var call : response.toolCalls())
+                    callsById.putIfAbsent(call.id(), call);
+
+                for (var result : turn.toolResults()) {
+
+                    var call = callsById.get(result.toolCallId());
+                    var input = renderArgs(call != null ? call.args() : Map.of());
+                    var output = result.content() != null ? result.content() : "";
+
+                    progress.add(new ProgressEntry(result.toolName(), input, output));
+                }
+            }
+        }
+
+        return progress;
+    }
+
+    private static String renderArgs(Map<String, Object> args) {
+
+        try {
+            return Json.writeValueAsString(args != null ? args : Map.of());
+        }
+        catch (Exception _) {
+            return "{}";
+        }
+    }
+
+    private static void rehydrateExplicitStores(ScratchpadToolkit localScratchpad, RunLog savedRun) {
+
+        for (var turn : savedRun.turns()) {
+
+            var response = turn.response();
+
+            if (response == null) continue;
+
+            for (var call : response.toolCalls()) {
+
+                if (!ScratchpadToolkit.STORE.equals(call.toolName())) continue;
+
+                var args = call.args();
+                var id = String.valueOf(args.get("id"));
+                var description = String.valueOf(args.get("description"));
+                var details = String.valueOf(args.get("details"));
+
+                if (id == null || id.isBlank() || "null".equals(id)) continue;
+
+                localScratchpad.store(id, description, details);
+            }
         }
     }
 
@@ -520,6 +602,7 @@ public class SmacAgentRunner implements AgentRunner {
         private TaskListener stepListener;
         private HitlManager hitlManager;
         private KnowledgeStore knowledgeStore;
+        private SkillRegistry skillRegistry;
 
         private Duration timeout = Duration.ofMinutes(30);
         private int maxTurns = 10;
@@ -535,6 +618,7 @@ public class SmacAgentRunner implements AgentRunner {
         public Builder taskListener(TaskListener taskListener) { this.stepListener = taskListener; return this; }
         public Builder hitlManager(HitlManager hitlManager) { this.hitlManager = hitlManager; return this; }
         public Builder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
+        public Builder skillRegistry(SkillRegistry skillRegistry) { this.skillRegistry = skillRegistry; return this; }
 
         public Builder maxIterations(int max) { this.maxTurns = max; return this; }
         public Builder timeout(Duration timeout) { this.timeout = timeout; return this; }
@@ -546,7 +630,7 @@ public class SmacAgentRunner implements AgentRunner {
             var finalTaskStateStore = taskStateStore != null ? taskStateStore : new MemTaskStateStore();
 
             return new SmacAgentRunner(llm, llmName, llmProvider, llmModel, hitlManager, knowledgeStore,
-                    finalTaskStateStore, maxTurns, timeout, stepListener);
+                    finalTaskStateStore, skillRegistry, maxTurns, timeout, stepListener);
         }
     }
 }

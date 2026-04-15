@@ -11,7 +11,8 @@ public record Plan(
         String name,
         String description,
         List<PlanParam> params,
-        List<PlanStep> steps) {
+        List<PlanStep> steps,
+        String externalId) {
 
     public Plan {
 
@@ -29,11 +30,25 @@ public record Plan(
 
         params = List.copyOf(params);
         steps = List.copyOf(steps);
+
+        if (externalId != null && externalId.isBlank())
+            externalId = null;
+    }
+
+    public Plan(String id, String name, String description, List<PlanParam> params, List<PlanStep> steps) {
+
+        this(id, name, description, params, steps, null);
     }
 
     public static Plan of(String name, String description, List<PlanParam> params, List<PlanStep> steps) {
 
-        return new Plan(null, name, description, params, steps);
+        return new Plan(null, name, description, params, steps, null);
+    }
+
+    public static Plan withExternalId(String externalId, String name, String description,
+                                      List<PlanParam> params, List<PlanStep> steps) {
+
+        return new Plan(null, name, description, params, steps, externalId);
     }
 
     public static PlanBuilder builder(String name) {

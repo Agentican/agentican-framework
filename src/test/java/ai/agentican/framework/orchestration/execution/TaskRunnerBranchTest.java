@@ -2,7 +2,7 @@ package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.MockLlmClient;
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.AgentRegistry;
+import ai.agentican.framework.agent.InMemoryAgentRegistry;
 import ai.agentican.framework.agent.SmacAgentRunner;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
@@ -11,8 +11,6 @@ import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
 import ai.agentican.framework.tools.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static ai.agentican.framework.MockLlmClient.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,7 +30,7 @@ class TaskRunnerBranchTest {
                 .maxIterations(5)
                 .build();
 
-        return new Agent(name, "Test agent for " + name, List.of(), runner);
+        return Agent.of(name, "Test agent for " + name, runner);
     }
 
     @Test
@@ -47,7 +45,7 @@ class TaskRunnerBranchTest {
         var pathBLlm = new MockLlmClient()
                 .onSend("", endTurn("B result"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
@@ -82,7 +80,7 @@ class TaskRunnerBranchTest {
         var pathBLlm = new MockLlmClient()
                 .onSend("", endTurn("B result"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
@@ -118,7 +116,7 @@ class TaskRunnerBranchTest {
         var pathBLlm = new MockLlmClient()
                 .onSend("", endTurn("B result"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
@@ -152,7 +150,7 @@ class TaskRunnerBranchTest {
         var pathBLlm = new MockLlmClient()
                 .onSend("", endTurn("B from array"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
@@ -187,7 +185,7 @@ class TaskRunnerBranchTest {
         var pathBLlm = new MockLlmClient()
                 .onSend("", endTurn("B via contains"));
 
-        var registry = new AgentRegistry();
+        var registry = new InMemoryAgentRegistry();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));

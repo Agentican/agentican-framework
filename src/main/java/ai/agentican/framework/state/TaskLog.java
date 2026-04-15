@@ -20,16 +20,35 @@ public class TaskLog {
     private final Map<String, String> params;
     private final Map<String, StepLog> steps = new ConcurrentHashMap<>();
 
+    private final String parentTaskId;
+    private final String parentStepId;
+    private final int iterationIndex;
+
     private volatile TaskStatus status;
     private volatile Instant completedAt;
 
     public TaskLog(String taskId, String taskName, Plan plan, Map<String, String> params) {
 
+        this(taskId, taskName, plan, params, null, null, 0);
+    }
+
+    public TaskLog(String taskId, String taskName, Plan plan, Map<String, String> params,
+                   String parentTaskId, String parentStepId, int iterationIndex) {
+
+        this(taskId, taskName, plan, params, parentTaskId, parentStepId, iterationIndex, Instant.now());
+    }
+
+    public TaskLog(String taskId, String taskName, Plan plan, Map<String, String> params,
+                   String parentTaskId, String parentStepId, int iterationIndex, Instant createdAt) {
+
         this.taskId = taskId;
         this.taskName = taskName;
-        this.createdAt = Instant.now();
+        this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.plan = plan;
         this.params = Map.copyOf(params);
+        this.parentTaskId = parentTaskId;
+        this.parentStepId = parentStepId;
+        this.iterationIndex = iterationIndex;
     }
 
     public String taskId() { return taskId; }
@@ -39,6 +58,10 @@ public class TaskLog {
 
     public Plan plan() { return plan; }
     public TaskStatus status() { return status; }
+
+    public String parentTaskId() { return parentTaskId; }
+    public String parentStepId() { return parentStepId; }
+    public int iterationIndex() { return iterationIndex; }
 
     public TokenUsage tokenUsage() {
         return TokenUsage.sum(steps.values().stream().map(StepLog::tokenUsage));

@@ -5,7 +5,6 @@ import ai.agentican.framework.util.Json;
 
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 public record ToolView(String name, String description, String schema) {
 

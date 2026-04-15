@@ -1,15 +1,20 @@
 package ai.agentican.framework;
 
-import ai.agentican.framework.agent.Agent;
+import ai.agentican.framework.agent.AgentFactory;
 import ai.agentican.framework.agent.AgentRegistry;
-import ai.agentican.framework.agent.SmacAgentRunner;
+import ai.agentican.framework.agent.InMemoryAgentRegistry;
 import ai.agentican.framework.config.AgentConfig;
+import ai.agentican.framework.config.ComposioConfig;
 import ai.agentican.framework.config.LlmConfig;
+import ai.agentican.framework.config.McpConfig;
+import ai.agentican.framework.config.PlanConfig;
 import ai.agentican.framework.config.RuntimeConfig;
-import ai.agentican.framework.hitl.AskQuestionToolkit;
+import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlNotifier;
+import ai.agentican.framework.knowledge.KnowledgeIngestor;
 import ai.agentican.framework.knowledge.KnowledgeStore;
+import ai.agentican.framework.knowledge.LlmKnowledgeExtractor;
 import ai.agentican.framework.knowledge.MemKnowledgeStore;
 import ai.agentican.framework.llm.AnthropicLlmClient;
 import ai.agentican.framework.llm.LlmClient;
@@ -18,7 +23,10 @@ import ai.agentican.framework.llm.RetryingLlmClient;
 import ai.agentican.framework.state.MemTaskStateStore;
 import ai.agentican.framework.state.NotifyingTaskStateStore;
 import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.orchestration.InMemoryPlanRegistry;
 import ai.agentican.framework.orchestration.PlanRegistry;
+import ai.agentican.framework.skill.InMemorySkillRegistry;
+import ai.agentican.framework.skill.SkillRegistry;
 import ai.agentican.framework.orchestration.execution.TaskHandle;
 import ai.agentican.framework.orchestration.execution.TaskRunner;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
@@ -42,6 +50,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 public class Agentican implements AutoCloseable {
 
@@ -54,6 +63,8 @@ public class Agentican implements AutoCloseable {
     private final PlanRegistry planRegistry;
     private final AgentRegistry agentRegistry;
     private final ToolkitRegistry toolkitRegistry;
+    private final SkillRegistry skillRegistry;
+    private final AgentFactory agentFactory;
 
     private final PlannerAgent taskPlanner;
     private final TaskRunner taskRunner;
@@ -71,8 +82,13 @@ public class Agentican implements AutoCloseable {
         return new AgenticanBuilder();
     }
 
+    @SuppressWarnings("unused")
     private Agentican(RuntimeConfig config, Map<String, LlmClient> llms, Map<String, Toolkit> toolkits,
+                      List<AgentConfig> extraAgents, List<SkillConfig> extraSkills, List<PlanConfig> extraPlans,
+                      List<McpConfig> extraMcp, ComposioConfig extraComposio,
                       TaskStateStore taskStateStore, HitlManager hitlManager, KnowledgeStore knowledgeStore,
+                      AgentRegistry agentRegistryOverride, SkillRegistry skillRegistryOverride,
+                      PlanRegistry planRegistryOverride,
                       LlmClientDecorator llmDecorator, TaskDecorator taskDecorator, TaskListener taskListener,
                       ExecutorService taskExecutor) {
 
@@ -80,14 +96,12 @@ public class Agentican implements AutoCloseable {
 
         this.taskDecorator = taskDecorator;
         this.taskListener = taskListener != null ? taskListener : new TaskListener() {};
-        this.taskStateStore = new NotifyingTaskStateStore(taskStateStore, this.taskListener);
         this.hitlManager = hitlManager;
         this.knowledgeStore = knowledgeStore;
 
         this.ownsExecutor = (taskExecutor == null);
         this.taskExecutor = taskExecutor != null ? taskExecutor : Executors.newVirtualThreadPerTaskExecutor();
 
-        // build llm clients
         var mutableLlms = new LinkedHashMap<String, LlmClient>();
 
         var agentRunnerConfig = config.agentRunner();
@@ -98,7 +112,6 @@ public class Agentican implements AutoCloseable {
 
             if (llmDecorator != null) client = llmDecorator.decorate(llmConfig, client);
 
-            // Wrap with retry so all callers (agent runner, planner, fact extractor) get retries
             client = new RetryingLlmClient(client,
                     agentRunnerConfig.llmMaxRetries(), agentRunnerConfig.llmRetryBaseDelay());
 
@@ -109,15 +122,34 @@ public class Agentican implements AutoCloseable {
 
         this.llms = Collections.unmodifiableMap(mutableLlms);
 
-        // register toolkits
+        TaskStateStore notifyingStore = new NotifyingTaskStateStore(taskStateStore, this.taskListener);
+
+        if (knowledgeStore != null) {
+
+            var defaultLlmForKnowledge = this.llms.get(LlmConfig.DEFAULT);
+
+            if (defaultLlmForKnowledge != null) {
+
+                var extractor = new LlmKnowledgeExtractor(defaultLlmForKnowledge);
+                var ingestor = new KnowledgeIngestor(taskStateStore, knowledgeStore, extractor, this.taskExecutor);
+
+                notifyingStore = new NotifyingTaskStateStore(notifyingStore, ingestor);
+            }
+        }
+
+        this.taskStateStore = notifyingStore;
+
         var toolkitRegistry = new ToolkitRegistry();
 
-        // register MCP toolkits
-        config.mcp().forEach(mcpConfig ->
-                toolkitRegistry.register(mcpConfig.slug(), McpToolkit.of(mcpConfig)));
+        Stream.concat(
+                config.mcp() != null ? config.mcp().stream() : Stream.<McpConfig>empty(),
+                extraMcp != null ? extraMcp.stream() : Stream.<McpConfig>empty()
+        ).forEach(mcpConfig -> toolkitRegistry.register(mcpConfig.slug(), McpToolkit.of(mcpConfig)));
 
-        // register Composio toolkits
-        var composioConfig = config.composio();
+        var composioConfig = extraComposio != null ? extraComposio : config.composio();
+
+        if (extraComposio != null && config.composio() != null)
+            LOG.warn("Both RuntimeConfig.composio() and builder.composio(...) provided — using the builder value");
 
         if (composioConfig != null && composioConfig.apiKey() != null) {
 
@@ -130,31 +162,57 @@ public class Agentican implements AutoCloseable {
                     toolkitRegistry.register(composioToolkit.slug(), composioToolkit));
         }
 
-        // register custom toolkits
         toolkits.forEach(toolkitRegistry::register);
-
-        // register built-in toolkits
-        toolkitRegistry.register(AskQuestionToolkit.TOOL_NAME, new AskQuestionToolkit());
 
         this.toolkitRegistry = toolkitRegistry;
 
         var defaultLlm = this.llms.get(LlmConfig.DEFAULT);
 
-        // register agents
-        var agentRegistry = new AgentRegistry();
+        SkillRegistry skillRegistry = skillRegistryOverride != null ? skillRegistryOverride : new InMemorySkillRegistry();
+        skillRegistry.seed();
 
-        config.agents().forEach(agentConfig -> agentRegistry.register(buildAgent(agentConfig)));
+        Stream.concat(
+                config.skills() != null ? config.skills().stream() : Stream.<SkillConfig>empty(),
+                extraSkills != null ? extraSkills.stream() : Stream.<SkillConfig>empty()
+        ).forEach(skill -> {
+            requireExternalId("skill", skill.name(), skill.externalId());
+            skillRegistry.register(skill);
+        });
+
+        this.skillRegistry = skillRegistry;
+
+        var agentFactory = new AgentFactory(config, this.llms, this.hitlManager,
+                this.knowledgeStore, this.taskStateStore, skillRegistry, this.taskListener);
+        this.agentFactory = agentFactory;
+
+        AgentRegistry agentRegistry = agentRegistryOverride != null ? agentRegistryOverride : new InMemoryAgentRegistry();
+        agentRegistry.seed(agentFactory);
+
+        Stream.concat(
+                config.agents() != null ? config.agents().stream() : Stream.<AgentConfig>empty(),
+                extraAgents != null ? extraAgents.stream() : Stream.<AgentConfig>empty()
+        ).forEach(agentConfig -> {
+            requireExternalId("agent", agentConfig.name(), agentConfig.externalId());
+            agentRegistry.register(agentFactory.build(agentConfig));
+        });
 
         this.agentRegistry = agentRegistry;
 
-        // register plans
-        var planRegistry = new PlanRegistry();
+        PlanRegistry planRegistry = planRegistryOverride != null ? planRegistryOverride : new InMemoryPlanRegistry();
+        planRegistry.seed();
 
-        config.plans().forEach(planConfig -> planRegistry.register(planConfig.toPlan()));
+        Stream.concat(
+                config.plans() != null ? config.plans().stream() : Stream.<PlanConfig>empty(),
+                extraPlans != null ? extraPlans.stream() : Stream.<PlanConfig>empty()
+        ).forEach(planConfig -> {
+            requireExternalId("plan", planConfig.name(), planConfig.externalId());
+            planRegistry.register(planConfig.toPlan());
+        });
 
         this.planRegistry = planRegistry;
 
-        this.taskPlanner = new PlannerAgent(defaultLlm, agentRegistry, toolkitRegistry, this::buildAgent);
+        this.taskPlanner = new PlannerAgent(defaultLlm, agentRegistry, toolkitRegistry, skillRegistry,
+                planRegistry, agentFactory);
 
         var taskTimeout = agentRunnerConfig.taskTimeout();
         var maxStepRetries = agentRunnerConfig.maxStepRetries();
@@ -222,13 +280,14 @@ public class Agentican implements AutoCloseable {
 
                 taskListener.onPlanStarted(taskId);
 
-                var plan = taskPlanner.plan(taskDescription);
+                var planningResult = taskPlanner.plan(taskDescription);
+                var plan = planningResult.plan();
 
                 planRegistry.registerIfAbsent(plan);
 
                 taskListener.onPlanCompleted(taskId, plan.id());
 
-                return taskRunner.run(plan, taskId, Map.of(), taskCancelled);
+                return taskRunner.run(plan, taskId, planningResult.inputs(), taskCancelled);
 
             }
             catch (Exception e) {
@@ -267,54 +326,22 @@ public class Agentican implements AutoCloseable {
         return toolkitRegistry;
     }
 
+    public SkillRegistry skills() {
+
+        return skillRegistry;
+    }
+
     public HitlManager hitlManager() {
 
         return hitlManager;
     }
 
-    private Agent buildAgent(AgentConfig agentConfig) {
+    private static void requireExternalId(String kind, String name, String externalId) {
 
-        var agentName = agentConfig.name();
-        var agentRole = agentConfig.role();
-        var agentSkills = agentConfig.skills();
-
-        var llmName = agentConfig.llm();
-        var defaultLlm = llms.get(LlmConfig.DEFAULT);
-
-        var agentLlm = llms.getOrDefault(llmName, defaultLlm);
-
-        if (agentLlm == null)
-            throw new IllegalStateException("No LLM client found for '" + agentConfig.llm() + "' (agent: " + agentName + ")");
-
-        var agentRunnerConfig = config.agentRunner();
-
-        var maxTurns = agentRunnerConfig.maxTurns();
-        var timeout = agentRunnerConfig.timeout();
-
-        var llmConfig = config.llm().stream()
-                .filter(llm -> llm.name().equals(llmName))
-                .findFirst()
-                .orElse(config.llm().isEmpty() ? null : config.llm().getFirst());
-
-        var agentRunnerBuilder = SmacAgentRunner.builder()
-                .llmClient(agentLlm)
-                .llmName(llmName != null ? llmName : LlmConfig.DEFAULT)
-                .llmProvider(llmConfig != null ? llmConfig.provider() : null)
-                .llmModel(llmConfig != null ? llmConfig.model() : null)
-                .maxIterations(maxTurns)
-                .timeout(timeout)
-                .hitlManager(hitlManager)
-                .knowledgeStore(knowledgeStore)
-                .taskStateStore(taskStateStore)
-                .taskListener(taskListener);
-
-        var agentRunner = agentRunnerBuilder.build();
-
-        var agent = Agent.of(agentName, agentRole, agentSkills, agentRunner);
-
-        LOG.info(Logs.AGENTICAN_BUILT_AGENT, agentName);
-
-        return agent;
+        if (externalId == null || externalId.isBlank())
+            throw new IllegalStateException(kind + " '" + name + "' is missing an externalId. "
+                    + "Config-file and fluent-builder " + kind + "s must declare a stable externalId "
+                    + "so the catalog can upsert consistently across deploys.");
     }
 
     @Override
@@ -333,8 +360,17 @@ public class Agentican implements AutoCloseable {
         private final Map<String, LlmClient> llms = new LinkedHashMap<>();
         private final Map<String, Toolkit> toolkits = new LinkedHashMap<>();
 
+        private final List<AgentConfig> extraAgents = new ArrayList<>();
+        private final List<SkillConfig> extraSkills = new ArrayList<>();
+        private final List<PlanConfig> extraPlans = new ArrayList<>();
+        private final List<McpConfig> extraMcp = new ArrayList<>();
+        private ComposioConfig extraComposio;
+
         private HitlManager hitlManager;
         private KnowledgeStore knowledgeStore;
+        private AgentRegistry agentRegistry;
+        private SkillRegistry skillRegistry;
+        private PlanRegistry planRegistry;
         private LlmClientDecorator llmDecorator;
         private TaskDecorator taskDecorator;
         private TaskListener stepListener;
@@ -344,9 +380,20 @@ public class Agentican implements AutoCloseable {
         public AgenticanBuilder config(RuntimeConfig config) { this.config = config; return this; }
         public AgenticanBuilder llm(String name, LlmClient llm) { this.llms.put(name, llm); return this; }
         public AgenticanBuilder llmDecorator(LlmClientDecorator llmDecorator) { this.llmDecorator = llmDecorator; return this; }
+
+        public AgenticanBuilder agent(AgentConfig agent) { this.extraAgents.add(agent); return this; }
+        public AgenticanBuilder skill(SkillConfig skill) { this.extraSkills.add(skill); return this; }
+        public AgenticanBuilder plan(PlanConfig plan)   { this.extraPlans.add(plan);   return this; }
+        public AgenticanBuilder mcp(McpConfig mcp)      { this.extraMcp.add(mcp);      return this; }
+        public AgenticanBuilder composio(ComposioConfig composio) { this.extraComposio = composio; return this; }
+
         public AgenticanBuilder toolkit(String slug, Toolkit toolkit) { this.toolkits.put(slug, toolkit); return this; }
+
         public AgenticanBuilder hitlManager(HitlManager hitlManager) { this.hitlManager = hitlManager; return this; }
         public AgenticanBuilder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
+        public AgenticanBuilder agentRegistry(AgentRegistry agentRegistry) { this.agentRegistry = agentRegistry; return this; }
+        public AgenticanBuilder skillRegistry(SkillRegistry skillRegistry) { this.skillRegistry = skillRegistry; return this; }
+        public AgenticanBuilder planRegistry(PlanRegistry planRegistry) { this.planRegistry = planRegistry; return this; }
         public AgenticanBuilder taskDecorator(TaskDecorator taskDecorator) { this.taskDecorator = taskDecorator; return this; }
         public AgenticanBuilder stepListener(TaskListener taskListener) { this.stepListener = taskListener; return this; }
         public AgenticanBuilder taskStateStore(TaskStateStore taskStateStore) { this.taskStateStore = taskStateStore; return this; }
@@ -361,7 +408,9 @@ public class Agentican implements AutoCloseable {
             knowledgeStore = knowledgeStore != null ? knowledgeStore : new MemKnowledgeStore();
             taskStateStore = taskStateStore != null ? taskStateStore : new MemTaskStateStore();
 
-            return new Agentican(config, llms, toolkits, taskStateStore, hitlManager, knowledgeStore, llmDecorator,
+            return new Agentican(config, llms, toolkits,
+                    extraAgents, extraSkills, extraPlans, extraMcp, extraComposio,
+                    taskStateStore, hitlManager, knowledgeStore, agentRegistry, skillRegistry, planRegistry, llmDecorator,
                     taskDecorator, stepListener, taskExecutor);
         }
     }
