@@ -1,6 +1,7 @@
 package ai.agentican.framework.state;
 
 import ai.agentican.framework.hitl.HitlCheckpoint;
+import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
 
@@ -22,6 +23,8 @@ public class StepLog {
     private volatile HitlCheckpoint checkpoint;
     private volatile Instant completedAt;
     private volatile TokenUsage aggregateTokenUsage;
+    private volatile String branchChosenPath;
+    private volatile HitlResponse hitlResponse;
 
     public StepLog(String id, String stepName) {
 
@@ -69,4 +72,10 @@ public class StepLog {
     public void addRun(RunLog run) { runs.add(run); }
 
     public void setAggregateTokenUsage(TokenUsage usage) { this.aggregateTokenUsage = usage; }
+
+    public String branchChosenPath() { return branchChosenPath; }
+    public void setBranchChosenPath(String pathName) { this.branchChosenPath = pathName; }
+
+    public HitlResponse hitlResponse() { return hitlResponse; }
+    public void setHitlResponse(HitlResponse response) { this.hitlResponse = response; }
 }

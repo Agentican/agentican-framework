@@ -1,5 +1,6 @@
 package ai.agentican.framework.agent;
 
+import ai.agentican.framework.orchestration.execution.resume.ResumePlan;
 import ai.agentican.framework.state.RunLog;
 import ai.agentican.framework.tools.ToolResult;
 import ai.agentican.framework.tools.Toolkit;
@@ -7,6 +8,7 @@ import ai.agentican.framework.tools.Toolkit;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public interface AgentRunner {
 
@@ -18,6 +20,15 @@ public interface AgentRunner {
                                String stepId, String stepName) {
 
         throw new UnsupportedOperationException("This agent runner does not support HITL resume");
+    }
+
+    default AgentResult resumeAfterCrash(Agent agent, String task, List<String> activeSkills,
+                                         RunLog savedRun, ResumePlan resumePlan,
+                                         Map<String, Toolkit> toolkits,
+                                         String taskId, String stepId, String stepName,
+                                         AtomicBoolean cancelled) {
+
+        return new AgentResult(AgentStatus.FAILED, savedRun);
     }
 
     default AgentRunner withTimeout(Duration timeout) { return this; }

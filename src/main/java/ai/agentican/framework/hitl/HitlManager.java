@@ -79,7 +79,6 @@ public class HitlManager {
 
             if (e.getCause() instanceof TimeoutException) {
 
-                pending.remove(checkpointId);
                 checkpoints.remove(checkpointId);
 
                 LOG.warn("HITL checkpoint '{}' timed out after {}", checkpointId, timeout);
@@ -93,11 +92,11 @@ public class HitlManager {
 
     public void respond(String checkpointId, HitlResponse response) {
 
-        var asyncResponse = pending.remove(checkpointId);
+        var asyncResponse = pending.get(checkpointId);
 
         checkpoints.remove(checkpointId);
 
-        if (asyncResponse == null) {
+        if (asyncResponse == null || asyncResponse.isDone()) {
 
             LOG.warn("No pending checkpoint found for ID: {}", checkpointId);
 
@@ -111,11 +110,11 @@ public class HitlManager {
 
     public void cancel(String checkpointId) {
 
-        var asyncResponse = pending.remove(checkpointId);
+        var asyncResponse = pending.get(checkpointId);
 
         checkpoints.remove(checkpointId);
 
-        if (asyncResponse != null) {
+        if (asyncResponse != null && !asyncResponse.isDone()) {
 
             LOG.info("Checkpoint '{}' cancelled", checkpointId);
 
@@ -126,6 +125,22 @@ public class HitlManager {
     public Map<String, HitlCheckpoint> pendingCheckpoints() {
 
         return Collections.unmodifiableMap(checkpoints);
+    }
+
+    public void rehydrate(HitlCheckpoint checkpoint) {
+
+        if (checkpoint == null || checkpoint.id() == null) return;
+
+        checkpoints.putIfAbsent(checkpoint.id(), checkpoint);
+        pending.computeIfAbsent(checkpoint.id(), k -> new CompletableFuture<>());
+
+        LOG.info("Checkpoint '{}' rehydrated after restart", checkpoint.id());
+    }
+
+    public boolean hasPending(String checkpointId) {
+
+        var future = pending.get(checkpointId);
+        return future != null && !future.isDone();
     }
 
     private HitlCheckpoint createCheckpoint(String id, HitlCheckpointType type, String stepName,

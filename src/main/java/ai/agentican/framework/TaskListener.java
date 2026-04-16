@@ -24,4 +24,11 @@ public interface TaskListener {
     default void onHitlNotified(String taskId, String hitlId, HitlCheckpointType type) {}
     default void onHitlResponded(String taskId, String hitlId, boolean approved) {}
     default void onToken(String taskId, String turnId, String token) {}
+    default void onTaskReaped(String taskId,
+                              ai.agentican.framework.orchestration.execution.resume.ReapReason reason) {}
+    default void onTaskResumed(String taskId) {}
+    default void onStepResumed(String taskId, String stepId) {}
+    default void onRunResumed(String taskId, String runId) {}
+    default void onTurnResumed(String taskId, String turnId,
+                               ai.agentican.framework.orchestration.execution.resume.TurnResumeState state) {}
 }

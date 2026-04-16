@@ -494,6 +494,594 @@ class AgenticanTest {
     }
 
     @Test
+    void reapOrphansMarksInProgressTasksFailed() {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+
+            var taskId = "orphan-" + ai.agentican.framework.util.Ids.generate();
+            store.taskStarted(taskId, "left running", null, Map.of());
+            var stepId = "step-" + ai.agentican.framework.util.Ids.generate();
+            store.stepStarted(taskId, stepId, "running-step");
+
+            var reaped = agentican.reapOrphans();
+
+            assertEquals(1, reaped);
+
+            var reloaded = store.load(taskId);
+            assertEquals(TaskStatus.FAILED, reloaded.status());
+            assertEquals(TaskStatus.FAILED, reloaded.step("running-step").status());
+        }
+    }
+
+    @Test
+    void reapOrphansLeavesTerminalTasksAlone() {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+            var taskId = "done-" + ai.agentican.framework.util.Ids.generate();
+            store.taskStarted(taskId, "already done", null, Map.of());
+            store.taskCompleted(taskId, TaskStatus.COMPLETED);
+
+            var reaped = agentican.reapOrphans();
+
+            assertEquals(0, reaped);
+            assertEquals(TaskStatus.COMPLETED, store.load(taskId).status());
+        }
+    }
+
+    @Test
+    void resumeInterruptedDrivesInflightAgentStepToCompletion() throws Exception {
+
+        var mockLlm = new MockLlmClient()
+                .onSend("planning-process", """
+                    {
+                        "type": "create",
+                        "name": "Resume Task",
+                        "description": "Resumable task",
+                        "agents": [{"name": "worker", "role": "Worker", "skills": []}],
+                        "paramConfigs": [],
+                        "stepConfigs": [{"name": "do-work", "type": "agent", "agent": "worker", "instructions": "Run to completion after resume"}]
+                    }
+                    """)
+                .onSend("after resume", "All done after resume");
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", mockLlm.toLlmClient())
+                .agent(AgentConfig.forCatalog("worker", "worker", "Worker role", null))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+
+            var taskId = "t-" + ai.agentican.framework.util.Ids.generate();
+            var stepId = "s-" + ai.agentican.framework.util.Ids.generate();
+            var runId = ai.agentican.framework.util.Ids.generate();
+            var turnId = ai.agentican.framework.util.Ids.generate();
+
+            var step = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+                    "do-work", "worker", "Run to completion after resume",
+                    List.of(), false, List.of(), List.of());
+            var plan = ai.agentican.framework.orchestration.model.Plan.of(
+                    "Resume Task", "test", List.of(), List.of(step));
+
+            agentican.plans().register(plan);
+
+            store.taskStarted(taskId, "Resume Task", plan, Map.of());
+            store.stepStarted(taskId, stepId, "do-work");
+            store.runStarted(taskId, stepId, runId, "worker");
+            store.turnStarted(taskId, runId, turnId);
+
+            int handled = agentican.resumeInterrupted();
+            assertEquals(1, handled);
+
+            long deadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < deadline) {
+                var loaded = store.load(taskId);
+                if (loaded != null && loaded.status() == TaskStatus.COMPLETED) break;
+                Thread.sleep(50);
+            }
+
+            var final_ = store.load(taskId);
+            assertEquals(TaskStatus.COMPLETED, final_.status(),
+                    "Resume should drive the abandoned turn to completion via a fresh turn");
+
+            var doWorkStep = final_.step("do-work");
+            assertEquals(TaskStatus.COMPLETED, doWorkStep.status());
+            assertTrue(doWorkStep.output() != null && doWorkStep.output().contains("done"));
+        }
+    }
+
+    @Test
+    void resumeWithPlanCorruptReapsWithSpecificReason() {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+
+            var taskId = "t-corrupt-" + ai.agentican.framework.util.Ids.generate();
+            store.taskStarted(taskId, "corrupt-plan-task", null, Map.of());
+
+            var taskLog = store.load(taskId);
+            taskLog.setPlanSnapshotCorrupt(true);
+
+            var classified = ai.agentican.framework.orchestration.execution.resume.ResumeClassifier
+                    .classify(taskLog, null);
+
+            assertTrue(classified.reapOnly());
+            assertEquals(ai.agentican.framework.orchestration.execution.resume.ReapReason.PLAN_CORRUPT, classified.reapReason());
+        }
+    }
+
+    @Test
+    void listInProgressFiltersOutTerminalTasks() {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+            var runningId = "run-" + ai.agentican.framework.util.Ids.generate();
+            var doneId = "done-" + ai.agentican.framework.util.Ids.generate();
+
+            store.taskStarted(runningId, "running", null, Map.of());
+            store.taskStarted(doneId, "done", null, Map.of());
+            store.taskCompleted(doneId, TaskStatus.COMPLETED);
+
+            var inProgressIds = store.listInProgress().stream()
+                    .map(t -> t.taskId()).toList();
+
+            assertTrue(inProgressIds.contains(runningId));
+            assertFalse(inProgressIds.contains(doneId));
+        }
+    }
+
+    @Test
+    void resumeMaxConcurrentGatesResumesWithoutLosingAny() throws Exception {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .agent(AgentConfig.forCatalog("worker", "worker", "Worker", null))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+            var step = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+                    "do", "worker", "do it", List.of(), false, List.of(), List.of());
+            var plan = ai.agentican.framework.orchestration.model.Plan.of(
+                    "Bounded Resume", "test", List.of(), List.of(step));
+            agentican.plans().register(plan);
+
+            for (int i = 0; i < 3; i++) {
+                var taskId = "t-" + i + "-" + ai.agentican.framework.util.Ids.generate();
+                store.taskStarted(taskId, "Bounded Resume", plan, Map.of());
+                var stepId = "s-" + i + "-" + ai.agentican.framework.util.Ids.generate();
+                store.stepStarted(taskId, stepId, "do");
+            }
+
+            var handled = agentican.resumeInterrupted(1);
+            assertEquals(3, handled);
+
+            long deadline = System.currentTimeMillis() + 10_000;
+            while (System.currentTimeMillis() < deadline) {
+                if (store.listInProgress().isEmpty()) break;
+                Thread.sleep(100);
+            }
+
+            assertEquals(0, store.listInProgress().size(),
+                    "All 3 tasks should eventually complete despite concurrency=1");
+        }
+    }
+
+    @Test
+    void resumeDispatchesRemainingParallelSiblingsConcurrently() throws Exception {
+
+        var mockLlm = new MockLlmClient()
+                .onSendRepeated("curate a team knowledge base", endTurn("{\"entries\":[]}"))
+                .onSend("sibling-a", "A done")
+                .onSend("sibling-b", "B done")
+                .onSend("sibling-c", "C done")
+                .onSend("synthesize", "all synthesized");
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", mockLlm.toLlmClient())
+                .agent(AgentConfig.forCatalog("worker", "worker", "Worker", null))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+
+            var siblingA = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+                    "sibling-a", "worker", "sibling-a", List.of(), false, List.of(), List.of());
+            var siblingB = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+                    "sibling-b", "worker", "sibling-b", List.of(), false, List.of(), List.of());
+            var siblingC = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+                    "sibling-c", "worker", "sibling-c", List.of(), false, List.of(), List.of());
+            var synth = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+                    "synthesize", "worker", "synthesize",
+                    List.of("sibling-a", "sibling-b", "sibling-c"), false, List.of(), List.of());
+
+            var plan = ai.agentican.framework.orchestration.model.Plan.of(
+                    "Parallel Resume", "test", List.of(),
+                    List.of(siblingA, siblingB, siblingC, synth));
+
+            agentican.plans().register(plan);
+
+            var taskId = "t-" + ai.agentican.framework.util.Ids.generate();
+            store.taskStarted(taskId, "Parallel Resume", plan, Map.of());
+
+            var aStepId = ai.agentican.framework.util.Ids.generate();
+            store.stepStarted(taskId, aStepId, "sibling-a");
+            store.stepCompleted(taskId, aStepId, TaskStatus.COMPLETED, "A done");
+
+            int handled = agentican.resumeInterrupted();
+            assertEquals(1, handled);
+
+            long deadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < deadline) {
+                var loaded = store.load(taskId);
+                if (loaded != null && loaded.status() == TaskStatus.COMPLETED) break;
+                Thread.sleep(50);
+            }
+
+            var finalLog = store.load(taskId);
+            assertEquals(TaskStatus.COMPLETED, finalLog.status(),
+                    "Parallel-resume should reach COMPLETED via the runSeeded dispatch loop");
+
+            assertEquals(TaskStatus.COMPLETED, finalLog.step("sibling-a").status());
+            assertEquals(TaskStatus.COMPLETED, finalLog.step("sibling-b").status());
+            assertEquals(TaskStatus.COMPLETED, finalLog.step("sibling-c").status());
+            assertEquals(TaskStatus.COMPLETED, finalLog.step("synthesize").status());
+
+            assertEquals(0, finalLog.step("sibling-a").runs().size(),
+                    "Already-completed step must NOT be re-dispatched (zero new runs after resume)");
+            assertTrue(finalLog.step("sibling-b").runs().size() >= 1);
+            assertTrue(finalLog.step("sibling-c").runs().size() >= 1);
+        }
+    }
+
+    @Test
+    void resumeInterruptedClassifiesAndReaps() {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+            var taskId = "interrupted-" + ai.agentican.framework.util.Ids.generate();
+            store.taskStarted(taskId, "mid-step-crash", null, Map.of());
+            var stepId = "step-" + ai.agentican.framework.util.Ids.generate();
+            store.stepStarted(taskId, stepId, "working-step");
+
+            var handled = agentican.resumeInterrupted();
+
+            assertEquals(1, handled);
+
+            var reloaded = store.load(taskId);
+            assertEquals(TaskStatus.FAILED, reloaded.status(),
+                    "In v1, resumeInterrupted falls back to reap while drive-forward is implemented in PR 5");
+        }
+    }
+
+    @Test
+    void reapOrphansLeavesSubTasksToParent() {
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> endTurn("ok"))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+            var parentId = "parent-" + ai.agentican.framework.util.Ids.generate();
+            var childId = "child-" + ai.agentican.framework.util.Ids.generate();
+            var stepId = "s-" + ai.agentican.framework.util.Ids.generate();
+
+            store.taskStarted(parentId, "parent", null, Map.of());
+            store.stepStarted(parentId, stepId, "loop-step");
+            store.taskStarted(childId, "iter-0", null, Map.of(), parentId, stepId, 0);
+
+            var reaped = agentican.reapOrphans();
+
+            assertEquals(1, reaped, "Only the parent is counted in the reap total; sub-tasks cascade");
+            assertEquals(TaskStatus.FAILED, store.load(parentId).status());
+            assertEquals(TaskStatus.FAILED, store.load(childId).status(),
+                    "Sub-task cascades to FAILED when its parent is reaped — prevents orphan RUNNING sub-task rows");
+        }
+    }
+
+    @Test
+    void resumeBranchStepUsesExistingCompletedChildWithoutReDispatch() throws Exception {
+
+        // Covers gap #13: when the branch-step's chosen child sub-task is already COMPLETED,
+        // resume must reuse its output — not re-dispatch the path body.
+        var llmCallCount = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        var mockLlm = new MockLlmClient()
+                .onSendRepeated("should-never-call", endTurn("would be wrong"));
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> {
+                    llmCallCount.incrementAndGet();
+                    return mockLlm.toLlmClient().send(request);
+                })
+                .agent(AgentConfig.forCatalog("worker", "worker", "Worker", null))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+
+            var pathBodyStep = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+                    "path-body", "worker", "do path", List.of(), false, List.of(), List.of());
+            var sourceForBranch = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+                    "source", "worker", "produce", List.of(), false, List.of(), List.of());
+            var branch = ai.agentican.framework.orchestration.model.PlanStepBranch.of(
+                    "choose", "source",
+                    List.of(new ai.agentican.framework.orchestration.model.PlanStepBranch.Path(
+                            "A", List.of(pathBodyStep))),
+                    "A", List.of(), false);
+
+            var plan = ai.agentican.framework.orchestration.model.Plan.of(
+                    "Branch Resume", "test", List.of(), List.of(sourceForBranch, branch));
+
+            agentican.plans().register(plan);
+
+            var taskId = "t-branch-" + ai.agentican.framework.util.Ids.generate();
+            var stepId = "s-" + ai.agentican.framework.util.Ids.generate();
+            var childId = "c-" + ai.agentican.framework.util.Ids.generate();
+            var childStepId = "cs-" + ai.agentican.framework.util.Ids.generate();
+
+            store.taskStarted(taskId, "Branch Resume", plan, Map.of());
+
+            var sourceStepId = "src-" + ai.agentican.framework.util.Ids.generate();
+            store.stepStarted(taskId, sourceStepId, "source");
+            store.stepCompleted(taskId, sourceStepId, TaskStatus.COMPLETED, "source-output");
+
+            store.stepStarted(taskId, stepId, "choose");
+            store.branchPathChosen(taskId, stepId, "A");
+
+            // Pre-seed a COMPLETED child sub-task for the chosen path.
+            var childPlan = ai.agentican.framework.orchestration.model.Plan.of(
+                    "choose-A", "", List.of(), List.of(pathBodyStep));
+            store.taskStarted(childId, "choose-A", childPlan, Map.of(), taskId, stepId, 0);
+            store.stepStarted(childId, childStepId, "path-body");
+            store.stepCompleted(childId, childStepId, TaskStatus.COMPLETED, "prerecorded path output");
+            store.taskCompleted(childId, TaskStatus.COMPLETED);
+
+            var before = llmCallCount.get();
+
+            int handled = agentican.resumeInterrupted();
+            assertEquals(1, handled);
+
+            long deadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < deadline) {
+                var loaded = store.load(taskId);
+                if (loaded != null && loaded.status() == TaskStatus.COMPLETED) break;
+                Thread.sleep(50);
+            }
+
+            var finalLog = store.load(taskId);
+            assertEquals(TaskStatus.COMPLETED, finalLog.status(),
+                    "Branch-resume should complete the parent task by reusing the existing child output");
+            assertEquals(before, llmCallCount.get(),
+                    "No LLM call should be made — the existing completed child output is reused verbatim");
+        }
+    }
+
+    @Test
+    void resumeLoopStepSkipsCompletedIterations() throws Exception {
+
+        // Covers gap #14: when a loop step has a completed iteration 0 and missing iteration 1,
+        // resume must preserve iter-0's output and dispatch iter-1 fresh — never re-run iter-0.
+        var llmCallCount = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        var mockLlm = new MockLlmClient()
+                .onSendRepeated("iter-body", endTurn("iter-1 fresh output"));
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", request -> {
+                    llmCallCount.incrementAndGet();
+                    return mockLlm.toLlmClient().send(request);
+                })
+                .agent(AgentConfig.forCatalog("worker", "worker", "Worker", null))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+
+            var source = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+                    "source", "worker", "produce items", List.of(), false, List.of(), List.of());
+
+            var bodyStep = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+                    "iter-body", "worker", "iter-body", List.of(), false, List.of(), List.of());
+
+            var loop = new ai.agentican.framework.orchestration.model.PlanStepLoop(
+                    "each", "source", List.of(bodyStep), List.of(), false);
+
+            var plan = ai.agentican.framework.orchestration.model.Plan.of(
+                    "Loop Resume", "test", List.of(), List.of(source, loop));
+
+            agentican.plans().register(plan);
+
+            var taskId = "t-loop-" + ai.agentican.framework.util.Ids.generate();
+            var sourceStepId = "src-" + ai.agentican.framework.util.Ids.generate();
+            var loopStepId = "loop-" + ai.agentican.framework.util.Ids.generate();
+            var iter0Id = "i0-" + ai.agentican.framework.util.Ids.generate();
+            var iter0StepId = "i0s-" + ai.agentican.framework.util.Ids.generate();
+
+            store.taskStarted(taskId, "Loop Resume", plan, Map.of());
+
+            store.stepStarted(taskId, sourceStepId, "source");
+            store.stepCompleted(taskId, sourceStepId, TaskStatus.COMPLETED,
+                    "[\"a\",\"b\"]");
+
+            store.stepStarted(taskId, loopStepId, "each");
+
+            // Pre-seed iter-0 as COMPLETED, iter-1 absent.
+            var iterPlan = ai.agentican.framework.orchestration.model.Plan.of(
+                    "each-iter-1", "", List.of(), List.of(bodyStep));
+            store.taskStarted(iter0Id, "each-iter-1", iterPlan, Map.of(), taskId, loopStepId, 0);
+            store.stepStarted(iter0Id, iter0StepId, "iter-body");
+            store.stepCompleted(iter0Id, iter0StepId, TaskStatus.COMPLETED, "iter-0 prerecorded");
+            store.taskCompleted(iter0Id, TaskStatus.COMPLETED);
+
+            var before = llmCallCount.get();
+
+            int handled = agentican.resumeInterrupted();
+            assertEquals(1, handled);
+
+            long deadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < deadline) {
+                var loaded = store.load(taskId);
+                if (loaded != null && loaded.status() == TaskStatus.COMPLETED) break;
+                Thread.sleep(50);
+            }
+
+            var finalLog = store.load(taskId);
+            assertEquals(TaskStatus.COMPLETED, finalLog.status(),
+                    "Loop-resume should complete after dispatching only the missing iteration");
+
+            // iter-0 child sub-task must remain COMPLETED with its prerecorded output — NOT re-run.
+            var iter0Log = store.load(iter0Id);
+            assertEquals(TaskStatus.COMPLETED, iter0Log.status());
+            assertEquals("iter-0 prerecorded", iter0Log.step("iter-body").output(),
+                    "Completed iteration output must be preserved verbatim — iter-0 was not re-run");
+
+            // Exactly one LLM call: the missing iter-1. iter-0 must NOT be re-run.
+            assertEquals(before + 1, llmCallCount.get(),
+                    "Exactly one LLM call expected — for the missing iteration only");
+        }
+    }
+
+    @Test
+    void resumeSuspendedStepWithRejectedStepOutputMarksTaskFailedWithFeedback() throws Exception {
+
+        // Covers gap #11 (full integration): SUSPENDED step with persisted rejected STEP_OUTPUT
+        // HITL response — resumeSuspendedAgentStep's rejection shortcut must mark the step FAILED
+        // with the feedback text, without invoking the LLM.
+
+        var mockLlm = new MockLlmClient();  // zero entries: throws if invoked
+
+        var config = RuntimeConfig.builder()
+                .llm(LlmConfig.builder().apiKey("mock").build())
+                .build();
+
+        try (var agentican = Agentican.builder()
+                .config(config)
+                .llm("default", mockLlm.toLlmClient())
+                .agent(AgentConfig.forCatalog("worker", "worker", "Worker", null))
+                .build()) {
+
+            var store = agentican.taskStateStore();
+
+            var step = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+                    "review", "worker", "review draft", List.of(), true, List.of(), List.of());
+            var plan = ai.agentican.framework.orchestration.model.Plan.of(
+                    "Rejected-Output Resume", "test", List.of(), List.of(step));
+
+            agentican.plans().register(plan);
+
+            var taskId = "t-rej-" + ai.agentican.framework.util.Ids.generate();
+            var stepId = "s-" + ai.agentican.framework.util.Ids.generate();
+            var runId = ai.agentican.framework.util.Ids.generate();
+            var turnId = ai.agentican.framework.util.Ids.generate();
+
+            store.taskStarted(taskId, "Rejected-Output Resume", plan, Map.of());
+            store.stepStarted(taskId, stepId, "review");
+            store.runStarted(taskId, stepId, runId, "worker");
+            store.turnStarted(taskId, runId, turnId);
+            store.messageSent(taskId, turnId,
+                    new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c"));
+            store.responseReceived(taskId, turnId,
+                    new ai.agentican.framework.llm.LlmResponse("draft", List.of(),
+                            ai.agentican.framework.llm.StopReason.END_TURN, 1, 1, 0, 0, 0));
+            store.turnCompleted(taskId, turnId);
+
+            var checkpoint = new ai.agentican.framework.hitl.HitlCheckpoint(
+                    ai.agentican.framework.util.Ids.generate(),
+                    ai.agentican.framework.hitl.HitlCheckpointType.STEP_OUTPUT,
+                    "review", "Step output: review", "draft");
+            store.hitlNotified(taskId, stepId, checkpoint);
+            store.hitlResponded(taskId, stepId, HitlResponse.reject("needs more polish"));
+            store.stepCompleted(taskId, stepId, TaskStatus.SUSPENDED, "draft");
+
+            int handled = agentican.resumeInterrupted();
+            assertEquals(1, handled);
+
+            long deadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < deadline) {
+                var loaded = store.load(taskId);
+                if (loaded != null && loaded.status() != null) break;
+                Thread.sleep(50);
+            }
+
+            var finalLog = store.load(taskId);
+            assertEquals(TaskStatus.FAILED, finalLog.status(),
+                    "Rejected STEP_OUTPUT on resume must drive the task to FAILED");
+            assertEquals(TaskStatus.FAILED, finalLog.step("review").status());
+            assertNotNull(finalLog.step("review").output());
+            assertTrue(finalLog.step("review").output().contains("needs more polish"),
+                    "Rejection feedback must be surfaced in the step output");
+        }
+    }
+
+    @Test
     void agentMissingExternalIdFailsAtBoot() {
 
         var config = RuntimeConfig.builder()

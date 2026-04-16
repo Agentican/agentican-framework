@@ -124,6 +124,15 @@ public class MemTaskStateStore implements TaskStateStore {
     }
 
     @Override
+    public void turnAbandoned(String taskId, String turnId) {
+
+        var turnLog = requireLog(taskId).findTurnById(turnId);
+
+        if (turnLog != null)
+            turnLog.abandon();
+    }
+
+    @Override
     public void messageSent(String taskId, String turnId, LlmRequest request) {
 
         var turnLog = requireLog(taskId).findTurnById(turnId);
@@ -169,8 +178,17 @@ public class MemTaskStateStore implements TaskStateStore {
 
         var stepLog = requireLog(taskId).findStepById(stepId);
 
+        if (stepLog != null && response != null)
+            stepLog.setHitlResponse(response);
+    }
+
+    @Override
+    public void branchPathChosen(String taskId, String stepId, String pathName) {
+
+        var stepLog = requireLog(taskId).findStepById(stepId);
+
         if (stepLog != null)
-            stepLog.setCheckpoint(null);
+            stepLog.setBranchChosenPath(pathName);
     }
 
     @Override

@@ -2,6 +2,7 @@ package ai.agentican.framework.state;
 
 import ai.agentican.framework.llm.LlmRequest;
 import ai.agentican.framework.llm.LlmResponse;
+import ai.agentican.framework.orchestration.execution.resume.TurnResumeState;
 import ai.agentican.framework.tools.ToolResult;
 import ai.agentican.framework.util.Ids;
 
@@ -10,6 +11,8 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class TurnLog {
+
+    public enum State { STARTED, COMPLETED, ABANDONED }
 
     private final String id;
     private final int index;
@@ -22,6 +25,8 @@ public class TurnLog {
     private volatile String responseId;
     private volatile LlmResponse response;
     private volatile Instant completedAt;
+    private volatile State state = State.STARTED;
+    private volatile TurnResumeState resumeState;
 
     public TurnLog(String id, int index) {
 
@@ -47,6 +52,14 @@ public class TurnLog {
                    String responseId, LlmResponse response, List<ToolResult> toolResults,
                    Instant startedAt, Instant completedAt) {
 
+        this(id, index, messageId, request, responseId, response, toolResults,
+                startedAt, completedAt, completedAt != null ? State.COMPLETED : State.STARTED);
+    }
+
+    public TurnLog(String id, int index, String messageId, LlmRequest request,
+                   String responseId, LlmResponse response, List<ToolResult> toolResults,
+                   Instant startedAt, Instant completedAt, State state) {
+
         this.id = id;
         this.index = index;
         this.messageId = messageId;
@@ -56,6 +69,7 @@ public class TurnLog {
         this.toolResults = new CopyOnWriteArrayList<>(toolResults != null ? toolResults : List.of());
         this.startedAt = startedAt != null ? startedAt : Instant.now();
         this.completedAt = completedAt;
+        this.state = state != null ? state : (completedAt != null ? State.COMPLETED : State.STARTED);
     }
 
     public void setRequest(LlmRequest request) {
@@ -70,7 +84,21 @@ public class TurnLog {
 
     public void addToolResult(ToolResult result) { toolResults.add(result); }
 
-    public void complete() { this.completedAt = Instant.now(); }
+    public void complete() {
+        this.completedAt = Instant.now();
+        this.state = State.COMPLETED;
+    }
+
+    public void abandon() {
+        this.completedAt = Instant.now();
+        this.state = State.ABANDONED;
+    }
+
+    public State state() { return state; }
+
+    public void setResumeState(TurnResumeState resumeState) { this.resumeState = resumeState; }
+
+    public TurnResumeState resumeState() { return resumeState; }
 
     public String id() { return id; }
 

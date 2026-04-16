@@ -14,6 +14,7 @@ public class MockToolkit implements Toolkit {
 
     private final List<Tool> tools;
     private final Map<String, String> responses = new LinkedHashMap<>();
+    private final Map<String, java.util.concurrent.atomic.AtomicInteger> invocations = new java.util.concurrent.ConcurrentHashMap<>();
     private String defaultResponse = "{\"successful\": true}";
 
     public MockToolkit(List<ToolDefinition> toolDefs) {
@@ -68,6 +69,14 @@ public class MockToolkit implements Toolkit {
     @Override
     public String execute(String toolName, Map<String, Object> arguments) {
 
+        invocations.computeIfAbsent(toolName, k -> new java.util.concurrent.atomic.AtomicInteger())
+                .incrementAndGet();
         return responses.getOrDefault(toolName, defaultResponse);
+    }
+
+    public int invocationCount(String toolName) {
+
+        var counter = invocations.get(toolName);
+        return counter != null ? counter.get() : 0;
     }
 }

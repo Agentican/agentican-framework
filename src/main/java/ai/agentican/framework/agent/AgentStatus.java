@@ -6,7 +6,8 @@ public enum AgentStatus {
     CANCELLED,
     TIMED_OUT,
     MAX_TURNS,
-    SUSPENDED;
+    SUSPENDED,
+    FAILED;
 
     public String defaultText() {
 
@@ -17,6 +18,7 @@ public enum AgentStatus {
             case TIMED_OUT -> "Task timed out";
             case MAX_TURNS -> "Task exceeded max turns";
             case SUSPENDED -> "Task suspended";
+            case FAILED -> "Task failed";
         };
     }
 }

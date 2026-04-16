@@ -36,6 +36,8 @@ public interface TaskStateStore {
 
     void turnCompleted(String taskId, String turnId);
 
+    default void turnAbandoned(String taskId, String turnId) { turnCompleted(taskId, turnId); }
+
     void messageSent(String taskId, String turnId, LlmRequest request);
 
     void responseReceived(String taskId, String turnId, LlmResponse response);
@@ -48,7 +50,14 @@ public interface TaskStateStore {
 
     void hitlResponded(String taskId, String stepId, HitlResponse response);
 
+    default void branchPathChosen(String taskId, String stepId, String pathName) {}
+
     TaskLog load(String taskId);
 
     List<TaskLog> list();
+
+    default List<TaskLog> listInProgress() {
+
+        return list().stream().filter(t -> t.status() == null).toList();
+    }
 }

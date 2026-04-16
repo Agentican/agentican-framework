@@ -13,6 +13,8 @@ import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmRequest;
 import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.llm.ToolCall;
+import ai.agentican.framework.orchestration.execution.resume.ResumePlan;
+import ai.agentican.framework.orchestration.execution.resume.TurnResumeState;
 import ai.agentican.framework.state.MemTaskStateStore;
 import ai.agentican.framework.state.RunLog;
 import ai.agentican.framework.state.TaskStateStore;
@@ -122,6 +124,76 @@ public class SmacAgentRunner implements AgentRunner {
         var agentName = agent.name();
 
         taskStateStore.runStarted(taskId, stepId, runId, agentName);
+
+        var agentResult = loop(task, Instant.now(), List.of(), ctx, cancelled, taskId, stepId, stepName, runId, 0);
+
+        taskStateStore.runCompleted(taskId, runId);
+
+        return agentResult;
+    }
+
+    public AgentResult resumeAfterCrash(Agent agent, String task, List<String> activeSkills,
+                                        RunLog savedRun, ResumePlan resumePlan,
+                                        Map<String, Toolkit> toolkits,
+                                        String taskId, String stepId, String stepName,
+                                        AtomicBoolean cancelled) {
+
+        LOG.info("Resuming agent step after crash: agent={}, savedTurns={}, turnState={}",
+                agent.name(), savedRun != null ? savedRun.turns().size() : 0,
+                resumePlan != null ? resumePlan.turnState() : "<no plan>");
+
+        var ctx = buildContext(agent, activeSkills, toolkits);
+
+        ensureTaskLog(taskId, stepId, stepName);
+
+        if (savedRun != null) rehydrateExplicitStores(ctx.localScratchpad(), savedRun);
+
+        if (savedRun != null && !savedRun.turns().isEmpty()) {
+
+            var lastTurn = savedRun.turns().getLast();
+            var lastTurnId = lastTurn.id();
+            var state = resumePlan != null ? resumePlan.turnState() : TurnResumeState.CLOSED;
+
+            if (state == TurnResumeState.CLOSED && lastTurn.response() != null
+                    && lastTurn.response().stopReason() != StopReason.TOOL_USE) {
+
+                LOG.info("Step '{}' was logically complete (last turn stopReason={}); short-circuiting resume",
+                        stepName, lastTurn.response().stopReason());
+
+                taskStateStore.runCompleted(taskId, savedRun.id());
+
+                return new AgentResult(AgentStatus.COMPLETED, savedRun);
+            }
+
+            switch (state) {
+
+                case CLOSED, NONE -> {
+                }
+
+                case STARTED_NO_MESSAGE, MESSAGE_SENT -> {
+                    LOG.info("Abandoning in-flight turn {} in state {}; starting fresh turn", lastTurnId, state);
+                    taskStateStore.turnAbandoned(taskId, lastTurnId);
+                }
+
+                case RESPONSE_RECEIVED, TOOLS_PARTIAL, TOOLS_COMPLETE -> {
+                    var pending = resumePlan != null ? resumePlan.toolsToExecute() : List.<ToolCall>of();
+
+                    if (!pending.isEmpty()) {
+                        LOG.info("Replaying response and executing {} pending tool call(s) for turn {}",
+                                pending.size(), lastTurnId);
+                        executeToolCalls(pending, ctx.toolkits(), cancelled, lastTurn.index(), taskId, lastTurnId);
+                    }
+                    taskStateStore.turnCompleted(taskId, lastTurnId);
+                }
+            }
+
+        }
+
+        if (savedRun != null) taskStateStore.runCompleted(taskId, savedRun.id());
+
+        var runId = Ids.generate();
+
+        taskStateStore.runStarted(taskId, stepId, runId, agent.name());
 
         var agentResult = loop(task, Instant.now(), List.of(), ctx, cancelled, taskId, stepId, stepName, runId, 0);
 

@@ -73,9 +73,13 @@ public class Agentican implements AutoCloseable {
     private final TaskStateStore taskStateStore;
     private final HitlManager hitlManager;
     private final KnowledgeStore knowledgeStore;
+    private KnowledgeIngestor knowledgeIngestor;
 
     private final ExecutorService taskExecutor;
     private final boolean ownsExecutor;
+
+    private final java.util.concurrent.CopyOnWriteArrayList<CompletableFuture<?>> reingestFutures
+            = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public static AgenticanBuilder builder() {
 
@@ -132,6 +136,7 @@ public class Agentican implements AutoCloseable {
 
                 var extractor = new LlmKnowledgeExtractor(defaultLlmForKnowledge);
                 var ingestor = new KnowledgeIngestor(taskStateStore, knowledgeStore, extractor, this.taskExecutor);
+                this.knowledgeIngestor = ingestor;
 
                 notifyingStore = new NotifyingTaskStateStore(notifyingStore, ingestor);
             }
@@ -336,6 +341,234 @@ public class Agentican implements AutoCloseable {
         return hitlManager;
     }
 
+    public TaskStateStore taskStateStore() {
+
+        return taskStateStore;
+    }
+
+    public int reapOrphans() {
+
+        return reapOrphans(ai.agentican.framework.orchestration.execution.resume.ReapReason.SERVER_RESTARTED);
+    }
+
+    public int resumeInterrupted() {
+
+        return resumeInterrupted(10);
+    }
+
+    public int resumeInterrupted(int maxConcurrent) {
+
+        var tasks = taskStateStore.listInProgress();
+        int resumed = 0;
+        int reaped = 0;
+        var semaphore = new java.util.concurrent.Semaphore(maxConcurrent > 0 ? maxConcurrent : 1, true);
+
+        for (var task : tasks) {
+
+            if (task.status() != null) continue;
+            if (task.parentTaskId() != null) continue;
+
+            var plan = task.plan();
+
+            var resumePlan = ai.agentican.framework.orchestration.execution.resume.ResumeClassifier
+                    .classify(task, plan);
+
+            if (resumePlan.reapOnly()) {
+
+                LOG.warn("Task {} ({}) cannot be resumed: {} — reaping",
+                        task.taskName(), task.taskId(),
+                        resumePlan.reapReason() != null ? resumePlan.reapReason().name() : "UNKNOWN");
+
+                reapSingleTask(task, resumePlan.reapReason() != null
+                        ? resumePlan.reapReason()
+                        : ai.agentican.framework.orchestration.execution.resume.ReapReason.UNKNOWN);
+                reaped++;
+                continue;
+            }
+
+            rehydratePendingCheckpoints(task);
+            reingestCompletedSteps(task);
+
+            LOG.info("Task {} ({}) resume classification: completedSteps={}, inFlightStep={}, turnState={}, pendingTools={} — "
+                            + "submitting to executor",
+                    task.taskName(), task.taskId(),
+                    resumePlan.completedSteps().size(),
+                    resumePlan.inFlightStep().map(s -> s.stepName()).orElse("<none>"),
+                    resumePlan.turnState(),
+                    resumePlan.toolsToExecute().size());
+
+            var finalPlan = plan;
+            var finalTaskId = task.taskId();
+            var finalParams = task.params();
+
+            var cancelled = new AtomicBoolean(false);
+
+            var submitted = wrapTaskRunner(Mdc.propagate(() -> {
+                try {
+                    semaphore.acquire();
+                    taskListener.onTaskResumed(finalTaskId);
+                    return taskRunner.resume(finalPlan, finalTaskId, finalParams, cancelled);
+                }
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    LOG.warn("Resume of task {} interrupted while waiting for concurrency slot", finalTaskId);
+                    taskListener.onTaskCompleted(finalTaskId, TaskStatus.CANCELLED);
+                    throw new java.util.concurrent.CompletionException(e);
+                }
+                catch (Exception e) {
+                    LOG.error("Resume of task {} failed: {}", finalTaskId, e.getMessage(), e);
+                    taskListener.onTaskCompleted(finalTaskId, TaskStatus.FAILED);
+                    throw e;
+                }
+                finally {
+                    semaphore.release();
+                }
+            }));
+
+            CompletableFuture.supplyAsync(submitted, taskExecutor);
+
+            resumed++;
+        }
+
+        var danglingReaped = reapDanglingSubTasks(tasks);
+
+        if (resumed > 0 || reaped > 0 || danglingReaped > 0)
+            LOG.info("Resume-on-start: {} task(s) resumed, {} task(s) reaped, {} dangling sub-task(s) cleaned",
+                    resumed, reaped, danglingReaped);
+
+        return resumed + reaped + danglingReaped;
+    }
+
+    private int reapDanglingSubTasks(List<ai.agentican.framework.state.TaskLog> inProgress) {
+
+        int reaped = 0;
+        for (var t : inProgress) {
+            if (t.parentTaskId() == null) continue;
+
+            var parent = taskStateStore.load(t.parentTaskId());
+            if (parent == null || parent.status() == null) continue;
+
+            LOG.warn("Reaping dangling sub-task {} (parent {} already terminal: {})",
+                    t.taskId(), t.parentTaskId(), parent.status());
+            reapSingleTask(t, ai.agentican.framework.orchestration.execution.resume.ReapReason.DANGLING_PARENT_TERMINAL);
+            reaped++;
+        }
+
+        return reaped;
+    }
+
+    private void reingestCompletedSteps(ai.agentican.framework.state.TaskLog task) {
+
+        if (knowledgeIngestor == null) return;
+
+        var taskId = task.taskId();
+        var stepIds = task.steps().values().stream()
+                .filter(s -> s.status() == TaskStatus.COMPLETED)
+                .filter(s -> s.output() != null && !s.output().isBlank())
+                .map(ai.agentican.framework.state.StepLog::id)
+                .toList();
+
+        if (stepIds.isEmpty()) return;
+
+        var future = CompletableFuture.runAsync(() -> {
+            for (var stepId : stepIds) {
+                try {
+                    knowledgeIngestor.onStepCompleted(taskId, stepId);
+                }
+                catch (RuntimeException ex) {
+                    LOG.warn("Knowledge re-ingestion for step {} of task {} failed: {}",
+                            stepId, taskId, ex.getMessage());
+                }
+            }
+        }, taskExecutor);
+
+        reingestFutures.add(future);
+        future.whenComplete((v, ex) -> reingestFutures.remove(future));
+    }
+
+    private void rehydratePendingCheckpoints(ai.agentican.framework.state.TaskLog task) {
+
+        if (hitlManager == null) return;
+
+        for (var step : task.steps().values()) {
+            var checkpoint = step.checkpoint();
+            if (checkpoint == null) continue;
+            if (hitlManager.hasPending(checkpoint.id())) continue;
+
+            hitlManager.rehydrate(checkpoint);
+
+            var persistedResponse = step.hitlResponse();
+            if (persistedResponse != null) {
+                LOG.info("Rehydrated HITL checkpoint {} for task {} / step {}; replaying persisted response (approved={})",
+                        checkpoint.id(), task.taskId(), step.stepName(), persistedResponse.approved());
+                hitlManager.respond(checkpoint.id(), persistedResponse);
+            }
+            else {
+                LOG.info("Rehydrated HITL checkpoint {} for task {} / step {}; awaiting human response",
+                        checkpoint.id(), task.taskId(), step.stepName());
+            }
+        }
+    }
+
+    private void reapSingleTask(ai.agentican.framework.state.TaskLog task,
+                                ai.agentican.framework.orchestration.execution.resume.ReapReason reason) {
+
+        reapOrphanedSubTasks(task.taskId(), reason);
+
+        for (var step : task.steps().values()) {
+            if (step.status() == null)
+                taskStateStore.stepCompleted(task.taskId(), step.id(), TaskStatus.FAILED,
+                        "Step abandoned: " + reason.name());
+        }
+        taskStateStore.taskCompleted(task.taskId(), TaskStatus.FAILED);
+        taskListener.onTaskReaped(task.taskId(), reason);
+    }
+
+    private void reapOrphanedSubTasks(String parentTaskId,
+                                      ai.agentican.framework.orchestration.execution.resume.ReapReason reason) {
+
+        var all = taskStateStore.list();
+        for (var candidate : all) {
+            if (!parentTaskId.equals(candidate.parentTaskId())) continue;
+            if (candidate.status() != null) continue;
+
+            reapOrphanedSubTasks(candidate.taskId(), reason);
+
+            for (var step : candidate.steps().values()) {
+                if (step.status() == null)
+                    taskStateStore.stepCompleted(candidate.taskId(), step.id(), TaskStatus.FAILED,
+                            "Step abandoned: " + reason.name());
+            }
+            taskStateStore.taskCompleted(candidate.taskId(), TaskStatus.FAILED);
+            taskListener.onTaskReaped(candidate.taskId(),
+                    ai.agentican.framework.orchestration.execution.resume.ReapReason.PARENT_REAPED);
+        }
+    }
+
+
+    public int reapOrphans(ai.agentican.framework.orchestration.execution.resume.ReapReason reason) {
+
+        var tasks = taskStateStore.listInProgress();
+        int reaped = 0;
+
+        for (var task : tasks) {
+
+            if (task.status() != null) continue;
+            if (task.parentTaskId() != null) continue;
+
+            reapSingleTask(task, reason);
+
+            LOG.warn("Reaped orphan task {} ({}): {}",
+                    task.taskName() != null ? task.taskName() : task.taskId(), task.taskId(), reason.name());
+
+            reaped++;
+        }
+
+        if (reaped > 0) LOG.info("Reaped {} orphan task(s) on startup", reaped);
+
+        return reaped;
+    }
+
     private static void requireExternalId(String kind, String name, String externalId) {
 
         if (externalId == null || externalId.isBlank())
@@ -346,6 +579,22 @@ public class Agentican implements AutoCloseable {
 
     @Override
     public void close() {
+
+        var pending = reingestFutures.toArray(new CompletableFuture[0]);
+        if (pending.length > 0) {
+            try {
+                CompletableFuture.allOf(pending)
+                        .get(10, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            catch (java.util.concurrent.TimeoutException ex) {
+                LOG.warn("Knowledge re-ingestion did not finish within 10s on close; {} job(s) abandoned",
+                        pending.length);
+            }
+            catch (Exception ex) {
+                LOG.warn("Knowledge re-ingestion wait interrupted on close: {}", ex.getMessage());
+                Thread.currentThread().interrupt();
+            }
+        }
 
         if (ownsExecutor)
             taskExecutor.shutdownNow();

@@ -26,6 +26,7 @@ public class TaskLog {
 
     private volatile TaskStatus status;
     private volatile Instant completedAt;
+    private volatile boolean planSnapshotCorrupt;
 
     public TaskLog(String taskId, String taskName, Plan plan, Map<String, String> params) {
 
@@ -116,4 +117,7 @@ public class TaskLog {
 
     public void setStatus(TaskStatus status) { this.status = status; }
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
+
+    public boolean planSnapshotCorrupt() { return planSnapshotCorrupt; }
+    public void setPlanSnapshotCorrupt(boolean corrupt) { this.planSnapshotCorrupt = corrupt; }
 }

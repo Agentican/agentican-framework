@@ -4,6 +4,8 @@ import ai.agentican.framework.TaskDecorator;
 import ai.agentican.framework.agent.AgentRegistry;
 import ai.agentican.framework.agent.AgentResult;
 import ai.agentican.framework.agent.AgentStatus;
+import ai.agentican.framework.orchestration.execution.resume.ResumeClassifier;
+import ai.agentican.framework.orchestration.execution.resume.ResumePlan;
 import ai.agentican.framework.config.WorkerConfig;
 import ai.agentican.framework.hitl.AskQuestionToolkit;
 import ai.agentican.framework.hitl.HitlCheckpoint;
@@ -89,7 +91,8 @@ public class TaskRunner {
         this.stepBranchRunner = new StepBranchRunner(
                 (subPlan, subParams, subCancelled, subOutputs, parentTaskId, parentStepId, iterationIndex) ->
                         wrapSubTask(() -> run(subPlan, newTaskId(), parentTaskId, parentStepId, iterationIndex,
-                                subParams, subCancelled, subOutputs)));
+                                subParams, subCancelled, subOutputs)),
+                taskStateStore);
     }
 
     private TaskResult wrapSubTask(java.util.function.Supplier<TaskResult> subTask) {
@@ -125,16 +128,396 @@ public class TaskRunner {
         return run(plan, taskId, null, null, 0, taskParams, taskCancelled, Map.of());
     }
 
+    public TaskResult resume(Plan plan, String taskId, Map<String, String> taskInputs, AtomicBoolean cancelled) {
+
+        var taskLog = taskStateStore.load(taskId);
+        var classified = ResumeClassifier.classify(taskLog, plan);
+
+        if (classified.reapOnly()) {
+
+            var reapName = classified.reapReason() != null ? classified.reapReason().name() : "UNKNOWN";
+            LOG.warn("Resuming task {}: classifier says reap ({})", taskId, reapName);
+            failTask(taskId, taskLog, reapName);
+            return TaskResult.of(plan.name(), TaskStatus.FAILED, List.of());
+        }
+
+        LOG.info("Resuming task {}: completedSteps={}, inFlightStep={}, turnState={}, pendingTools={}",
+                taskId,
+                classified.completedSteps().size(),
+                classified.inFlightStep().map(s -> s.stepName()).orElse("<none>"),
+                classified.turnState(),
+                classified.toolsToExecute().size());
+
+        var taskParams = setTaskParameters(plan, taskInputs);
+
+        var parentOutputs = new LinkedHashMap<String, String>();
+        for (var step : classified.completedSteps())
+            parentOutputs.put(step.stepName(), step.output() != null ? step.output() : "");
+
+        var stepResults = new ArrayList<TaskStepResult>();
+
+        var resumedStepName = classified.inFlightStep()
+                .map(ai.agentican.framework.state.StepLog::stepName).orElse(null);
+
+        if (classified.inFlightStep().isPresent()) {
+
+            var stepLog = classified.inFlightStep().get();
+            var planStep = plan.steps().stream()
+                    .filter(s -> s.name().equals(stepLog.stepName()))
+                    .findFirst().orElse(null);
+
+            if (planStep == null) {
+
+                LOG.warn("Task {}: in-flight step '{}' missing from plan; reaping", taskId, stepLog.stepName());
+                failTask(taskId, taskLog, "in_flight_step_missing_from_plan");
+                return TaskResult.of(plan.name(), TaskStatus.FAILED, List.of());
+            }
+
+            var resumeStepResult = resumeInFlightStep(planStep, stepLog, classified, parentOutputs,
+                    taskParams, taskId, cancelled);
+
+            stepResults.add(resumeStepResult);
+
+            if (resumeStepResult.status() != TaskStatus.COMPLETED) {
+
+                taskStateStore.taskCompleted(taskId, TaskStatus.FAILED);
+                return TaskResult.of(plan.name(), TaskStatus.FAILED, stepResults);
+            }
+
+            parentOutputs.put(planStep.name(), resumeStepResult.output() != null ? resumeStepResult.output() : "");
+        }
+
+        var alreadyFinished = new HashSet<String>();
+        for (var step : classified.completedSteps()) alreadyFinished.add(step.stepName());
+        if (resumedStepName != null) alreadyFinished.add(resumedStepName);
+
+        var remainingResult = runSeeded(plan, taskId, null, null, 0,
+                taskParams, cancelled, parentOutputs,
+                alreadyFinished, stepResults, true);
+
+        return remainingResult;
+    }
+
+    private TaskStepResult resumeInFlightStep(PlanStep planStep, ai.agentican.framework.state.StepLog stepLog,
+                                               ResumePlan classified, Map<String, String> parentOutputs,
+                                               Map<String, String> taskParams, String taskId,
+                                               AtomicBoolean cancelled) {
+
+        if (planStep instanceof PlanStepLoop loopStep)
+            return resumeLoopStep(loopStep, stepLog, parentOutputs, taskParams, taskId, cancelled);
+
+        if (planStep instanceof PlanStepBranch branchStep)
+            return resumeBranchStep(branchStep, stepLog, parentOutputs, taskParams, taskId, cancelled);
+
+        if (!(planStep instanceof PlanStepAgent agentStep))
+            return new TaskStepResult(planStep.name(), TaskStatus.FAILED,
+                    "Unknown step type for resume: " + planStep.getClass().getSimpleName(), List.of());
+
+        if (stepLog.status() == TaskStatus.SUSPENDED && stepLog.checkpoint() != null) {
+            return resumeSuspendedAgentStep(agentStep, stepLog, parentOutputs, taskParams, taskId, cancelled);
+        }
+
+        var lastRun = classified.inFlightRun().orElse(null);
+
+        if (lastRun == null) {
+
+            LOG.info("Resuming step '{}': no prior run — running fresh", planStep.name());
+            return stepAgentRunner.run(agentStep, parentOutputs, taskParams, taskId, stepLog.id());
+        }
+
+        var agent = agentRegistry.get(agentStep.agentId());
+        if (agent == null) agent = agentRegistry.getByName(agentStep.agentId());
+
+        if (agent == null)
+            return new TaskStepResult(planStep.name(), TaskStatus.FAILED,
+                    "No agent found for ref: " + agentStep.agentId(), List.of());
+
+        var instructions = Placeholders.resolveStepOutputs(
+                Placeholders.resolveParams(agentStep.instructions(), taskParams), parentOutputs);
+
+        var taskStepToolkits = toolkitRegistry.scopeForStep(agentStep.tools());
+
+        LOG.info("Resuming agent step '{}' via AgentRunner.resumeAfterCrash ({})",
+                agentStep.name(), agent.runner().getClass().getSimpleName());
+
+        var agentResult = agent.runner().resumeAfterCrash(agent, instructions, agentStep.skills(),
+                lastRun, classified, taskStepToolkits, taskId, stepLog.id(), agentStep.name(), cancelled);
+
+        if (agentResult.status() == AgentStatus.COMPLETED) {
+
+            var output = agentResult.text();
+            taskStateStore.stepCompleted(taskId, stepLog.id(), TaskStatus.COMPLETED, output);
+
+            return new TaskStepResult(planStep.name(), TaskStatus.COMPLETED,
+                    output != null ? output : "", List.of(agentResult));
+        }
+
+        var status = agentResult.status() == AgentStatus.SUSPENDED ? TaskStatus.SUSPENDED : TaskStatus.FAILED;
+        taskStateStore.stepCompleted(taskId, stepLog.id(), status, agentResult.text());
+
+        return new TaskStepResult(planStep.name(), status,
+                agentResult.text() != null ? agentResult.text() : "", List.of(agentResult));
+    }
+
+    private TaskStepResult resumeSuspendedAgentStep(PlanStepAgent agentStep,
+                                                     ai.agentican.framework.state.StepLog stepLog,
+                                                     Map<String, String> parentOutputs,
+                                                     Map<String, String> taskParams,
+                                                     String taskId,
+                                                     AtomicBoolean cancelled) {
+
+        var checkpoint = stepLog.checkpoint();
+        var persistedResponse = stepLog.hitlResponse();
+
+        if (persistedResponse == null) {
+            LOG.info("Step '{}' is SUSPENDED awaiting HITL response for checkpoint {}; blocking on hitlManager",
+                    agentStep.name(), checkpoint.id());
+            try {
+                persistedResponse = hitlManager.awaitResponse(checkpoint.id());
+            }
+            catch (Exception ex) {
+                return new TaskStepResult(agentStep.name(), TaskStatus.FAILED,
+                        "HITL await failed on resume: " + ex.getMessage(), List.of());
+            }
+        }
+
+        var agent = agentRegistry.get(agentStep.agentId());
+        if (agent == null) agent = agentRegistry.getByName(agentStep.agentId());
+        if (agent == null)
+            return new TaskStepResult(agentStep.name(), TaskStatus.FAILED,
+                    "No agent found for ref: " + agentStep.agentId(), List.of());
+
+        var savedRun = stepLog.lastRun();
+        if (savedRun == null)
+            return new TaskStepResult(agentStep.name(), TaskStatus.FAILED,
+                    "SUSPENDED step has no run log to resume from", List.of());
+
+        if (!persistedResponse.approved()
+                && checkpoint.type() == HitlCheckpointType.STEP_OUTPUT) {
+            LOG.info("Step '{}' rejected via HITL; marking step FAILED with feedback",
+                    agentStep.name());
+            var msg = persistedResponse.feedback() != null ? persistedResponse.feedback() : "rejected";
+            taskStateStore.stepCompleted(taskId, stepLog.id(), TaskStatus.FAILED,
+                    "HITL rejected on resume: " + msg);
+            return new TaskStepResult(agentStep.name(), TaskStatus.FAILED, msg, List.of());
+        }
+
+        var hitlToolResults = buildHitlToolResults(checkpoint, persistedResponse);
+        var scopedToolkits = toolkitRegistry.scopeForStep(agentStep.tools());
+
+        var instructions = Placeholders.resolveStepOutputs(
+                Placeholders.resolveParams(agentStep.instructions(), taskParams), parentOutputs);
+
+        LOG.info("Resuming SUSPENDED step '{}' via HITL path (approved={})",
+                agentStep.name(), persistedResponse.approved());
+
+        var agentResult = agent.runner().resume(agent, instructions, agentStep.skills(),
+                savedRun, hitlToolResults, scopedToolkits, taskId, stepLog.id(), agentStep.name());
+
+        var status = agentResult.status() == AgentStatus.COMPLETED ? TaskStatus.COMPLETED
+                : agentResult.status() == AgentStatus.SUSPENDED ? TaskStatus.SUSPENDED
+                : TaskStatus.FAILED;
+
+        taskStateStore.stepCompleted(taskId, stepLog.id(), status, agentResult.text());
+        return new TaskStepResult(agentStep.name(), status,
+                agentResult.text() != null ? agentResult.text() : "", List.of(agentResult));
+    }
+
+    private TaskStepResult resumeLoopStep(PlanStepLoop loopStep,
+                                           ai.agentican.framework.state.StepLog stepLog,
+                                           Map<String, String> parentOutputs,
+                                           Map<String, String> taskParams,
+                                           String taskId,
+                                           AtomicBoolean cancelled) {
+
+        var upstreamOutput = parentOutputs.get(loopStep.over());
+        if (upstreamOutput == null)
+            return new TaskStepResult(loopStep.name(), TaskStatus.FAILED,
+                    "No output found from step: " + loopStep.over(), List.of());
+
+        var items = Json.findArray(upstreamOutput);
+
+        var existingChildren = taskStateStore.list().stream()
+                .filter(t -> taskId.equals(t.parentTaskId()))
+                .filter(t -> stepLog.id().equals(t.parentStepId()))
+                .sorted(java.util.Comparator.comparingInt(t -> t.iterationIndex()))
+                .toList();
+
+        var childrenByIter = new java.util.HashMap<Integer, ai.agentican.framework.state.TaskLog>();
+        for (var c : existingChildren) childrenByIter.put(c.iterationIndex(), c);
+
+        LOG.info("Resuming loop step '{}': {} items, {} existing children", loopStep.name(),
+                items.size(), existingChildren.size());
+
+        var outputs = new java.util.ArrayList<String>();
+        int failures = 0;
+
+        for (int i = 0; i < items.size(); i++) {
+
+            if (cancelled.get())
+                return new TaskStepResult(loopStep.name(), TaskStatus.CANCELLED, "", List.of());
+
+            var existing = childrenByIter.get(i);
+            String iterationOutput = null;
+
+            if (existing != null) {
+
+                if (existing.status() == TaskStatus.COMPLETED) {
+
+                    iterationOutput = lastStepOutput(existing);
+                }
+                else if (existing.status() == null) {
+
+                    LOG.info("Loop step '{}': recursively resuming sub-task for iteration {}",
+                            loopStep.name(), i);
+
+                    if (existing.plan() == null) {
+                        LOG.warn("Loop sub-task {} has no plan snapshot; skipping", existing.taskId());
+                        failures++;
+                        continue;
+                    }
+
+                    var subResult = resume(existing.plan(), existing.taskId(), existing.params(), cancelled);
+                    iterationOutput = subResult.lastOutput();
+
+                    if (subResult.status() != TaskStatus.COMPLETED) failures++;
+                }
+                else {
+
+                    failures++;
+                }
+            }
+            else {
+
+                var resolvedBody = stepLoopRunner.resolveLoopBody(loopStep.body(), items.get(i), taskParams);
+                var subPlan = new Plan(null, loopStep.name() + "-iter-" + (i + 1), "", List.of(), resolvedBody);
+
+                LOG.info("Loop step '{}': dispatching fresh iteration {}", loopStep.name(), i);
+
+                var subTaskResult = run(subPlan, newTaskId(), taskId, stepLog.id(), i,
+                        taskParams, cancelled, parentOutputs);
+
+                iterationOutput = subTaskResult.lastOutput();
+                if (subTaskResult.status() != TaskStatus.COMPLETED) failures++;
+            }
+
+            outputs.add("## Iteration " + (i + 1) + "\n\n" + (iterationOutput != null ? iterationOutput : ""));
+        }
+
+        var status = failures == 0 ? TaskStatus.COMPLETED : TaskStatus.FAILED;
+        return new TaskStepResult(loopStep.name(), status, String.join("\n\n", outputs), List.of());
+    }
+
+    private TaskStepResult resumeBranchStep(PlanStepBranch branchStep,
+                                             ai.agentican.framework.state.StepLog stepLog,
+                                             Map<String, String> parentOutputs,
+                                             Map<String, String> taskParams,
+                                             String taskId,
+                                             AtomicBoolean cancelled) {
+
+        var chosenPath = stepLog.branchChosenPath();
+
+        if (chosenPath == null)
+            return new TaskStepResult(branchStep.name(), TaskStatus.FAILED,
+                    "Branch step has no recorded chosen path — cannot resume deterministically", List.of());
+
+        var path = branchStep.paths().stream()
+                .filter(p -> chosenPath.equals(p.pathName()))
+                .findFirst().orElse(null);
+
+        if (path == null)
+            return new TaskStepResult(branchStep.name(), TaskStatus.FAILED,
+                    "Chosen path '" + chosenPath + "' not found in branch step", List.of());
+
+        LOG.info("Resuming branch step '{}': chosen path '{}' ({} body steps)",
+                branchStep.name(), chosenPath, path.body().size());
+
+        var existingChild = taskStateStore.list().stream()
+                .filter(t -> taskId.equals(t.parentTaskId()))
+                .filter(t -> stepLog.id().equals(t.parentStepId()))
+                .findFirst().orElse(null);
+
+        if (existingChild != null && existingChild.status() == null) {
+
+            LOG.info("Branch step '{}': recursively resuming existing child sub-task {}",
+                    branchStep.name(), existingChild.taskId());
+
+            if (existingChild.plan() == null) {
+                LOG.warn("Branch sub-task {} has no plan snapshot; marking branch failed",
+                        existingChild.taskId());
+                return new TaskStepResult(branchStep.name(), TaskStatus.FAILED,
+                        "Branch sub-task plan unavailable for resume", List.of());
+            }
+
+            var subResult = resume(existingChild.plan(), existingChild.taskId(),
+                    existingChild.params(), cancelled);
+
+            return new TaskStepResult(branchStep.name(), subResult.status(),
+                    subResult.lastOutput() != null ? subResult.lastOutput() : "", List.of());
+        }
+
+        if (existingChild != null && existingChild.status() == TaskStatus.COMPLETED) {
+
+            LOG.info("Branch step '{}': existing child sub-task {} already completed; using its output",
+                    branchStep.name(), existingChild.taskId());
+
+            return new TaskStepResult(branchStep.name(), TaskStatus.COMPLETED,
+                    lastStepOutput(existingChild) != null ? lastStepOutput(existingChild) : "",
+                    List.of());
+        }
+
+        var subPlan = new Plan(null, branchStep.name() + "-" + chosenPath, "", List.of(), path.body());
+        var subResult = run(subPlan, newTaskId(), taskId, stepLog.id(), 0,
+                taskParams, cancelled, parentOutputs);
+
+        return new TaskStepResult(branchStep.name(), subResult.status(),
+                subResult.lastOutput() != null ? subResult.lastOutput() : "", List.of());
+    }
+
+    private static String lastStepOutput(ai.agentican.framework.state.TaskLog log) {
+
+        String last = null;
+        for (var step : log.steps().values()) {
+            if (step.output() != null) last = step.output();
+        }
+        return last;
+    }
+
+    private void failTask(String taskId, ai.agentican.framework.state.TaskLog taskLog, String reason) {
+
+        if (taskLog != null) {
+            for (var step : taskLog.steps().values()) {
+                if (step.status() == null)
+                    taskStateStore.stepCompleted(taskId, step.id(), TaskStatus.FAILED, "reaped: " + reason);
+            }
+        }
+        taskStateStore.taskCompleted(taskId, TaskStatus.FAILED);
+    }
+
     private TaskResult run(Plan plan, String taskId, String parentTaskId, String parentStepId, int iterationIndex,
                            Map<String, String> taskParams, AtomicBoolean taskCancelled,
                            Map<String, String> parentStepOutputs) {
+
+        return runSeeded(plan, taskId, parentTaskId, parentStepId, iterationIndex,
+                taskParams, taskCancelled, parentStepOutputs,
+                Set.of(), List.of(), false);
+    }
+
+    private TaskResult runSeeded(Plan plan, String taskId, String parentTaskId, String parentStepId,
+                                  int iterationIndex, Map<String, String> taskParams, AtomicBoolean taskCancelled,
+                                  Map<String, String> parentStepOutputs,
+                                  Set<String> alreadyFinishedStepNames,
+                                  List<TaskStepResult> preSeededResults,
+                                  boolean skipTaskStart) {
 
         var taskName = plan.name();
 
         LOG.info(Logs.RUNNER_TASK_RUNNING, taskName);
 
-        taskStateStore.taskStarted(taskId, taskName, plan, taskParams,
-                parentTaskId, parentStepId, iterationIndex);
+        if (!skipTaskStart) {
+            taskStateStore.taskStarted(taskId, taskName, plan, taskParams,
+                    parentTaskId, parentStepId, iterationIndex);
+        }
 
         if (taskDecorator != null)
             STEP_DECORATOR.set(taskDecorator.snapshot());
@@ -163,6 +546,9 @@ public class TaskRunner {
             }
         }
 
+        dispatchedTaskSteps.addAll(alreadyFinishedStepNames);
+        taskStepResults.addAll(preSeededResults);
+
         int taskStepsRunning = 0;
         int taskStepsSuspended = 0;
 
@@ -178,6 +564,8 @@ public class TaskRunner {
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
 
             for (var step : plan.steps()) {
+
+                if (dispatchedTaskSteps.contains(step.name())) continue;
 
                 if (depGraph.remainingDeps.getOrDefault(step.name(), 0) <= 0) {
 

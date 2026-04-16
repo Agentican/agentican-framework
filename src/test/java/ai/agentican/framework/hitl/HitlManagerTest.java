@@ -99,4 +99,76 @@ class HitlManagerTest {
         assertFalse(response.approved());
         assertEquals("Cancelled", response.feedback());
     }
+
+    @Test
+    void rehydrateRestoresCheckpointSoWaitingResumerReceivesResponse() throws Exception {
+
+        // Covers the SUSPENDED-step HITL resume path: after restart, rehydrate re-opens the
+        // pending future so a resumed step waiting on awaitResponse unblocks when respond()
+        // fires with the persisted approval.
+        var manager = new HitlManager((mgr, cp) -> {});
+
+        var checkpoint = new HitlCheckpoint("cp-rehydrated", HitlCheckpointType.TOOL_CALL,
+                "approve-step", "Tool call: deploy", "{}");
+
+        manager.rehydrate(checkpoint);
+        assertTrue(manager.hasPending(checkpoint.id()),
+                "rehydrated checkpoint must be marked pending");
+
+        var waiter = java.util.concurrent.CompletableFuture
+                .supplyAsync(() -> manager.awaitResponse(checkpoint.id()));
+
+        Thread.sleep(50);
+
+        manager.respond(checkpoint.id(), HitlResponse.approve("pre-crash approval"));
+
+        var response = waiter.get(2, java.util.concurrent.TimeUnit.SECONDS);
+        assertTrue(response.approved(), "resumed step sees the persisted approval");
+        assertEquals("pre-crash approval", response.feedback());
+    }
+
+    @Test
+    void rehydrateRestoresCheckpointForRejectedStepOutput() throws Exception {
+
+        // Covers the rejected-STEP_OUTPUT HITL resume path.
+        var manager = new HitlManager((mgr, cp) -> {});
+
+        var checkpoint = new HitlCheckpoint("cp-reject", HitlCheckpointType.STEP_OUTPUT,
+                "review-step", "Step output: review-step", "draft output");
+
+        manager.rehydrate(checkpoint);
+
+        var waiter = java.util.concurrent.CompletableFuture
+                .supplyAsync(() -> manager.awaitResponse(checkpoint.id()));
+
+        Thread.sleep(50);
+
+        manager.respond(checkpoint.id(), HitlResponse.reject("rework required"));
+
+        var response = waiter.get(2, java.util.concurrent.TimeUnit.SECONDS);
+        assertFalse(response.approved());
+        assertEquals("rework required", response.feedback());
+    }
+
+    @Test
+    void rehydrateAfterRespondDoesNotReopenFuture() {
+
+        var manager = new HitlManager((mgr, cp) -> {});
+
+        var checkpoint = new HitlCheckpoint("cp-double", HitlCheckpointType.TOOL_CALL,
+                "step", "Tool call: deploy", "{}");
+
+        manager.rehydrate(checkpoint);
+        assertTrue(manager.hasPending(checkpoint.id()));
+
+        manager.respond(checkpoint.id(), HitlResponse.approve());
+
+        assertFalse(manager.hasPending(checkpoint.id()),
+                "After respond, hasPending must return false — the checkpoint is resolved");
+
+        manager.rehydrate(checkpoint);
+
+        assertFalse(manager.hasPending(checkpoint.id()),
+                "Rehydrate after respond must not re-open the future — completed tombstone blocks it");
+    }
 }

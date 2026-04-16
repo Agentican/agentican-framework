@@ -1,6 +1,7 @@
 package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.orchestration.model.*;
+import ai.agentican.framework.state.TaskStateStore;
 
 import ai.agentican.framework.util.Json;
 
@@ -18,10 +19,12 @@ class StepBranchRunner {
     private static final Logger LOG = LoggerFactory.getLogger(StepBranchRunner.class);
 
     private final StepLoopRunner.SubPlanRunner subPlanRunner;
+    private final TaskStateStore taskStateStore;
 
-    StepBranchRunner(StepLoopRunner.SubPlanRunner subPlanRunner) {
+    StepBranchRunner(StepLoopRunner.SubPlanRunner subPlanRunner, TaskStateStore taskStateStore) {
 
         this.subPlanRunner = subPlanRunner;
+        this.taskStateStore = taskStateStore;
     }
 
     TaskStepResult run(PlanStepBranch step, Map<String, String> outputs, Map<String, String> params,
@@ -44,6 +47,8 @@ class StepBranchRunner {
         }
 
         LOG.info("Branch step '{}': selected path '{}'", step.name(), selectedPath.pathName());
+
+        taskStateStore.branchPathChosen(parentTaskId, parentStepId, selectedPath.pathName());
 
         var subPlan = new Plan(
                 null, step.name() + "-" + selectedPath.pathName(), "", List.of(), selectedPath.body());

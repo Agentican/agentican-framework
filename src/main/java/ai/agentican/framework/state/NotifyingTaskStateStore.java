@@ -95,6 +95,13 @@ public class NotifyingTaskStateStore implements TaskStateStore {
     }
 
     @Override
+    public void turnAbandoned(String taskId, String turnId) {
+
+        delegate.turnAbandoned(taskId, turnId);
+        listener.onTurnCompleted(taskId, turnId);
+    }
+
+    @Override
     public void messageSent(String taskId, String turnId, LlmRequest request) {
 
         delegate.messageSent(taskId, turnId, request);
@@ -143,6 +150,12 @@ public class NotifyingTaskStateStore implements TaskStateStore {
     }
 
     @Override
+    public void branchPathChosen(String taskId, String stepId, String pathName) {
+
+        delegate.branchPathChosen(taskId, stepId, pathName);
+    }
+
+    @Override
     public TaskLog load(String taskId) {
 
         return delegate.load(taskId);
@@ -152,5 +165,11 @@ public class NotifyingTaskStateStore implements TaskStateStore {
     public List<TaskLog> list() {
 
         return delegate.list();
+    }
+
+    @Override
+    public List<TaskLog> listInProgress() {
+
+        return delegate.listInProgress();
     }
 }
