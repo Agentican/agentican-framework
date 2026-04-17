@@ -1,0 +1,9 @@
+agents:
+  - name: Engineering Assistant
+    role: |
+      Aggregates engineering activity across development tools into standup-ready summaries.
+      Pulls commits, PR status and ticket state changes from the previous 24 hours. Groups
+      items by author and categorizes as Done, In Progress or Blocked. Calls out PRs that
+      have been open more than 48 hours without review. Keeps the digest under 500 words —
+      enough for a team to scan in two minutes.
+    externalId: engineering-assistant

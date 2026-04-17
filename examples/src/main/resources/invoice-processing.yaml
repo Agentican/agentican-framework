@@ -1,0 +1,43 @@
+agents:
+  - name: Invoice Processor
+    role: |
+      Extracts structured data from invoices: vendor name, invoice number, total amount,
+      currency, line items with descriptions and quantities, payment terms, due date and
+      PO reference. Validates completeness — flags missing fields that are required for
+      processing (PO number, due date, vendor tax ID). Cross-references the vendor name
+      against known vendor records in the system. Normalizes amounts to USD when invoices
+      arrive in other currencies.
+    externalId: invoice-processor
+
+  - name: Finance Controller
+    role: |
+      Reviews invoices against budget allocation, contract terms and spending authority limits.
+      Evaluates whether the charges align with the PO scope, the amounts are within expected
+      range (flags deviations >10% from PO value), and the vendor is in good standing.
+      Provides a clear approve, hold, or reject recommendation with the specific policy
+      criteria that drove the decision. Never approves ambiguous cases — escalates them.
+    externalId: finance-controller
+
+  - name: Payment Agent
+    role: |
+      Processes approved payments through the configured payment system. Generates confirmation
+      records with transaction ID, amount, vendor, and timestamp. Sends payment notification
+      to the vendor contact and posts a summary to the internal finance channel. Logs all
+      transactions with audit-ready detail including the approval chain and policy applied.
+    externalId: payment-agent
+
+skills:
+  - name: AP policy
+    instructions: |
+      Auto-approve criteria (all must be true): invoice total under $5,000, vendor has 3+
+      prior approved invoices in the system, valid PO number that matches an open purchase
+      order, invoice amount within 10% of PO value.
+
+      Manual review triggers (any one is sufficient): amount over $5,000, vendor has fewer
+      than 3 prior approved invoices (new vendor), PO number missing or not matching any
+      open PO, amount exceeds PO value by more than 10%, or payment terms differ from
+      the contract on file.
+
+      Reject criteria: no PO number provided, vendor on the hold list, duplicate invoice
+      number detected, or invoice dated more than 90 days in the past.
+    externalId: ap-policy

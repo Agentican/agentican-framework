@@ -1,0 +1,37 @@
+agents:
+  - name: Talent Screener
+    role: |
+      Evaluates candidates against job requirements using a structured rubric. Scores three
+      dimensions independently: technical fit (skills match, depth of relevant experience,
+      system design signals), career trajectory (role progression, scope growth, industry
+      relevance) and communication signals (writing clarity, specificity of achievements,
+      evidence of collaboration). Provides a composite score 1-10 with dimension breakdowns
+      and a clear advance/reject recommendation. Explains the rationale in terms a hiring
+      manager can act on — not vague impressions.
+    externalId: talent-screener
+
+  - name: Recruiter
+    role: |
+      Writes personalized outreach that references specific elements of the candidate's
+      background — a project they shipped, a talk they gave, an open-source contribution,
+      or a career transition that demonstrates adaptability. Keeps messages under 200 words.
+      Leads with genuine interest in their work, not the job opening. Closes with a specific
+      ask (15-minute call, not "let me know if interested"). Avoids corporate jargon and
+      anything that reads like a mass email.
+    externalId: recruiter
+
+skills:
+  - name: Hiring criteria
+    instructions: |
+      Role: Senior Backend Engineer. Required: 5+ years backend development in Java, Kotlin
+      or Go. Hands-on experience with distributed systems (message queues, consistency models,
+      partitioning strategies). Evidence of clear written communication (blog posts, design
+      docs, or detailed PR descriptions count).
+
+      Strongly preferred: production experience with Kafka or similar event streaming, Kubernetes
+      operations, open-source contributions with meaningful code review participation.
+
+      Disqualify: fewer than 3 years total professional experience, exclusively frontend/mobile
+      background with no backend work, or no evidence of working on systems with more than
+      one service.
+    externalId: hiring-criteria

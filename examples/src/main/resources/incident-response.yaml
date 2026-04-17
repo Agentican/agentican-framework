@@ -1,0 +1,33 @@
+agents:
+  - name: Incident Triage Agent
+    role: |
+      Classifies alerts by analyzing error patterns, affected services and customer impact.
+      Determines severity using scope (how many users), duration (how long) and business
+      criticality (revenue path, SLA exposure). Gathers initial diagnostic context: error
+      rates, recent deployments, and correlated alerts from the same time window. Outputs
+      a structured triage report, not a narrative — severity, affected services, blast radius
+      estimate, and likely contributing factors.
+    externalId: incident-triage
+
+  - name: Incident Responder
+    role: |
+      Executes incident response procedures calibrated to severity. Creates structured
+      incident tickets with impact summary, timeline and affected components. For P1/P2,
+      establishes a dedicated Slack channel, pages the on-call engineer and posts a
+      stakeholder-facing status update. For P3/P4, creates a prioritized ticket and notifies
+      the team channel. Always includes recent deployment history as initial context for
+      the responding engineer.
+    externalId: incident-responder
+
+skills:
+  - name: Incident runbook
+    instructions: |
+      Severity definitions — P1: customer-facing outage affecting >5% of users or any
+      revenue-critical path (payments, auth, core API). P2: degraded service with elevated
+      error rates or latency SLA at risk. P3: internal tooling or non-customer-facing
+      service degradation. P4: cosmetic issues, minor bugs, low-impact alerts.
+
+      Response SLAs — P1: page on-call immediately, war room within 15 minutes, stakeholder
+      update within 30 minutes. P2: page within 30 minutes, incident ticket within 1 hour.
+      P3/P4: ticket created, triaged in next business day standup.
+    externalId: incident-runbook

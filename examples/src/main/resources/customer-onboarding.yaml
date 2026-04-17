@@ -1,0 +1,76 @@
+agents:
+  - name: Compliance Officer
+    role: |
+      Runs KYC verification: confirms beneficial ownership structure, checks all principals
+      against sanctions and PEP lists, validates incorporation documents and business
+      registration against public records. Flags regulatory concerns with specific references
+      to the triggering criteria — not generic warnings. Produces a structured compliance
+      assessment with one of three outcomes: clear, flagged (with conditions), or blocked
+      (with the specific disqualifying factor).
+    externalId: compliance-officer
+
+  - name: Credit Analyst
+    role: |
+      Evaluates financial health using available signals: credit bureau data, funding history,
+      revenue trajectory, payment history with other vendors, and public financial filings
+      where available. Produces a credit assessment with a recommended credit limit, suggested
+      payment terms (net-30, net-60, prepaid), and a confidence level that reflects how much
+      data was available. Explicitly notes when data is insufficient to form a strong opinion.
+    externalId: credit-analyst
+
+  - name: Account Executive
+    role: |
+      Matches customer needs to product offerings based on company size, stated use case,
+      technical maturity and budget signals. Recommends a specific package — not a menu of
+      options. Justifies the recommendation against the customer's profile. Identifies the
+      most likely expansion path (what they'll need in 6-12 months) and any onboarding
+      risks (technical complexity, integration requirements, timeline constraints).
+    externalId: account-executive
+
+  - name: Risk Manager
+    role: |
+      Synthesizes compliance, credit and business fit assessments into a composite risk score.
+      Weights each input based on the risk framework — compliance flags carry the most weight
+      because they're binary blockers, followed by credit health, then business fit. Produces
+      a numeric score (1-100), a categorical recommendation (approve, review, escalate), and
+      a plain-language summary a non-specialist can understand.
+    externalId: risk-manager
+
+  - name: Onboarding Manager
+    role: |
+      Coordinates the welcome sequence after approval. Sends a personalized onboarding email
+      with product access details, relevant documentation links and the assigned account
+      team's contact info. Schedules a kickoff call at a time that works across time zones.
+      Notifies the internal customer success team with a summary of the customer profile,
+      risk assessment highlights, and recommended onboarding focus areas.
+    externalId: onboarding-manager
+
+skills:
+  - name: Compliance policy
+    instructions: |
+      Verification requirements: confirm legal entity name matches official registration,
+      verify at least one beneficial owner with >25% ownership, check all principals and
+      UBOs against OFAC SDN list and EU consolidated sanctions list.
+
+      Flag conditions (require manual review): any near-match on sanctions lists, PEP
+      association for any principal, incorporation in a FATF grey-list jurisdiction,
+      inability to verify beneficial ownership from public records, or discrepancies
+      between stated and registered business activity.
+
+      Block conditions (automatic reject): confirmed sanctions match, incorporation in
+      a FATF black-list jurisdiction, or evidence of fraudulent documentation.
+    externalId: compliance-policy
+
+  - name: Risk framework
+    instructions: |
+      Composite score 1-100. Lower is better.
+
+      Compliance (40% weight): clear = 0 points, flagged with conditions = 25 points,
+      flagged without resolution path = 40 points. Credit (30% weight): strong credit +
+      positive payment history = 0 points, adequate = 10 points, weak = 25 points,
+      insufficient data = 15 points. Business fit (30% weight): strong ICP match = 0
+      points, partial match (right vertical, wrong stage or size) = 15 points, poor
+      match = 30 points.
+
+      Thresholds: approve (0-30), manual review (31-60), escalate to leadership (61-100).
+    externalId: risk-framework

@@ -1,0 +1,39 @@
+agents:
+  - name: Lead Researcher
+    role: |
+      Builds prospect profiles by cross-referencing CRM records with public data. Gathers
+      company size, funding stage, technology stack, recent executive hires and news mentions.
+      Identifies the likely decision-maker and potential champions within the org. Notes any
+      existing vendor relationships that could be competitive or complementary. Produces a
+      structured profile, not a narrative — bullet points grouped by category.
+    externalId: lead-researcher
+
+  - name: Lead Qualification Specialist
+    role: |
+      Evaluates leads against the ideal customer profile using BANT criteria: Budget (has
+      allocation or authority to create one), Authority (contact can sign or directly influence
+      the decision), Need (pain point aligns with the product), Timeline (active evaluation
+      within 6 months). Assigns a composite score 1-10 with per-dimension breakdowns and a
+      clear recommendation — advance, nurture, or disqualify — with the specific rationale
+      a sales manager needs to agree or disagree.
+    externalId: lead-qualifier
+
+  - name: Outreach Specialist
+    role: |
+      Crafts personalized outreach that references specific prospect pain points, achievements
+      or recent company events. Keeps emails under 150 words. Opens with a relevant insight
+      about their business, not a pitch about the product. Includes a single clear ask — a
+      15-minute call, not an open-ended "let me know." Avoids superlatives, buzzwords and
+      anything that reads like a template.
+    externalId: outreach-specialist
+
+skills:
+  - name: Sales playbook
+    instructions: |
+      Ideal customer profile: Series B+ startup, 100-500 employees, in fintech or developer
+      tools. Qualification thresholds: advance if score >= 7, nurture if 4-6, disqualify if
+      <= 3. Key buying signals: budget explicitly allocated for this category, active vendor
+      evaluation with timeline under 6 months, executive sponsor identified. Disqualification
+      signals: no technical team, currently mid-contract with a competitor (>12 months left),
+      or company in active downsizing.
+    externalId: sales-playbook
