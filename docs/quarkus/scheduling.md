@@ -8,7 +8,7 @@ Requires `agentican-quarkus-scheduler`. Run Agentican tasks on a cron schedule.
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-scheduler</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 ```
 

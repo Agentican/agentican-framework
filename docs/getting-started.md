@@ -10,15 +10,17 @@ This guide walks you through installing Agentican, configuring it, and running y
 
 ## Installation
 
-Add Agentican to your `pom.xml`:
+Agentican is published to [Maven Central](https://central.sonatype.com/namespace/ai.agentican). Add the core dependency to your `pom.xml` — no custom repository configuration required:
 
 ```xml
 <dependency>
     <groupId>ai.agentican</groupId>
-    <artifactId>agentican-framework</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <artifactId>agentican-framework-core</artifactId>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 ```
+
+On Quarkus? Use [`agentican-quarkus-runtime`](quarkus/getting-started.md) instead — it brings the core framework in transitively and adds CDI, config binding, and lifecycle wiring.
 
 ## Hello World
 

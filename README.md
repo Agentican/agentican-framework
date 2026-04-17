@@ -2,6 +2,7 @@
 
 > A multi-agent orchestration framework for Java — declarative plans with parallel steps, loops, branches and human checkpoints, composed from agents, skills, tools and knowledge.
 
+[![Maven Central](https://img.shields.io/maven-central/v/ai.agentican/agentican-framework-core.svg?label=Maven%20Central)](https://central.sonatype.com/namespace/ai.agentican)
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 ![Build](https://github.com/Agentican/agentican-framework/actions/workflows/build.yml/badge.svg)
@@ -57,6 +58,8 @@ This is a multi-module project. Each module has a focused responsibility:
 | [examples](examples/) | `agentican-framework-examples` | Real-world showcase examples spanning 9 domains from simple to complex. |
 
 ## Installation
+
+All artifacts are published to [Maven Central](https://central.sonatype.com/namespace/ai.agentican) under the `ai.agentican` namespace — no extra repository configuration required.
 
 **Requirements:** Java 25+
 

@@ -8,13 +8,15 @@
 
 ## Add the dependency
 
+All modules are on [Maven Central](https://central.sonatype.com/namespace/ai.agentican). No custom repository needed — Quarkus resolves each module's build-time companion automatically.
+
 For CDI-only integration:
 
 ```xml
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-runtime</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 ```
 
@@ -23,23 +25,23 @@ For the full stack (REST + metrics + tracing + Dev UI):
 ```xml
 <dependency>
     <groupId>ai.agentican</groupId>
-    <artifactId>agentican-quarkus-deployment</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <artifactId>agentican-quarkus-runtime</artifactId>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-rest</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-metrics</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-otel</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 ```
 
@@ -49,12 +51,12 @@ For Postgres persistence (task state, knowledge, registries, spans):
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-store-jpa</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-otel-store-jpa</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 <dependency>
     <groupId>io.quarkus</groupId>
