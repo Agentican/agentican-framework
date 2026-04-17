@@ -14,7 +14,7 @@ changes.
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-otel-store-jpa</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
 
