@@ -9,10 +9,12 @@ import ai.agentican.framework.orchestration.model.PlanParam;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record PlanConfig(
+public record  PlanConfig(
         String name,
         String description,
         List<PlanParamConfig> paramConfigs,
@@ -40,6 +42,11 @@ public record PlanConfig(
         this(name, description, paramConfigs, stepConfigs, null);
     }
 
+    public static PlanConfigBuilder builder() {
+
+        return new PlanConfigBuilder();
+    }
+
     public Plan toPlan() {
 
         var params = paramConfigs.stream().map(tpc ->
@@ -49,6 +56,179 @@ public record PlanConfig(
         var steps = stepConfigs.stream().map(PlanStepConfig::toPlanStep).toList();
 
         return Plan.withExternalId(externalId, name, description, params, steps);
+    }
+
+    public static class PlanConfigBuilder {
+
+        private String name;
+        private String description;
+        private String externalId;
+
+        private final List<PlanParamConfig> paramConfigs = new ArrayList<>();
+        private final List<PlanStepConfig> stepConfigs = new ArrayList<>();
+
+        public PlanConfigBuilder name(String name) { this.name = name; return this; }
+        public PlanConfigBuilder description(String description) { this.description = description; return this; }
+        public PlanConfigBuilder externalId(String externalId) { this.externalId = externalId; return this; }
+
+        public PlanConfigBuilder param(PlanParamConfig param) { this.paramConfigs.add(param); return this; }
+        public PlanConfigBuilder param(String name, String description, String defaultValue, boolean required) {
+            this.paramConfigs.add(new PlanParamConfig(name, description, defaultValue, required));
+            return this;
+        }
+
+        public PlanConfigBuilder step(PlanStepConfig step) { this.stepConfigs.add(step); return this; }
+        public PlanConfigBuilder steps(List<PlanStepConfig> steps) { this.stepConfigs.addAll(steps); return this; }
+
+        public PlanConfigBuilder step(String name, Consumer<StepBuilder> config) {
+            var b = new StepBuilder(name);
+            config.accept(b);
+            this.stepConfigs.add(b.build());
+            return this;
+        }
+
+        public PlanConfigBuilder loop(String name, Consumer<LoopBuilder> config) {
+            var b = new LoopBuilder(name);
+            config.accept(b);
+            this.stepConfigs.add(b.build());
+            return this;
+        }
+
+        public PlanConfigBuilder branch(String name, Consumer<BranchBuilder> config) {
+            var b = new BranchBuilder(name);
+            config.accept(b);
+            this.stepConfigs.add(b.build());
+            return this;
+        }
+
+        public PlanConfig build() {
+
+            return new PlanConfig(name, description, paramConfigs, stepConfigs, externalId);
+        }
+    }
+
+    public static class StepBuilder {
+
+        private final String name;
+        private String agent;
+        private String instructions;
+        private List<String> dependencies = List.of();
+        private boolean hitl;
+        private List<String> skills = List.of();
+        private List<String> tools = List.of();
+
+        StepBuilder(String name) { this.name = name; }
+
+        public StepBuilder agent(String agent) { this.agent = agent; return this; }
+        public StepBuilder instructions(String instructions) { this.instructions = instructions; return this; }
+        public StepBuilder dependencies(String... deps) { this.dependencies = List.of(deps); return this; }
+        public StepBuilder dependencies(List<String> deps) { this.dependencies = deps; return this; }
+        public StepBuilder hitl(boolean hitl) { this.hitl = hitl; return this; }
+        public StepBuilder hitl() { this.hitl = true; return this; }
+        public StepBuilder skills(String... skills) { this.skills = List.of(skills); return this; }
+        public StepBuilder skills(List<String> skills) { this.skills = skills; return this; }
+        public StepBuilder tools(String... tools) { this.tools = List.of(tools); return this; }
+        public StepBuilder tools(List<String> tools) { this.tools = tools; return this; }
+
+        PlanStepConfig build() {
+
+            return new PlanStepConfig(name, "agent", agent, instructions, dependencies, hitl, skills, tools,
+                    null, null, null, null, null);
+        }
+    }
+
+    public static class LoopBuilder {
+
+        private final String name;
+        private String over;
+        private List<String> dependencies = List.of();
+        private boolean hitl;
+        private final List<PlanStepConfig> stepConfigs = new ArrayList<>();
+
+        LoopBuilder(String name) { this.name = name; }
+
+        public LoopBuilder over(String stepName) { this.over = stepName; return this; }
+        public LoopBuilder dependencies(String... deps) { this.dependencies = List.of(deps); return this; }
+        public LoopBuilder dependencies(List<String> deps) { this.dependencies = deps; return this; }
+        public LoopBuilder hitl(boolean hitl) { this.hitl = hitl; return this; }
+        public LoopBuilder hitl() { this.hitl = true; return this; }
+
+        public LoopBuilder step(PlanStepConfig step) { stepConfigs.add(step); return this; }
+        public LoopBuilder step(String name, Consumer<StepBuilder> config) {
+            var b = new StepBuilder(name);
+            config.accept(b);
+            stepConfigs.add(b.build());
+            return this;
+        }
+
+        PlanStepConfig build() {
+
+            return new PlanStepConfig(name, "loop", null, null, dependencies, hitl, null, null,
+                    over, null, null, null, stepConfigs);
+        }
+    }
+
+    public static class BranchBuilder {
+
+        private final String name;
+        private String from;
+        private String defaultPath;
+        private List<String> dependencies = List.of();
+        private boolean hitl;
+        private final List<BranchPathConfig> pathConfigs = new ArrayList<>();
+
+        BranchBuilder(String name) { this.name = name; }
+
+        public BranchBuilder from(String stepName) { this.from = stepName; return this; }
+        public BranchBuilder defaultPath(String pathName) { this.defaultPath = pathName; return this; }
+        public BranchBuilder dependencies(String... deps) { this.dependencies = List.of(deps); return this; }
+        public BranchBuilder dependencies(List<String> deps) { this.dependencies = deps; return this; }
+        public BranchBuilder hitl(boolean hitl) { this.hitl = hitl; return this; }
+        public BranchBuilder hitl() { this.hitl = true; return this; }
+
+        public BranchBuilder path(BranchPathConfig path) { pathConfigs.add(path); return this; }
+        public BranchBuilder path(String pathName, Consumer<PathBuilder> config) {
+            var b = new PathBuilder(pathName);
+            config.accept(b);
+            pathConfigs.add(b.build());
+            return this;
+        }
+
+        PlanStepConfig build() {
+
+            return new PlanStepConfig(name, "branch", null, null, dependencies, hitl, null, null,
+                    null, from, pathConfigs, defaultPath, null);
+        }
+    }
+
+    public static class PathBuilder {
+
+        private final String pathName;
+        private String agent;
+        private String instructions;
+        private List<String> tools = List.of();
+        private final List<PlanStepConfig> stepConfigs = new ArrayList<>();
+
+        PathBuilder(String pathName) { this.pathName = pathName; }
+
+        public PathBuilder agent(String agent) { this.agent = agent; return this; }
+        public PathBuilder instructions(String instructions) { this.instructions = instructions; return this; }
+        public PathBuilder tools(String... tools) { this.tools = List.of(tools); return this; }
+        public PathBuilder tools(List<String> tools) { this.tools = tools; return this; }
+
+        public PathBuilder step(PlanStepConfig step) { stepConfigs.add(step); return this; }
+        public PathBuilder step(String name, Consumer<StepBuilder> config) {
+            var b = new StepBuilder(name);
+            config.accept(b);
+            stepConfigs.add(b.build());
+            return this;
+        }
+
+        BranchPathConfig build() {
+
+            return new BranchPathConfig(pathName, agent, instructions, tools,
+                    stepConfigs.isEmpty() ? null : stepConfigs);
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

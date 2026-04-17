@@ -378,7 +378,7 @@ public class TaskRunner {
                     }
 
                     var subResult = resume(existing.plan(), existing.taskId(), existing.params(), cancelled);
-                    iterationOutput = subResult.lastOutput();
+                    iterationOutput = subResult.output();
 
                     if (subResult.status() != TaskStatus.COMPLETED) failures++;
                 }
@@ -397,7 +397,7 @@ public class TaskRunner {
                 var subTaskResult = run(subPlan, newTaskId(), taskId, stepLog.id(), i,
                         taskParams, cancelled, parentOutputs);
 
-                iterationOutput = subTaskResult.lastOutput();
+                iterationOutput = subTaskResult.output();
                 if (subTaskResult.status() != TaskStatus.COMPLETED) failures++;
             }
 
@@ -453,7 +453,7 @@ public class TaskRunner {
                     existingChild.params(), cancelled);
 
             return new TaskStepResult(branchStep.name(), subResult.status(),
-                    subResult.lastOutput() != null ? subResult.lastOutput() : "", List.of());
+                    subResult.output() != null ? subResult.output() : "", List.of());
         }
 
         if (existingChild != null && existingChild.status() == TaskStatus.COMPLETED) {
@@ -471,7 +471,7 @@ public class TaskRunner {
                 taskParams, cancelled, parentOutputs);
 
         return new TaskStepResult(branchStep.name(), subResult.status(),
-                subResult.lastOutput() != null ? subResult.lastOutput() : "", List.of());
+                subResult.output() != null ? subResult.output() : "", List.of());
     }
 
     private static String lastStepOutput(ai.agentican.framework.state.TaskLog log) {

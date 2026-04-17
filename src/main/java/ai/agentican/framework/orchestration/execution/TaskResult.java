@@ -36,7 +36,7 @@ public record TaskResult(
     public long cacheWriteTokens() { return tokenUsage().cacheWrite(); }
     public long webSearchRequests() { return tokenUsage().webSearches(); }
 
-    public String lastOutput() {
+    public String output() {
 
         if (stepResults.isEmpty())
             return "";

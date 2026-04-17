@@ -41,7 +41,7 @@ public class Hello {
 
             var handle = agentican.run("Explain quantum entanglement in 3 sentences.");
 
-            System.out.println(handle.result().lastOutput());
+            System.out.println(handle.result().output());
         }
     }
 }

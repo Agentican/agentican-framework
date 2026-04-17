@@ -119,7 +119,7 @@ class AgenticanTest {
             var result = handle.result();
 
             assertEquals(TaskStatus.COMPLETED, result.status());
-            assertEquals("Work completed successfully.", result.lastOutput());
+            assertEquals("Work completed successfully.", result.output());
         }
     }
 
@@ -152,7 +152,7 @@ class AgenticanTest {
             var result = handle.result();
 
             assertEquals(TaskStatus.COMPLETED, result.status());
-            assertTrue(result.lastOutput().contains("widgets"));
+            assertTrue(result.output().contains("widgets"));
         }
     }
 
