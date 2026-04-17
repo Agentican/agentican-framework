@@ -5,7 +5,7 @@
 
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-framework-parent</artifactId>
-    <version>0.1.0-alpha.1</version>
+    <version>0.1.0-alpha.2-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Agentican Framework</name>
     <description>Parent POM for the Agentican agent orchestration framework and its Quarkus extensions.</description>
