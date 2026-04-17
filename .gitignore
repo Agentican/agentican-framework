@@ -7,8 +7,9 @@ target/
 # Compiled class file
 *.class
 
-# Log file
+# Log files and directories
 *.log
+logs/
 
 # BlueJ files
 *.ctxt

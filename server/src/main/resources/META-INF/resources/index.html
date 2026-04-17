@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agentican Playground</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="playground.css">
+</head>
+<body>
+  <div class="layout">
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="logo">Agent<span>ican</span></div>
+      <a href="#tasks" class="nav-item active" data-panel="tasks">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Tasks
+      </a>
+      <a href="#plans" class="nav-item" data-panel="plans">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Plans
+      </a>
+      <a href="#agents" class="nav-item" data-panel="agents">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 00-16 0"/></svg>
+        Agents
+      </a>
+      <a href="#skills" class="nav-item" data-panel="skills">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Skills
+      </a>
+      <a href="#tools" class="nav-item" data-panel="tools">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        Tools
+      </a>
+      <a href="#knowledge" class="nav-item" data-panel="knowledge">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        Knowledge
+      </a>
+      <a href="#metrics" class="nav-item" data-panel="metrics">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        Metrics
+      </a>
+      <a href="#config" class="nav-item" data-panel="config">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Config
+      </a>
+      <div class="sidebar-footer">
+        <button class="theme-toggle" onclick="toggleTheme()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="content">
+
+      <!-- Tasks panel -->
+      <div id="panel-tasks" class="panel active">
+        <div class="panel-header">
+          <h1>Tasks</h1>
+          <p class="subtitle">Submit tasks, stream progress in real time, and respond to HITL checkpoints.</p>
+        </div>
+
+        <div class="task-columns">
+
+          <!-- Left column: submit + result -->
+          <div class="task-left">
+            <div class="card">
+              <h2>Submit a task</h2>
+              <div class="form-row">
+                <textarea id="task-input" class="input-area" rows="4" placeholder="Describe what you want the agents to do..."></textarea>
+              </div>
+              <div class="form-actions" style="justify-content:flex-end">
+                <button class="btn btn-primary" onclick="submitTask()">Run</button>
+              </div>
+            </div>
+
+            <!-- HITL checkpoint -->
+            <div id="hitl-panel" class="card" style="display:none">
+              <h2 id="hitl-title">Approval Required</h2>
+              <div class="hitl-prompt" id="hitl-prompt"></div>
+              <div id="hitl-answer-wrap" style="display:none; margin-top: 12px;">
+                <textarea id="hitl-answer" rows="3" style="width: 100%; box-sizing: border-box;" placeholder="Type your answer..."></textarea>
+              </div>
+              <div class="form-actions" id="hitl-approval-actions" style="display:none">
+                <button class="btn btn-primary" onclick="respondHitl(true)">Approve</button>
+                <button class="btn btn-danger" onclick="respondHitl(false)">Reject</button>
+              </div>
+              <div class="form-actions" id="hitl-question-actions" style="display:none">
+                <button class="btn btn-primary" onclick="submitHitlAnswer()">Submit answer</button>
+              </div>
+            </div>
+
+            <!-- History -->
+            <div class="card">
+              <div class="card-header">
+                <h2>Recent Tasks</h2>
+                <button class="btn btn-sm" onclick="loadTasks()">Refresh</button>
+              </div>
+              <div class="grid-table tasks-grid" id="tasks-table">
+                <div class="grid-header">
+                  <div>ID</div><div>Name</div><div>Status</div><div>Tokens</div><div>Created</div>
+                </div>
+                <div id="tasks-body"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right column: diagnostics -->
+          <div class="task-right">
+            <div class="card diag-card">
+              <div class="btn-group-bar">
+                <div class="btn-group">
+                  <button class="btn-group-item active" data-tab="diag-events" onclick="switchDiagTab(this)">Events</button>
+                  <button class="btn-group-item" data-tab="diag-steps" onclick="switchDiagTab(this)">Trace</button>
+                  <button class="btn-group-item" data-tab="diag-metrics" onclick="switchDiagTab(this)">Metrics</button>
+                  <button class="btn-group-item" data-tab="diag-result" onclick="switchDiagTab(this)">Result</button>
+                  <button class="btn-group-item" data-tab="diag-plan" onclick="switchDiagTab(this)">Plan</button>
+                </div>
+              </div>
+
+              <!-- Events tab: full-width table, no padding -->
+              <div id="diag-events" class="tab-events active">
+                <div class="grid-table events-grid">
+                  <div class="grid-header">
+                    <div>Time</div><div>Type</div><div>ID</div><div>Parent</div><div>Message</div>
+                  </div>
+                  <div id="event-table-body"></div>
+                </div>
+              </div>
+
+              <!-- Trace tab: full-width waterfall, no padding -->
+              <div id="diag-steps" class="tab-trace">
+                <div id="diag-steps-content">
+                  <p class="tab-placeholder">Trace will appear here after task execution.</p>
+                </div>
+              </div>
+
+              <!-- Metrics tab: card grid with padding -->
+              <div id="diag-metrics" class="tab-metrics">
+                <div id="diag-metrics-content">
+                  <p class="tab-placeholder">Task metrics will appear here after task completion.</p>
+                </div>
+              </div>
+
+              <!-- Result tab -->
+              <div id="diag-result" class="tab-result">
+                <div id="diag-result-content">
+                  <p class="tab-placeholder">Task result will appear here after completion.</p>
+                </div>
+              </div>
+
+              <!-- Plan tab: step cards with padding -->
+              <div id="diag-plan" class="tab-plan">
+                <div id="diag-plan-content">
+                  <p class="tab-placeholder">Submit a task to see the execution plan.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Plans panel -->
+      <div id="panel-plans" class="panel">
+        <div class="panel-header">
+          <h1>Plans</h1>
+          <p class="subtitle">Registered plan definitions available for execution.</p>
+        </div>
+        <div id="plans-list" class="card-grid"></div>
+      </div>
+
+      <!-- Agents panel -->
+      <div id="panel-agents" class="panel">
+        <div class="panel-header">
+          <h1>Agents</h1>
+          <p class="subtitle">Pre-registered agents available for task execution.</p>
+        </div>
+        <div id="agents-list" class="card-grid"></div>
+      </div>
+
+      <!-- Skills panel -->
+      <div id="panel-skills" class="panel">
+        <div class="panel-header">
+          <h1>Skills</h1>
+          <p class="subtitle">Shared behavioral instructions. Steps activate skills to extend an agent's system prompt.</p>
+        </div>
+        <div id="skills-list" class="card-grid"></div>
+      </div>
+
+      <!-- Tools panel -->
+      <div id="panel-tools" class="panel">
+        <div class="panel-header">
+          <h1>Tools</h1>
+          <p class="subtitle">Registered toolkits and their available tools.</p>
+        </div>
+        <div id="tools-list" class="card-grid"></div>
+      </div>
+
+      <!-- Knowledge panel -->
+      <div id="panel-knowledge" class="panel">
+        <div class="panel-header">
+          <h1>Knowledge Base</h1>
+          <p class="subtitle">Persistent facts that agents curate and recall across tasks.</p>
+        </div>
+
+        <div id="knowledge-list" class="card-grid"></div>
+      </div>
+
+      <!-- Metrics panel -->
+      <div id="panel-metrics" class="panel">
+        <div class="panel-header">
+          <h1>Metrics</h1>
+          <p class="subtitle">Live Micrometer metrics from the Prometheus endpoint.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header" style="justify-content:flex-end">
+            <button class="btn btn-sm" onclick="loadMetrics()">Refresh</button>
+          </div>
+          <div id="metrics-grid"></div>
+        </div>
+      </div>
+
+      <!-- Config panel -->
+      <div id="panel-config" class="panel">
+        <div class="panel-header">
+          <h1>Config</h1>
+          <p class="subtitle">Current runtime configuration.</p>
+        </div>
+        <div id="config-content" class="card"></div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Knowledge entry modal -->
+  <div id="knowledge-modal" class="modal-overlay" onclick="if(event.target===this)closeKnowledgeModal()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="knowledge-modal-title"></span>
+        <button class="modal-close" onclick="closeKnowledgeModal()">&times;</button>
+      </div>
+      <div class="modal-tab-content active knowledge-modal-body">
+        <div id="knowledge-modal-desc"></div>
+        <div id="knowledge-modal-facts" class="fact-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Turn detail modal -->
+  <div id="turn-modal" class="modal-overlay" onclick="if(event.target===this)closeTurnModal()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="turn-modal-title"></span>
+        <button class="modal-close" onclick="closeTurnModal()">&times;</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-mtab="request" onclick="switchModalTab(this)">Request</button>
+        <button class="modal-tab" data-mtab="response" onclick="switchModalTab(this)">Response</button>
+      </div>
+      <div id="mtab-request" class="modal-tab-content active"></div>
+      <div id="mtab-response" class="modal-tab-content"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="playground.js"></script>
+</body>
+</html>
