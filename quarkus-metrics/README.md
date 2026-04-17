@@ -10,7 +10,7 @@ Metrics appear at `/q/metrics` in Prometheus format.
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-metrics</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
 

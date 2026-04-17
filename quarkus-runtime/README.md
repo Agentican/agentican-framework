@@ -1,11 +1,11 @@
-# Agentican Quarkus
+# Agentican Quarkus Runtime
 
-> Production-ready Quarkus integration for the Agentican agent framework.
+> CDI runtime for Agentican — `@Inject Agentican` and configure from `application.properties`.
 
 [![Quarkus](https://img.shields.io/badge/Quarkus-3.31-blue.svg)](https://quarkus.io/)
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
 
-Drop-in Quarkus modules that turn Agentican into a fully-featured platform: REST API, real-time SSE and WebSocket streaming, human-in-the-loop via HTTP, Micrometer metrics, OpenTelemetry tracing, cron scheduling, and a Dev UI dashboard — all configurable from `application.properties`.
+The runtime half of the Agentican Quarkus extension. Exposes `Agentican` as a CDI singleton, maps `RuntimeConfig` onto typed `application.properties`, validates config at boot, wires lifecycle events, and serves liveness/readiness health checks. This is the foundation every other `quarkus-*` module composes on top of.
 
 ## Quick Start
 
@@ -13,7 +13,7 @@ Drop-in Quarkus modules that turn Agentican into a fully-featured platform: REST
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-runtime</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -40,53 +40,31 @@ var result = handle.result();
 
 That's it. The framework plans, executes, and returns — with CDI lifecycle, health checks, and config validation wired automatically.
 
-## Modules
-
-Pick the modules you need. Each is opt-in via a Maven dependency.
-
-| Module | Artifact | What it adds |
-|---|---|---|
-| **CDI Core** | `agentican-quarkus` | `@Inject Agentican`, config, events, health checks |
-| **Deployment** | `agentican-quarkus-deployment` | Bean discovery, native image hints, Dev UI |
-| **REST** | `agentican-quarkus-rest` | REST API, SSE streaming, WebSocket, HITL bridge |
-| **Metrics** | `agentican-quarkus-metrics` | Micrometer counters/timers at `/q/metrics` |
-| **Tracing** | `agentican-quarkus-otel` | OpenTelemetry spans with Gen AI attributes |
-| **JPA Store** | `agentican-quarkus-store-jpa` | Postgres-backed task state, knowledge, agent/skill/plan registries (Flyway V1) |
-| **JPA OTel Store** | `agentican-quarkus-otel-store-jpa` | Postgres-backed span storage (Flyway V2) |
-| **Scheduler** | `agentican-quarkus-scheduler` | Cron-scheduled agent tasks |
-| **Test** | `agentican-quarkus-test` | Shared `MockLlmClient` + `TestTaskBuilder` |
-
-All modules compose correctly when combined — decorators and listeners stack automatically.
-
 ## What's in the box
 
-- **`@Inject Agentican`** — singleton CDI bean with full lifecycle management
-- **`@AgenticanAgent("name")`** — inject individual agents by name
-- **`ReactiveAgentican`** — Mutiny `Uni`-based API for reactive/Vert.x applications
-- **REST API** — 18 endpoints for tasks, agents, checkpoints, knowledge
-- **SSE streaming** — real-time events with replay via `Last-Event-ID`
-- **WebSocket** — bidirectional task submission, event streaming, and HITL responses
-- **HITL bridge** — respond to checkpoints over HTTP/WS; parked virtual threads wake up instantly
-- **Micrometer metrics** — LLM tokens, tool calls, task lifecycle, HITL gauges
-- **OpenTelemetry tracing** — step → run → turn → LLM call span hierarchy with Gen AI attributes
-- **Cron scheduling** — config-driven periodic tasks
-- **Dev UI** — agents, tasks, checkpoints, knowledge dashboard at `/q/dev-ui`
-- **Health checks** — liveness + readiness at `/q/health`
-- **Bean validation** — fail-fast on invalid config
-- **Native image hints** — reflection registration for GraalVM
+- **`@Inject Agentican`** — singleton CDI bean with full lifecycle management.
+- **`@AgenticanAgent("name")`** — qualifier for injecting individual agents by name.
+- **`ReactiveAgentican`** — Mutiny `Uni`-based API for reactive / Vert.x callers.
+- **Config binding** — `RuntimeConfig` → `application.properties` via SmallRye `@ConfigMapping`, validated at boot.
+- **Lifecycle events** — `StartupEvent` / `ShutdownEvent` observers drive `Agentican` construction and `AutoCloseable` teardown.
+- **Health checks** — liveness + readiness at `/q/health`.
+- **CDI event bridge** — task / step / HITL lifecycle events published to the CDI bus so other modules can observe them.
+- **Native image hints** — reflection registration is contributed by the sibling [`quarkus-deployment`](../quarkus-deployment/) module.
+
+For REST endpoints, metrics, tracing, persistence, scheduling, and test fixtures, add the matching peer module — see the [top-level module index](../README.md#modules).
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md) — install, configure, run your first task on Quarkus
-- [CDI Integration](docs/cdi.md) — injection, qualifiers, events, bean overrides, reactive support
-- [REST & Real-Time](docs/rest.md) — REST API, SSE streaming, WebSocket, HITL bridge
-- [Observability](docs/observability.md) — Micrometer metrics, OpenTelemetry tracing, Dev UI
-- [Extension Points](docs/extension-points.md) — decorators, listeners, custom executors
-- [Scheduling](docs/scheduling.md) — cron-driven agent tasks
-- [Testing](docs/testing.md) — MockLlmClient, TestTaskBuilder, @QuarkusTest patterns
-- [Configuration Reference](docs/configuration.md) — all properties, metrics, spans, endpoints
-- [JPA Store](../store-jpa/README.md) — Postgres persistence for tasks, knowledge, and registries
-- [JPA OTel Store](../otel-store-jpa/README.md) — persistent span storage
+- [Getting Started (Quarkus)](../docs/quarkus/getting-started.md) — install, configure, run your first task on Quarkus
+- [CDI Integration](../docs/quarkus/cdi.md) — injection, qualifiers, events, bean overrides, reactive support
+- [REST & Real-Time](../docs/quarkus/rest.md) — REST API, SSE streaming, WebSocket, HITL bridge
+- [Observability](../docs/quarkus/observability.md) — Micrometer metrics, OpenTelemetry tracing, Dev UI
+- [Extension Points](../docs/quarkus/extension-points.md) — decorators, listeners, custom executors
+- [Scheduling](../docs/quarkus/scheduling.md) — cron-driven agent tasks
+- [Testing](../docs/quarkus/testing.md) — MockLlmClient, TestTaskBuilder, @QuarkusTest patterns
+- [Configuration Reference](../docs/quarkus/configuration.md) — all properties, metrics, spans, endpoints
+- [JPA Store](../quarkus-store-jpa/README.md) — Postgres persistence for tasks, knowledge, and registries
+- [JPA OTel Store](../quarkus-otel-store-jpa/README.md) — persistent span storage
 
 ## Example: Full Stack
 
@@ -95,22 +73,22 @@ All modules compose correctly when combined — decorators and listeners stack a
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-deployment</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-SNAPSHOT</version>
 </dependency>
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-rest</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-SNAPSHOT</version>
 </dependency>
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-metrics</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-SNAPSHOT</version>
 </dependency>
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-otel</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
 
