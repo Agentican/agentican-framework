@@ -5,7 +5,6 @@
 [![Maven Central](https://img.shields.io/maven-central/v/ai.agentican/agentican-framework-core.svg?label=Maven%20Central)](https://central.sonatype.com/namespace/ai.agentican)
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-![Build](https://github.com/Agentican/agentican-framework/actions/workflows/build.yml/badge.svg)
 
 Describe a task in natural language and the built-in Planner breaks it into a structured workflow — creating agents and skills if none exist — then executes it with parallel dispatch, HITL checkpoints and durable state. Or hand-author plans with the fluent builder API and wire them into Quarkus, Spring Boot, or standalone Java.
 
