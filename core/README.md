@@ -12,7 +12,7 @@ This is the framework. Everything else in this repo (`quarkus-runtime`, `quarkus
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-framework-core</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 ```
 

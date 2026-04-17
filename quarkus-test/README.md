@@ -10,7 +10,7 @@ A test-scope utility jar that eliminates boilerplate across every Quarkus module
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-test</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
     <scope>test</scope>
 </dependency>
 ```

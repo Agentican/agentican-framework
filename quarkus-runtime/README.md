@@ -13,7 +13,7 @@ The runtime half of the Agentican Quarkus extension. Exposes `Agentican` as a CD
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-runtime</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 ```
 
@@ -73,22 +73,22 @@ For REST endpoints, metrics, tracing, persistence, scheduling, and test fixtures
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-deployment</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-rest</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-metrics</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-otel</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 ```
 

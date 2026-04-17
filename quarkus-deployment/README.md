@@ -12,7 +12,7 @@ Usually, no. `agentican-quarkus-runtime` declares this as its build-time compani
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-deployment</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
     <!-- build-time only; typically not declared explicitly -->
 </dependency>
 ```

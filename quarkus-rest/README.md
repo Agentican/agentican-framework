@@ -20,7 +20,7 @@ progress in real time, and respond to human-in-the-loop checkpoints.
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-rest</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 ```
 

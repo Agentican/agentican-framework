@@ -10,7 +10,7 @@ Wraps [Quarkus Scheduler](https://quarkus.io/guides/scheduler) to fire `agentica
 <dependency>
     <groupId>ai.agentican</groupId>
     <artifactId>agentican-quarkus-scheduler</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0-alpha.1</version>
 </dependency>
 ```
 
