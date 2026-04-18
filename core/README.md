@@ -31,7 +31,7 @@ try (var agentican = Agentican.builder().config(config).build()) {
 }
 ```
 
-No agents, skills, or plans registered — the built-in `PlannerAgent` creates them from the task description. For declarative workflows, use the `PlanConfig` builder (loops, branches, HITL checkpoints, parallel steps).
+No agents, skills, or plans registered — the built-in `PlannerAgent` creates them from the task description. For declarative workflows, use the `PlanConfig` builder (loops, branches, typed code steps, HITL checkpoints, parallel steps).
 
 ## What's in the box
 
@@ -41,8 +41,10 @@ Everything is under `ai.agentican.framework.*`.
 - `Agentican` — orchestrator, `AutoCloseable`; fluent builder for decorators, listeners, registries, and state stores.
 
 **Orchestration model** (`orchestration`)
-- `Plan`, `PlanStep`, `PlanStepAgent`, `PlanStepBranch`, `PlanStepLoop` — the declarative workflow AST.
-- `PlanConfig` — fluent builder with `step()`, `loop()`, `branch()` sub-builders.
+- `Plan`, `PlanStep`, `PlanStepAgent`, `PlanStepBranch`, `PlanStepLoop`, `PlanStepCode<I>` — the declarative workflow AST.
+- `PlanConfig` — fluent builder with `step()`, `loop()`, `branch()`, `codeStep()` sub-builders.
+- `CodeStep<I, O>`, `CodeStepSpec<I, O>`, `CodeStepRegistry`, `StepContext` — typed deterministic Java steps registered against the builder; Jackson handles I/O ser/deser at the boundaries.
+- `PlanCodec` — registry-aware Jackson reader for plan deserialization (resolves `codeSlug` → `Class<I>`).
 - `PlannerAgent` — LLM-driven planner that manufactures agents, skills, and plans from natural language.
 - `TaskRunner`, `TaskHandle`, `TaskStatus` — execution primitives.
 
@@ -51,7 +53,9 @@ Everything is under `ai.agentican.framework.*`.
 - `AgentRegistry`, `SkillRegistry` — pluggable in-memory implementations included; swap for persistent registries via the builder.
 
 **LLM clients** (`llm`)
-- `LlmClient`, `AnthropicLlmClient`, `RetryingLlmClient`, `LlmClientDecorator` — decorator chain for retries, caching, metering.
+- `LlmClient` — single SPI; one `send(LlmRequest)` call per provider.
+- `AnthropicLlmClient`, `OpenAiLlmClient` (Responses API; powers `openai` and `groq`), `GeminiLlmClient`, `BedrockLlmClient` (Converse API; Claude / Llama / Nova / Mistral / Cohere / DeepSeek / AI21), `OpenAiCompatibleLlmClient` (Chat Completions; powers `sambanova`, `together`, `fireworks`, and the `openai-compatible` escape hatch for Ollama / vLLM / LiteLLM / corporate proxies).
+- `RetryingLlmClient`, `LlmClientDecorator` — decorator chain for retries, caching, metering.
 
 **Tools** (`tools`)
 - `Toolkit` — the tool-provider interface.
@@ -85,7 +89,7 @@ If your app already runs on Quarkus, use [`agentican-quarkus-runtime`](../quarku
 
 - [Getting Started](../docs/getting-started.md) — install, configure, run your first task.
 - [Core Concepts](../docs/concepts.md) — architecture, terminology, data flow.
-- [Plans & Steps](../docs/tasks.md) — workflow modeling with agents, loops, branches.
+- [Plans & Steps](../docs/tasks.md) — workflow modeling with agents, loops, branches, and typed code steps.
 - [Agents](../docs/agents.md) — defining agents, skills, roles.
 - [Tools & Toolkits](../docs/tools.md) — built-in toolkits, Composio, MCP, custom tools.
 - [Human in the Loop](../docs/hitl.md) — approvals, questions, resumption.

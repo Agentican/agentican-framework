@@ -86,11 +86,12 @@ You can build a `Plan` manually with the builder, or let the planner create one 
 
 ### PlanStep
 
-A step in a plan. Three variants (sealed interface):
+A step in a plan. Four variants (sealed interface):
 
 - **`PlanStepAgent`** — runs an agent with given instructions
 - **`PlanStepLoop`** — iterates over an upstream step's output, running a sub-plan per item
 - **`PlanStepBranch`** — picks one of several paths based on an upstream step's output
+- **`PlanStepCode<I>`** — runs a registered Java function (no LLM round-trip), with a typed input and output
 
 Steps can depend on each other. The runner builds a dependency graph and executes independent steps in parallel.
 

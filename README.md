@@ -1,6 +1,6 @@
 # Agentican Framework
 
-> A multi-agent orchestration framework for Java — declarative plans with parallel steps, loops, branches and human checkpoints, composed from agents, skills, tools and knowledge.
+> A multi-agent orchestration framework for Java — declarative plans with parallel steps, loops, branches, typed code steps, and human checkpoints, composed from agents, skills, tools and knowledge.
 
 [![Maven Central](https://img.shields.io/maven-central/v/ai.agentican/agentican-framework-core.svg?label=Maven%20Central)](https://central.sonatype.com/namespace/ai.agentican)
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
@@ -109,8 +109,9 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 ### Core framework (`agentican-framework-core`)
 
 - **`Agentican`** — main entry point with builder API
-- **`Plan` / `PlanStep`** — declarative workflow model (agent steps, loops, branches)
-- **`PlanConfig`** — fluent builder for plans with `step()`, `loop()`, `branch()` sub-builders
+- **`Plan` / `PlanStep`** — declarative workflow model (agent steps, loops, branches, typed code steps)
+- **`PlanConfig`** — fluent builder for plans with `step()`, `loop()`, `branch()`, `codeStep()` sub-builders
+- **`CodeStep<I, O>` / `CodeStepSpec<I, O>`** — register typed Java functions as plan steps (no LLM round-trip)
 - **`Agent` / `AgentRunner`** — agent abstraction with pluggable runners
 - **`SmacAgentRunner`** — production agent loop with tool calling, HITL and knowledge
 - **`PlannerAgent`** — LLM planner that creates agents, skills and plans from natural language
@@ -118,7 +119,8 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 - **`HitlManager`** — checkpoint-based human-in-the-loop (tool approval, step approval, questions)
 - **`KnowledgeStore`** — persistent facts with LLM-driven extraction and `RECALL_KNOWLEDGE` tool
 - **`TaskStateStore`** — durable execution state (task → step → run → turn → tool call)
-- **Integrations**: Anthropic Claude, Composio (100+ SaaS), Model Context Protocol (MCP)
+- **LLM providers**: Anthropic Claude, OpenAI (Responses API), Groq, Google Gemini, AWS Bedrock (Converse API — Claude / Llama / Nova / Mistral / Cohere / DeepSeek / AI21), SambaNova, Together, Fireworks, plus an `openai-compatible` escape hatch for Ollama / vLLM / LiteLLM / corporate proxies
+- **Tool integrations**: Composio (100+ SaaS), Model Context Protocol (MCP)
 
 ### Quarkus integration
 
@@ -144,7 +146,7 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 
 - [Getting Started](docs/getting-started.md) — install, configure and run your first task
 - [Core Concepts](docs/concepts.md) — architecture, terminology, data flow
-- [Plans & Steps](docs/tasks.md) — workflow modeling with agents, loops and branches
+- [Plans & Steps](docs/tasks.md) — workflow modeling with agents, loops, branches, and typed code steps
 - [Agents](docs/agents.md) — defining agents, skills and roles
 - [Tools & Toolkits](docs/tools.md) — built-in toolkits, Composio, MCP, custom tools
 - [Human in the Loop](docs/hitl.md) — approvals, questions and resumption

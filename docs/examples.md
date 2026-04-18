@@ -250,6 +250,47 @@ var task = Plan.builder("triage")
         .build();
 ```
 
+## Typed Code Step (Deterministic Java in a Plan)
+
+When a step is deterministic — an HTTP call, a database lookup, a computed enrichment — there's no need to round-trip through an LLM. Register a `CodeStep<I, O>` with typed input and output records; the framework wires Jackson at the boundaries so the executor stays in plain Java.
+
+```java
+record HttpInput(String url, String method) {
+    public HttpInput { if (method == null) method = "GET"; }
+}
+record HttpOutput(String body, int status) { }
+
+var agentican = Agentican.builder()
+        .config(config)
+        .codeStep(
+                CodeStepSpec.of("http-get", HttpInput.class, HttpOutput.class),
+                (HttpInput input, StepContext ctx) -> {
+                    var response = HttpClient.newHttpClient().send(
+                            HttpRequest.newBuilder(URI.create(input.url()))
+                                    .method(input.method(), HttpRequest.BodyPublishers.noBody())
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
+                    return new HttpOutput(response.body(), response.statusCode());
+                })
+        .plan(PlanConfig.builder()
+                .name("payment-enrichment").externalId("payment-enrichment")
+                .param("customer_id", "Customer to enrich", null, true)
+                .codeStep("fetch-customer", s -> s
+                        .code("http-get")
+                        .input(new HttpInput(
+                                "https://api.internal/customers/{{param.customer_id}}",
+                                "GET")))
+                .step("decide", s -> s
+                        .agent("Risk Analyst")
+                        .instructions("Customer record:\n{{step.fetch-customer.output.body}}\n\n"
+                                    + "HTTP status was {{step.fetch-customer.output.status}}.")
+                        .dependencies("fetch-customer"))
+                .build())
+        .build();
+```
+
+The agent reads individual fields from the typed JSON output via `{{step.X.output.field}}`, not the raw blob. See [Plans & Steps → PlanStepCode](tasks.md#planstepcodei) for the full contract.
+
 ## Multiple LLMs (Cost Optimization)
 
 Use a fast/cheap model for classification and a stronger one for content generation:
