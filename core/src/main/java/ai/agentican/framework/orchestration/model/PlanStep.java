@@ -9,9 +9,10 @@ import java.util.List;
 @JsonSubTypes({
         @JsonSubTypes.Type(value = PlanStepAgent.class, name = "agent"),
         @JsonSubTypes.Type(value = PlanStepLoop.class, name = "loop"),
-        @JsonSubTypes.Type(value = PlanStepBranch.class, name = "branch")
+        @JsonSubTypes.Type(value = PlanStepBranch.class, name = "branch"),
+        @JsonSubTypes.Type(value = PlanStepCode.class, name = "code")
 })
-public sealed interface PlanStep permits PlanStepAgent, PlanStepLoop, PlanStepBranch {
+public sealed interface PlanStep permits PlanStepAgent, PlanStepLoop, PlanStepBranch, PlanStepCode {
 
     String name();
 

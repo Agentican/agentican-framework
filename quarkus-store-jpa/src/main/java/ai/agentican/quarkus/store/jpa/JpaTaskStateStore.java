@@ -9,6 +9,7 @@ import ai.agentican.framework.llm.ToolCall;
 import ai.agentican.framework.orchestration.PlanRegistry;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
 import ai.agentican.framework.orchestration.model.Plan;
+import ai.agentican.framework.orchestration.model.PlanCodec;
 import ai.agentican.framework.state.RunLog;
 import ai.agentican.framework.state.StepLog;
 import ai.agentican.framework.state.TaskLog;
@@ -28,6 +29,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 
 import io.quarkus.arc.properties.IfBuildProperty;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
@@ -48,6 +50,9 @@ public class JpaTaskStateStore implements TaskStateStore {
 
     @Inject
     PlanRegistry planRegistry;
+
+    @Inject
+    Instance<PlanCodec> planCodec;
 
     @Override
     @Transactional
@@ -325,7 +330,7 @@ public class JpaTaskStateStore implements TaskStateStore {
         boolean snapshotCorrupt = false;
 
         if (task.planSnapshotJson != null && !task.planSnapshotJson.isBlank()) {
-            try { plan = Json.readValue(task.planSnapshotJson, Plan.class); }
+            try { plan = readPlan(task.planSnapshotJson); }
             catch (Exception ex) {
                 LOG.warn("Failed to deserialize plan snapshot for task {}: {}", task.id, ex.getMessage());
                 snapshotCorrupt = true;
@@ -468,5 +473,13 @@ public class JpaTaskStateStore implements TaskStateStore {
         if (s == null) return null;
         try { return TaskStatus.valueOf(s); }
         catch (IllegalArgumentException ex) { return null; }
+    }
+
+    private Plan readPlan(String json) throws Exception {
+
+        if (planCodec != null && planCodec.isResolvable())
+            return planCodec.get().fromJson(json, Plan.class);
+
+        return Json.readValue(json, Plan.class);
     }
 }

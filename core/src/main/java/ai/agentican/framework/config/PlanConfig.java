@@ -1,11 +1,14 @@
 package ai.agentican.framework.config;
 
+import ai.agentican.framework.orchestration.code.CodeStepRegistry;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
 import ai.agentican.framework.orchestration.model.PlanStepBranch;
+import ai.agentican.framework.orchestration.model.PlanStepCode;
 import ai.agentican.framework.orchestration.model.PlanStepLoop;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanStep;
 import ai.agentican.framework.orchestration.model.PlanParam;
+import ai.agentican.framework.util.Json;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
@@ -49,11 +52,16 @@ public record  PlanConfig(
 
     public Plan toPlan() {
 
+        return toPlan(null);
+    }
+
+    public Plan toPlan(CodeStepRegistry codeStepRegistry) {
+
         var params = paramConfigs.stream().map(tpc ->
                         PlanParam.of(tpc.name(), tpc.description(), tpc.defaultValue(), tpc.required()))
                 .toList();
 
-        var steps = stepConfigs.stream().map(PlanStepConfig::toPlanStep).toList();
+        var steps = stepConfigs.stream().map(s -> s.toPlanStep(codeStepRegistry)).toList();
 
         return Plan.withExternalId(externalId, name, description, params, steps);
     }
@@ -101,6 +109,13 @@ public record  PlanConfig(
             return this;
         }
 
+        public PlanConfigBuilder codeStep(String name, Consumer<CodeStepBuilder> config) {
+            var b = new CodeStepBuilder(name);
+            config.accept(b);
+            this.stepConfigs.add(b.build());
+            return this;
+        }
+
         public PlanConfig build() {
 
             return new PlanConfig(name, description, paramConfigs, stepConfigs, externalId);
@@ -133,7 +148,28 @@ public record  PlanConfig(
         PlanStepConfig build() {
 
             return new PlanStepConfig(name, "agent", agent, instructions, dependencies, hitl, skills, tools,
-                    null, null, null, null, null);
+                    null, null, null, null, null, null, null);
+        }
+    }
+
+    public static class CodeStepBuilder {
+
+        private final String name;
+        private String codeSlug;
+        private Object inputs;
+        private List<String> dependencies = List.of();
+
+        CodeStepBuilder(String name) { this.name = name; }
+
+        public CodeStepBuilder code(String slug) { this.codeSlug = slug; return this; }
+        public <I> CodeStepBuilder input(I input) { this.inputs = input; return this; }
+        public CodeStepBuilder dependencies(String... deps) { this.dependencies = List.of(deps); return this; }
+        public CodeStepBuilder dependencies(List<String> deps) { this.dependencies = deps; return this; }
+
+        PlanStepConfig build() {
+
+            return new PlanStepConfig(name, "code", null, null, dependencies, false, null, null,
+                    null, null, null, null, null, codeSlug, inputs);
         }
     }
 
@@ -164,7 +200,7 @@ public record  PlanConfig(
         PlanStepConfig build() {
 
             return new PlanStepConfig(name, "loop", null, null, dependencies, hitl, null, null,
-                    over, null, null, null, stepConfigs);
+                    over, null, null, null, stepConfigs, null, null);
         }
     }
 
@@ -197,7 +233,7 @@ public record  PlanConfig(
         PlanStepConfig build() {
 
             return new PlanStepConfig(name, "branch", null, null, dependencies, hitl, null, null,
-                    null, from, pathConfigs, defaultPath, null);
+                    null, from, pathConfigs, defaultPath, null, null, null);
         }
     }
 
@@ -259,7 +295,9 @@ public record  PlanConfig(
             String from,
             List<BranchPathConfig> pathConfigs,
             String defaultPath,
-            List<PlanStepConfig> stepConfigs) {
+            List<PlanStepConfig> stepConfigs,
+            String codeSlug,
+            Object codeInputs) {
 
         public PlanStepConfig {
 
@@ -281,6 +319,11 @@ public record  PlanConfig(
 
         public PlanStep toPlanStep() {
 
+            return toPlanStep(null);
+        }
+
+        public PlanStep toPlanStep(CodeStepRegistry codeStepRegistry) {
+
             return switch (type) {
 
                 case "loop" -> {
@@ -289,7 +332,7 @@ public record  PlanConfig(
 
                     if (stepConfigs != null && !stepConfigs.isEmpty()) {
 
-                        steps = stepConfigs.stream().map(PlanStepConfig::toPlanStep).toList();
+                        steps = stepConfigs.stream().map(s -> s.toPlanStep(codeStepRegistry)).toList();
                     }
                     else {
 
@@ -306,14 +349,36 @@ public record  PlanConfig(
                 case "branch" -> {
 
                     var paths = this.pathConfigs.stream()
-                            .map(bpc -> PlanStepBranch.Path.of(bpc.pathName(), bpc.toPlanStep()))
+                            .map(bpc -> PlanStepBranch.Path.of(bpc.pathName(), bpc.toPlanStep(codeStepRegistry)))
                             .toList();
 
                     yield PlanStepBranch.of(name, from, paths, defaultPath, dependencies, hitl);
                 }
 
+                case "code" -> buildCodeStep(codeStepRegistry);
+
                 default -> PlanStepAgent.of(name, agent, instructions, dependencies, hitl, skills, tools);
             };
+        }
+
+        private PlanStepCode<?> buildCodeStep(CodeStepRegistry codeStepRegistry) {
+
+            Object typedInputs = codeInputs;
+
+            if (codeInputs != null && codeStepRegistry != null) {
+
+                var registered = codeStepRegistry.get(codeSlug);
+
+                if (registered != null) {
+
+                    var inputType = registered.spec().inputType();
+
+                    if (inputType != Void.class && !inputType.isInstance(codeInputs))
+                        typedInputs = Json.mapper().convertValue(codeInputs, inputType);
+                }
+            }
+
+            return PlanStepCode.of(name, codeSlug, typedInputs, dependencies);
         }
     }
 
@@ -336,8 +401,13 @@ public record  PlanConfig(
 
         List<PlanStep> toPlanStep() {
 
+            return toPlanStep(null);
+        }
+
+        List<PlanStep> toPlanStep(CodeStepRegistry codeStepRegistry) {
+
             if (stepConfigs != null && !stepConfigs.isEmpty())
-                return stepConfigs.stream().map(PlanStepConfig::toPlanStep).toList();
+                return stepConfigs.stream().map(s -> s.toPlanStep(codeStepRegistry)).toList();
 
             var stepName = pathName + "-body";
 

@@ -456,7 +456,7 @@ class AgenticanTest {
     void fluentPlanIsRegistered() {
 
         var step = new PlanConfig.PlanStepConfig("s1", "agent", "noop", "do nothing",
-                List.of(), false, List.of(), List.of(), null, null, List.of(), null, List.of());
+                List.of(), false, List.of(), List.of(), null, null, List.of(), null, List.of(), null, null);
 
         var planConfig = new PlanConfig("fluent-plan", "desc", List.of(), List.of(step), "fluent-plan-ext");
 

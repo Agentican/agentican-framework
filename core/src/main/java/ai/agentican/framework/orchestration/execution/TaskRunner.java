@@ -58,22 +58,34 @@ public class TaskRunner {
     private final ConcurrentHashMap<Plan, ImmutableDeps> depsCache = new ConcurrentHashMap<>();
     private final StepLoopRunner stepLoopRunner;
     private final StepBranchRunner stepBranchRunner;
+    private final StepCodeRunner stepCodeRunner;
 
     public static TaskRunner of(AgentRegistry agentRegistry, HitlManager hitlManager,
                                 ToolkitRegistry toolkitRegistry, TaskStateStore taskStateStore) {
 
-        return new TaskRunner(agentRegistry, hitlManager, toolkitRegistry, taskStateStore, null, 0, null);
+        return new TaskRunner(agentRegistry, hitlManager, toolkitRegistry, taskStateStore, null, 0, null,
+                new ai.agentican.framework.orchestration.code.CodeStepRegistry());
     }
 
     public static TaskRunner of(AgentRegistry agentRegistry, HitlManager hitlManager,
                                 ToolkitRegistry toolkitRegistry, TaskStateStore taskStateStore, Duration taskTimeout) {
 
-        return new TaskRunner(agentRegistry, hitlManager, toolkitRegistry, taskStateStore, taskTimeout, 0, null);
+        return new TaskRunner(agentRegistry, hitlManager, toolkitRegistry, taskStateStore, taskTimeout, 0, null,
+                new ai.agentican.framework.orchestration.code.CodeStepRegistry());
     }
 
     public TaskRunner(AgentRegistry agentRegistry, HitlManager hitlManager,
                       ToolkitRegistry toolkitRegistry, TaskStateStore taskStateStore, Duration taskTimeout,
                       int maxStepRetries, TaskDecorator taskDecorator) {
+
+        this(agentRegistry, hitlManager, toolkitRegistry, taskStateStore, taskTimeout,
+                maxStepRetries, taskDecorator, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+    }
+
+    public TaskRunner(AgentRegistry agentRegistry, HitlManager hitlManager,
+                      ToolkitRegistry toolkitRegistry, TaskStateStore taskStateStore, Duration taskTimeout,
+                      int maxStepRetries, TaskDecorator taskDecorator,
+                      ai.agentican.framework.orchestration.code.CodeStepRegistry codeStepRegistry) {
 
         this.agentRegistry = agentRegistry;
         this.hitlManager = hitlManager;
@@ -83,6 +95,7 @@ public class TaskRunner {
         this.maxStepRetries = maxStepRetries > 0 ? maxStepRetries : WorkerConfig.DEFAULT_MAX_STEP_RETRIES;
         this.taskDecorator = taskDecorator;
         this.stepAgentRunner = new StepAgentRunner(agentRegistry, toolkitRegistry);
+        this.stepCodeRunner = new StepCodeRunner(codeStepRegistry, taskStateStore, hitlManager);
 
         this.stepLoopRunner = new StepLoopRunner(
                 (subPlan, subParams, subCancelled, subOutputs, parentTaskId, parentStepId, iterationIndex) ->
@@ -208,6 +221,12 @@ public class TaskRunner {
 
         if (planStep instanceof PlanStepBranch branchStep)
             return resumeBranchStep(branchStep, stepLog, parentOutputs, taskParams, taskId, cancelled);
+
+        if (planStep instanceof PlanStepCode<?> codeStep) {
+
+            LOG.info("Resuming code step '{}': re-running from scratch", planStep.name());
+            return stepCodeRunner.run(codeStep, parentOutputs, taskParams, cancelled, taskId, stepLog.id());
+        }
 
         if (!(planStep instanceof PlanStepAgent agentStep))
             return new TaskStepResult(planStep.name(), TaskStatus.FAILED,
@@ -824,6 +843,7 @@ public class TaskRunner {
             case PlanStepAgent agentTaskStep -> stepAgentRunner.run(agentTaskStep, parentStepOutputs, taskParams, taskId, stepId);
             case PlanStepLoop loopTaskStep -> stepLoopRunner.run(loopTaskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
             case PlanStepBranch branchTaskStep -> stepBranchRunner.run(branchTaskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
+            case PlanStepCode<?> codeTaskStep -> stepCodeRunner.run(codeTaskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
         };
     }
 
@@ -963,6 +983,7 @@ public class TaskRunner {
                     s.dependencies(), s.hitl(), s.skills(), s.tools());
             case PlanStepLoop s -> s;
             case PlanStepBranch s -> s;
+            case PlanStepCode<?> s -> s;
         };
 
         return runTaskStep(modifiedTaskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);

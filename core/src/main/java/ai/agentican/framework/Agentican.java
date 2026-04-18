@@ -24,6 +24,10 @@ import ai.agentican.framework.llm.LlmClientDecorator;
 import ai.agentican.framework.llm.OpenAiCompatibleLlmClient;
 import ai.agentican.framework.llm.OpenAiLlmClient;
 import ai.agentican.framework.llm.RetryingLlmClient;
+import ai.agentican.framework.orchestration.code.CodeStep;
+import ai.agentican.framework.orchestration.code.CodeStepRegistry;
+import ai.agentican.framework.orchestration.code.CodeStepSpec;
+import ai.agentican.framework.orchestration.model.PlanStepCode;
 import ai.agentican.framework.state.MemTaskStateStore;
 import ai.agentican.framework.state.NotifyingTaskStateStore;
 import ai.agentican.framework.state.TaskStateStore;
@@ -90,6 +94,19 @@ public class Agentican implements AutoCloseable {
         return new AgenticanBuilder();
     }
 
+    private static void validateCodeStepSlugs(ai.agentican.framework.orchestration.model.Plan plan,
+                                              CodeStepRegistry registry) {
+
+        for (var step : plan.steps()) {
+
+            if (step instanceof PlanStepCode<?> code && !registry.contains(code.codeSlug())) {
+
+                throw new IllegalStateException("Plan '" + plan.name() + "' step '" + code.name()
+                        + "' references unknown code step slug '" + code.codeSlug() + "'");
+            }
+        }
+    }
+
     @SuppressWarnings("unused")
     private Agentican(RuntimeConfig config, Map<String, LlmClient> llms, Map<String, Toolkit> toolkits,
                       List<AgentConfig> extraAgents, List<SkillConfig> extraSkills, List<PlanConfig> extraPlans,
@@ -98,7 +115,8 @@ public class Agentican implements AutoCloseable {
                       AgentRegistry agentRegistryOverride, SkillRegistry skillRegistryOverride,
                       PlanRegistry planRegistryOverride,
                       LlmClientDecorator llmDecorator, TaskDecorator taskDecorator, TaskListener taskListener,
-                      ExecutorService taskExecutor) {
+                      ExecutorService taskExecutor,
+                      CodeStepRegistry codeStepRegistry) {
 
         this.config = config;
 
@@ -226,7 +244,9 @@ public class Agentican implements AutoCloseable {
                 extraPlans != null ? extraPlans.stream() : Stream.<PlanConfig>empty()
         ).forEach(planConfig -> {
             requireExternalId("plan", planConfig.name(), planConfig.externalId());
-            planRegistry.register(planConfig.toPlan());
+            var plan = planConfig.toPlan(codeStepRegistry);
+            validateCodeStepSlugs(plan, codeStepRegistry);
+            planRegistry.register(plan);
         });
 
         this.planRegistry = planRegistry;
@@ -238,7 +258,7 @@ public class Agentican implements AutoCloseable {
         var maxStepRetries = agentRunnerConfig.maxStepRetries();
 
         this.taskRunner = new TaskRunner(agentRegistry, hitlManager, toolkitRegistry, this.taskStateStore,
-                taskTimeout, maxStepRetries, taskDecorator);
+                taskTimeout, maxStepRetries, taskDecorator, codeStepRegistry);
 
         var numLlms = this.llms.size();
         var numToolkits = toolkitRegistry.slugs().size();
@@ -623,6 +643,7 @@ public class Agentican implements AutoCloseable {
 
         private final Map<String, LlmClient> llms = new LinkedHashMap<>();
         private final Map<String, Toolkit> toolkits = new LinkedHashMap<>();
+        private final CodeStepRegistry codeStepRegistry = new CodeStepRegistry();
 
         private final List<AgentConfig> extraAgents = new ArrayList<>();
         private final List<SkillConfig> extraSkills = new ArrayList<>();
@@ -653,6 +674,11 @@ public class Agentican implements AutoCloseable {
 
         public AgenticanBuilder toolkit(String slug, Toolkit toolkit) { this.toolkits.put(slug, toolkit); return this; }
 
+        public <I, O> AgenticanBuilder codeStep(CodeStepSpec<I, O> spec, CodeStep<I, O> executor) {
+            this.codeStepRegistry.register(spec, executor);
+            return this;
+        }
+
         public AgenticanBuilder hitlManager(HitlManager hitlManager) { this.hitlManager = hitlManager; return this; }
         public AgenticanBuilder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
         public AgenticanBuilder agentRegistry(AgentRegistry agentRegistry) { this.agentRegistry = agentRegistry; return this; }
@@ -675,7 +701,7 @@ public class Agentican implements AutoCloseable {
             return new Agentican(config, llms, toolkits,
                     extraAgents, extraSkills, extraPlans, extraMcp, extraComposio,
                     taskStateStore, hitlManager, knowledgeStore, agentRegistry, skillRegistry, planRegistry, llmDecorator,
-                    taskDecorator, stepListener, taskExecutor);
+                    taskDecorator, stepListener, taskExecutor, codeStepRegistry);
         }
     }
 }

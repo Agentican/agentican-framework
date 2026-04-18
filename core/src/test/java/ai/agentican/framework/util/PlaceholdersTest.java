@@ -78,4 +78,65 @@ class PlaceholdersTest {
 
         assertEquals("Data: {{step.nonexistent.output}}", result);
     }
+
+    @Test
+    void resolveStepOutputFieldExtractsFromJson() {
+
+        var result = Placeholders.resolveStepOutputs(
+                "body={{step.fetch.output.body}} status={{step.fetch.output.status}}",
+                Map.of("fetch", "{\"body\":\"hello\",\"status\":200}"));
+
+        assertEquals("body=hello status=200", result);
+    }
+
+    @Test
+    void resolveStepOutputFieldNestedPath() {
+
+        var result = Placeholders.resolveStepOutputs(
+                "name={{step.user.output.profile.name}}",
+                Map.of("user", "{\"profile\":{\"name\":\"Alice\"}}"));
+
+        assertEquals("name=Alice", result);
+    }
+
+    @Test
+    void resolveStepOutputFieldMissingFieldYieldsEmpty() {
+
+        var result = Placeholders.resolveStepOutputs(
+                "missing=[{{step.fetch.output.nope}}]",
+                Map.of("fetch", "{\"body\":\"hello\"}"));
+
+        assertEquals("missing=[]", result);
+    }
+
+    @Test
+    void resolveStepOutputFieldOnNonJsonYieldsEmpty() {
+
+        var result = Placeholders.resolveStepOutputs(
+                "field=[{{step.agent.output.body}}]",
+                Map.of("agent", "this is plain agent text, not JSON"));
+
+        assertEquals("field=[]", result);
+    }
+
+    @Test
+    void resolveStepOutputsRawDoesNotWrap() {
+
+        var result = Placeholders.resolveStepOutputsRaw(
+                "Data: {{step.research.output}}",
+                Map.of("research", "some data"));
+
+        assertEquals("Data: some data", result);
+        assertFalse(result.contains("<upstream-output"));
+    }
+
+    @Test
+    void resolveStepOutputsRawSupportsFieldAccess() {
+
+        var result = Placeholders.resolveStepOutputsRaw(
+                "url={{step.fetch.output.url}}",
+                Map.of("fetch", "{\"url\":\"https://x\"}"));
+
+        assertEquals("url=https://x", result);
+    }
 }

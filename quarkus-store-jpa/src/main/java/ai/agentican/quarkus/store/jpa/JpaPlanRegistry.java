@@ -2,11 +2,14 @@ package ai.agentican.quarkus.store.jpa;
 
 import ai.agentican.framework.orchestration.PlanRegistry;
 import ai.agentican.framework.orchestration.model.Plan;
+import ai.agentican.framework.orchestration.model.PlanCodec;
 import ai.agentican.framework.util.Json;
 import ai.agentican.quarkus.store.jpa.entity.PlanEntity;
 
 import io.quarkus.arc.properties.IfBuildProperty;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import org.slf4j.Logger;
@@ -28,6 +31,9 @@ public class JpaPlanRegistry implements PlanRegistry {
     private final ConcurrentMap<String, Plan> byId = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, String> idByName = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, String> idByExternalId = new ConcurrentHashMap<>();
+
+    @Inject
+    Instance<PlanCodec> planCodec;
 
     @Override
     @Transactional
@@ -78,7 +84,7 @@ public class JpaPlanRegistry implements PlanRegistry {
 
             try {
 
-                var plan = Json.readValue(row.definitionJson, Plan.class);
+                var plan = readPlan(row.definitionJson);
                 byId.put(plan.id(), plan);
                 idByName.put(plan.name(), plan.id());
                 if (row.externalId != null)
@@ -172,5 +178,13 @@ public class JpaPlanRegistry implements PlanRegistry {
         catch (Exception ex) {
             throw new IllegalStateException("Failed to serialize plan '" + plan.name() + "': " + ex.getMessage(), ex);
         }
+    }
+
+    private Plan readPlan(String json) throws Exception {
+
+        if (planCodec != null && planCodec.isResolvable())
+            return planCodec.get().fromJson(json, Plan.class);
+
+        return Json.readValue(json, Plan.class);
     }
 }
