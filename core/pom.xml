@@ -17,6 +17,9 @@
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
         <anthropic.version>2.19.0</anthropic.version>
+        <openai.version>4.32.0</openai.version>
+        <genai.version>1.51.0</genai.version>
+        <aws.sdk.version>2.42.36</aws.sdk.version>
         <mcp.version>1.1.0</mcp.version>
         <jackson.version>2.18.3</jackson.version>
         <slf4j.version>2.0.17</slf4j.version>
@@ -29,6 +32,21 @@
             <groupId>com.anthropic</groupId>
             <artifactId>anthropic-java</artifactId>
             <version>${anthropic.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.openai</groupId>
+            <artifactId>openai-java</artifactId>
+            <version>${openai.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.genai</groupId>
+            <artifactId>google-genai</artifactId>
+            <version>${genai.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>bedrockruntime</artifactId>
+            <version>${aws.sdk.version}</version>
         </dependency>
         <dependency>
             <groupId>io.modelcontextprotocol.sdk</groupId>

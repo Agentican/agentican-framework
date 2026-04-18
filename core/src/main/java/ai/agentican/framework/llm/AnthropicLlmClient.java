@@ -22,6 +22,7 @@ public class AnthropicLlmClient {
 
     private final String model;
     private final long maxTokens;
+    private final Double temperature;
 
     private final AnthropicClient client;
 
@@ -30,6 +31,7 @@ public class AnthropicLlmClient {
         this.client = AnthropicOkHttpClient.builder().apiKey(config.apiKey()).build();
         this.model = config.model();
         this.maxTokens = config.maxTokens();
+        this.temperature = config.temperature();
     }
 
     private static AnthropicLlmClient of(LlmConfig llmConfig) {
@@ -88,6 +90,8 @@ public class AnthropicLlmClient {
                 .maxTokens(maxTokens)
                 .systemOfTextBlockParams(List.of(systemPromptBlock))
                 .messages(List.of(userMessageParam));
+
+        if (temperature != null) messageBuilder.temperature(temperature);
 
         var toolBuilders = new ArrayList<Tool.Builder>();
 

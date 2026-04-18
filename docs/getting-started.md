@@ -56,6 +56,95 @@ export ANTHROPIC_API_KEY=sk-ant-...
 mvn compile exec:java -Dexec.mainClass=Hello
 ```
 
+### Using OpenAI instead
+
+Swap the `LlmConfig` for an OpenAI-backed one — everything else is identical:
+
+```java
+var llm = LlmConfig.builder()
+        .provider("openai")
+        .apiKey(System.getenv("OPENAI_API_KEY"))
+        .model("gpt-4o-mini")
+        .build();
+
+var config = RuntimeConfig.builder().llm(llm).build();
+```
+
+### Using Google Gemini
+
+Same shape, `provider = "gemini"`. Google Search grounding is on by default; pick any Gemini 2.0+ model:
+
+```java
+var llm = LlmConfig.builder()
+        .provider("gemini")
+        .apiKey(System.getenv("GOOGLE_API_KEY"))
+        .model("gemini-2.5-flash")
+        .build();
+
+var config = RuntimeConfig.builder().llm(llm).build();
+```
+
+### Using OSS-hosted providers
+
+The framework ships native support for four OSS-focused providers. All four take an OpenAI-shaped `LlmConfig`; only the `provider` and `model` strings change.
+
+```java
+// Groq — routes through the Responses API; built-in browser_search
+// kicks in automatically on openai/gpt-oss-* models.
+.provider("groq").model("llama-3.3-70b-versatile")
+.provider("groq").model("openai/gpt-oss-120b")
+
+// SambaNova — reports cached_tokens; OSS model zoo.
+.provider("sambanova").model("Meta-Llama-3.3-70B-Instruct")
+
+// Together — broadest coverage (chat, vision, embeddings, speech).
+.provider("together").model("meta-llama/Llama-3.3-70B-Instruct-Turbo")
+
+// Fireworks — OpenAI-compatible Chat Completions.
+.provider("fireworks").model("accounts/fireworks/models/llama-v3p3-70b-instruct")
+```
+
+### Using AWS Bedrock
+
+Bedrock's Converse API serves Claude, Llama, Nova, Mistral, Cohere, and DeepSeek through one unified request/response shape. Auth comes from your AWS credentials (env vars, `~/.aws/credentials`, IAM role — whatever the AWS SDK's default chain picks up):
+
+```java
+var llm = LlmConfig.builder()
+        .provider("bedrock")
+        .region("us-east-1")
+        .model("anthropic.claude-sonnet-4-5-20250929-v1:0")
+        .build();
+
+var config = RuntimeConfig.builder().llm(llm).build();
+```
+
+For static credentials — e.g. in tests — pair `apiKey` and `secretKey`:
+
+```java
+.provider("bedrock")
+.region("us-east-1")
+.apiKey(System.getenv("AWS_ACCESS_KEY_ID"))
+.secretKey(System.getenv("AWS_SECRET_ACCESS_KEY"))
+.model("anthropic.claude-sonnet-4-5-20250929-v1:0")
+```
+
+### Using a self-hosted OpenAI-compatible endpoint
+
+Point the framework at Ollama, vLLM, LiteLLM, LocalAI, or any corporate proxy with the `openai-compatible` provider plus an explicit `baseUrl`:
+
+```java
+var llm = LlmConfig.builder()
+        .provider("openai-compatible")
+        .baseUrl("http://localhost:11434/v1")
+        .apiKey("ollama")          // Ollama ignores; any non-blank string works
+        .model("llama3.3:70b")
+        .build();
+
+var config = RuntimeConfig.builder().llm(llm).build();
+```
+
+See [Configuration → Supported providers](configuration.md#supported-providers) for what's the same and what's not across providers.
+
 ## What Just Happened?
 
 When you called `agentican.run("Explain quantum entanglement...")`, the framework:

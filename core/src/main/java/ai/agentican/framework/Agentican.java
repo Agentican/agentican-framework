@@ -17,8 +17,12 @@ import ai.agentican.framework.knowledge.KnowledgeStore;
 import ai.agentican.framework.knowledge.LlmKnowledgeExtractor;
 import ai.agentican.framework.knowledge.MemKnowledgeStore;
 import ai.agentican.framework.llm.AnthropicLlmClient;
+import ai.agentican.framework.llm.BedrockLlmClient;
+import ai.agentican.framework.llm.GeminiLlmClient;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmClientDecorator;
+import ai.agentican.framework.llm.OpenAiCompatibleLlmClient;
+import ai.agentican.framework.llm.OpenAiLlmClient;
 import ai.agentican.framework.llm.RetryingLlmClient;
 import ai.agentican.framework.state.MemTaskStateStore;
 import ai.agentican.framework.state.NotifyingTaskStateStore;
@@ -112,7 +116,18 @@ public class Agentican implements AutoCloseable {
 
         config.llm().forEach(llmConfig -> {
 
-            var client = AnthropicLlmClient.create(llmConfig);
+            LlmClient client = switch (llmConfig.provider()) {
+                case "anthropic"          -> AnthropicLlmClient.create(llmConfig);
+                case "openai", "groq"     -> OpenAiLlmClient.create(llmConfig);
+                case "gemini"             -> GeminiLlmClient.create(llmConfig);
+                case "bedrock"            -> BedrockLlmClient.create(llmConfig);
+                case "sambanova",
+                     "together",
+                     "fireworks",
+                     "openai-compatible"  -> OpenAiCompatibleLlmClient.create(llmConfig);
+                default -> throw new IllegalStateException(
+                        "Unsupported LLM provider: " + llmConfig.provider());
+            };
 
             if (llmDecorator != null) client = llmDecorator.decorate(llmConfig, client);
 
