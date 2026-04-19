@@ -86,9 +86,9 @@ class EndToEndTest {
     void submitAndVerify() throws Exception {
         mockLlm.queueEndTurn("Result");
 
-        var step = TaskStepAgent.of("s", "researcher", "do it",
+        var step = new PlanStepAgent("s", "researcher", "do it",
             List.of(), false, List.of(), List.of());
-        var task = Task.of("test", "d", List.of(), List.of(step));
+        var task = Plan.builder("test").description("d").step(step).build();
 
         var taskId = given()
             .contentType("application/json")

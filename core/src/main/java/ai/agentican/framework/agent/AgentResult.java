@@ -14,12 +14,7 @@ public record AgentResult(
 
         if (status == null) throw new IllegalArgumentException("Status is required");
 
-        if (run == null) run = RunLog.of(Ids.generate(), 0, null);
-    }
-
-    public AgentResult(AgentStatus status, RunLog run) {
-
-        this(status, run, null);
+        if (run == null) run = new RunLog(Ids.generate(), 0, null);
     }
 
     public String text() {
@@ -40,4 +35,27 @@ public record AgentResult(
     public long cacheReadTokens() { return tokenUsage().cacheRead(); }
     public long cacheWriteTokens() { return tokenUsage().cacheWrite(); }
     public long webSearchRequests() { return tokenUsage().webSearches(); }
+
+    public static Builder builder() {
+
+        return new Builder();
+    }
+
+    public static class Builder {
+
+        private AgentStatus status;
+        private RunLog run;
+        private HitlCheckpoint checkpoint;
+
+        Builder() {}
+
+        public Builder status(AgentStatus status) { this.status = status; return this; }
+        public Builder run(RunLog run) { this.run = run; return this; }
+        public Builder checkpoint(HitlCheckpoint checkpoint) { this.checkpoint = checkpoint; return this; }
+
+        public AgentResult build() {
+
+            return new AgentResult(status, run, checkpoint);
+        }
+    }
 }

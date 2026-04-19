@@ -20,7 +20,7 @@ class PlanStepCodeDeserializerTest {
     void roundTripWithTypedInputUsingCodec() throws Exception {
 
         var registry = new CodeStepRegistry();
-        registry.register(CodeStepSpec.of("http", HttpInput.class, String.class),
+        registry.register(new CodeStepSpec<>("http", null, HttpInput.class, String.class),
                 (CodeStep<HttpInput, String>) (input, ctx) -> "ok");
 
         var codec = new PlanCodec(registry);
@@ -28,8 +28,7 @@ class PlanStepCodeDeserializerTest {
         var step = new PlanStepCode<>("fetch", "http",
                 new HttpInput("https://example.com", "GET"), List.of("upstream"));
 
-        var plan = Plan.of("test-plan", "desc", List.of(),
-                List.<PlanStep>of(step));
+        var plan = Plan.builder("test-plan").description("desc").step(step).build();
 
         var json = Json.writeValueAsString(plan);
         var roundTripped = codec.fromJson(json, Plan.class);
@@ -52,7 +51,7 @@ class PlanStepCodeDeserializerTest {
         var step = new PlanStepCode<>("fetch", "http",
                 new HttpInput("https://example.com", "GET"), List.of());
 
-        var plan = Plan.of("test-plan", "desc", List.of(), List.<PlanStep>of(step));
+        var plan = Plan.builder("test-plan").description("desc").step(step).build();
 
         var json = Json.writeValueAsString(plan);
         var roundTripped = Json.readValue(json, Plan.class);
@@ -85,13 +84,13 @@ class PlanStepCodeDeserializerTest {
     void nullInputsRoundTrip() throws Exception {
 
         var registry = new CodeStepRegistry();
-        registry.register(CodeStepSpec.of("noop", Void.class, Void.class),
+        registry.register(new CodeStepSpec<>("noop", null, Void.class, Void.class),
                 (CodeStep<Void, Void>) (input, ctx) -> null);
 
         var codec = new PlanCodec(registry);
 
         var step = new PlanStepCode<>("n", "noop", null, List.of());
-        var plan = Plan.of("p", "d", List.of(), List.<PlanStep>of(step));
+        var plan = Plan.builder("p").description("d").step(step).build();
 
         var json = Json.writeValueAsString(plan);
         var back = codec.fromJson(json, Plan.class);

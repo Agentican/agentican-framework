@@ -61,7 +61,7 @@ public class CdiEventBridge implements TaskListener {
     private String resolvePlanName(String planId) {
 
         if (!agentican.isResolvable()) return null;
-        var plan = agentican.get().plans().getById(planId);
+        var plan = agentican.get().registry().plans().getById(planId);
         return plan != null ? plan.name() : null;
     }
 

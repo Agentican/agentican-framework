@@ -15,9 +15,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
-import java.util.function.Function;
 
-public class AgentFactory implements Function<AgentConfig, Agent> {
+public class AgentFactory {
 
     private static final Logger LOG = LoggerFactory.getLogger(AgentFactory.class);
 
@@ -29,9 +28,9 @@ public class AgentFactory implements Function<AgentConfig, Agent> {
     private final SkillRegistry skillRegistry;
     private final TaskListener taskListener;
 
-    public AgentFactory(RuntimeConfig config, Map<String, LlmClient> llms, HitlManager hitlManager,
-                        KnowledgeStore knowledgeStore, TaskStateStore taskStateStore,
-                        SkillRegistry skillRegistry, TaskListener taskListener) {
+    private AgentFactory(RuntimeConfig config, Map<String, LlmClient> llms, HitlManager hitlManager,
+                         KnowledgeStore knowledgeStore, TaskStateStore taskStateStore,
+                         SkillRegistry skillRegistry, TaskListener taskListener) {
 
         this.config = config;
         this.llms = llms;
@@ -42,18 +41,12 @@ public class AgentFactory implements Function<AgentConfig, Agent> {
         this.taskListener = taskListener;
     }
 
-    @Override
-    public Agent apply(AgentConfig agentConfig) {
-
-        return build(agentConfig);
-    }
-
     public Agent build(AgentConfig agentConfig) {
 
         var agentName = agentConfig.name();
         var llmName = agentConfig.llm();
-        var defaultLlm = llms.get(LlmConfig.DEFAULT);
 
+        var defaultLlm = llms.get(LlmConfig.DEFAULT);
         var agentLlm = llms.getOrDefault(llmName, defaultLlm);
 
         if (agentLlm == null)
@@ -85,6 +78,38 @@ public class AgentFactory implements Function<AgentConfig, Agent> {
 
         LOG.info(Logs.AGENTICAN_BUILT_AGENT, agentName);
 
-        return Agent.of(agentConfig, agentRunner);
+        return Agent.builder().config(agentConfig).runner(agentRunner).build();
+    }
+
+    public static Builder builder() {
+
+        return new Builder();
+    }
+
+    public static class Builder {
+
+        private RuntimeConfig config;
+        private Map<String, LlmClient> llms;
+        private HitlManager hitlManager;
+        private KnowledgeStore knowledgeStore;
+        private TaskStateStore taskStateStore;
+        private SkillRegistry skillRegistry;
+        private TaskListener taskListener;
+
+        Builder() {}
+
+        public Builder config(RuntimeConfig config) { this.config = config; return this; }
+        public Builder llms(Map<String, LlmClient> llms) { this.llms = llms; return this; }
+        public Builder hitlManager(HitlManager hitlManager) { this.hitlManager = hitlManager; return this; }
+        public Builder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
+        public Builder taskStateStore(TaskStateStore taskStateStore) { this.taskStateStore = taskStateStore; return this; }
+        public Builder skillRegistry(SkillRegistry skillRegistry) { this.skillRegistry = skillRegistry; return this; }
+        public Builder taskListener(TaskListener taskListener) { this.taskListener = taskListener; return this; }
+
+        public AgentFactory build() {
+
+            return new AgentFactory(config, llms, hitlManager, knowledgeStore, taskStateStore,
+                    skillRegistry, taskListener);
+        }
     }
 }

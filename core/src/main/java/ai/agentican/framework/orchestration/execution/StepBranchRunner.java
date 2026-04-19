@@ -50,8 +50,10 @@ class StepBranchRunner {
 
         taskStateStore.branchPathChosen(parentTaskId, parentStepId, selectedPath.pathName());
 
-        var subPlan = new Plan(
-                null, step.name() + "-" + selectedPath.pathName(), "", List.of(), selectedPath.body());
+        var subPlan = Plan.builder(step.name() + "-" + selectedPath.pathName())
+                .description("")
+                .steps(selectedPath.body())
+                .build();
 
         var subResult = subPlanRunner.run(subPlan, params, cancelled, outputs,
                 parentTaskId, parentStepId, 0);

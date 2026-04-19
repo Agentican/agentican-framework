@@ -12,12 +12,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public interface AgentRunner {
 
-    AgentResult run(Agent agent, String task, List<String> activeSkills, Map<String, Toolkit> toolkits, String taskId,
-                    String stepId, String stepName);
+
+    AgentResult run(Agent agent, String task, List<String> activeSkills, Map<String, Toolkit> toolkits,
+                    String taskId, String stepId, String stepName, Duration timeoutOverride);
 
     default AgentResult resume(Agent agent, String task, List<String> activeSkills, RunLog savedRun,
-                               List<ToolResult> hitlToolResults, Map<String, Toolkit> toolkits, String taskId,
-                               String stepId, String stepName) {
+                               List<ToolResult> hitlToolResults, Map<String, Toolkit> toolkits,
+                               String taskId, String stepId, String stepName, Duration timeoutOverride) {
 
         throw new UnsupportedOperationException("This agent runner does not support HITL resume");
     }
@@ -28,8 +29,6 @@ public interface AgentRunner {
                                          String taskId, String stepId, String stepName,
                                          AtomicBoolean cancelled) {
 
-        return new AgentResult(AgentStatus.FAILED, savedRun);
+        return AgentResult.builder().status(AgentStatus.FAILED).run(savedRun).build();
     }
-
-    default AgentRunner withTimeout(Duration timeout) { return this; }
 }

@@ -22,7 +22,7 @@ public class SkillsResource {
     @GET
     public List<SkillSummary> list() {
 
-        return agentican.skills().getAll().stream()
+        return agentican.registry().skills().getAll().stream()
                 .map(SkillSummary::of)
                 .toList();
     }
@@ -31,9 +31,9 @@ public class SkillsResource {
     @Path("/{ref}")
     public SkillSummary get(@PathParam("ref") String ref) {
 
-        var skill = agentican.skills().get(ref);
+        var skill = agentican.registry().skills().get(ref);
 
-        if (skill == null) skill = agentican.skills().getByName(ref);
+        if (skill == null) skill = agentican.registry().skills().getByName(ref);
 
         if (skill == null)
             throw new NotFoundException("No skill with id or name: " + ref);

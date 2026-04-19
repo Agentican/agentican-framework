@@ -40,8 +40,8 @@ import java.util.stream.Collectors;
 public class SmacAgentRunner implements AgentRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(SmacAgentRunner.class);
-    private static final Templates TEMPLATES = new Templates();
 
+    private static final Templates TEMPLATES = new Templates();
     private static final TaskListener NO_OP_LISTENER = new TaskListener() {};
 
     private final LlmClient llm;
@@ -78,40 +78,29 @@ public class SmacAgentRunner implements AgentRunner {
         this.maxTurns = maxTurns;
     }
 
-    public static Builder builder() {
-
-        return new Builder();
-    }
-
-    @Override
-    public AgentRunner withTimeout(Duration timeout) {
-
-        return new SmacAgentRunner(llm, llmName, llmProvider, llmModel, hitlManager, knowledgeStore, taskStateStore,
-                skillRegistry, maxTurns, timeout, taskListener);
-    }
-
     @Override
     public AgentResult run(Agent agent, String task, List<String> activeSkills, Map<String, Toolkit> toolkits,
-                           String taskId, String stepId, String stepName) {
+                           String taskId, String stepId, String stepName, Duration timeoutOverride) {
 
         var taskCancelled = new AtomicBoolean(false);
 
-        return execute(agent, task, activeSkills, toolkits, taskId, stepId, stepName, taskCancelled);
+        return execute(agent, task, activeSkills, toolkits, taskId, stepId, stepName, taskCancelled, timeoutOverride);
     }
 
     @Override
     public AgentResult resume(Agent agent, String task, List<String> activeSkills, RunLog savedRun,
                               List<ToolResult> hitlToolResults, Map<String, Toolkit> toolkits, String taskId,
-                              String stepId, String stepName) {
+                              String stepId, String stepName, Duration timeoutOverride) {
 
         var taskCancelled = new AtomicBoolean(false);
 
         return resumeExecution(agent, task, activeSkills, savedRun, hitlToolResults, toolkits, taskId, stepId, stepName,
-                taskCancelled);
+                taskCancelled, timeoutOverride);
     }
 
     private AgentResult execute(Agent agent, String task, List<String> activeSkills, Map<String, Toolkit> toolkits,
-                                String taskId, String stepId, String stepName, AtomicBoolean cancelled) {
+                                String taskId, String stepId, String stepName, AtomicBoolean cancelled,
+                                Duration timeoutOverride) {
 
         LOG.info(Logs.AGENT_RUNNING_STEP, agent.name(), activeSkills.size(), toolkits.size());
         LOG.debug(Logs.AGENT_RUNNING_STEP_FULL, task);
@@ -125,7 +114,8 @@ public class SmacAgentRunner implements AgentRunner {
 
         taskStateStore.runStarted(taskId, stepId, runId, agentName);
 
-        var agentResult = loop(task, Instant.now(), List.of(), ctx, cancelled, taskId, stepId, stepName, runId, 0);
+        var agentResult = loop(task, Instant.now(), List.of(), ctx, cancelled, taskId, stepId, stepName, runId, 0,
+                timeoutOverride);
 
         taskStateStore.runCompleted(taskId, runId);
 
@@ -162,7 +152,7 @@ public class SmacAgentRunner implements AgentRunner {
 
                 taskStateStore.runCompleted(taskId, savedRun.id());
 
-                return new AgentResult(AgentStatus.COMPLETED, savedRun);
+                return AgentResult.builder().status(AgentStatus.COMPLETED).run(savedRun).build();
             }
 
             switch (state) {
@@ -195,7 +185,8 @@ public class SmacAgentRunner implements AgentRunner {
 
         taskStateStore.runStarted(taskId, stepId, runId, agent.name());
 
-        var agentResult = loop(task, Instant.now(), List.of(), ctx, cancelled, taskId, stepId, stepName, runId, 0);
+        var agentResult = loop(task, Instant.now(), List.of(), ctx, cancelled, taskId, stepId, stepName, runId, 0,
+                null);
 
         taskStateStore.runCompleted(taskId, runId);
 
@@ -204,7 +195,8 @@ public class SmacAgentRunner implements AgentRunner {
 
     private AgentResult resumeExecution(Agent agent, String task, List<String> activeSkills, RunLog savedRun,
                                         List<ToolResult> approvalToolResults, Map<String, Toolkit> toolkits,
-                                        String taskId, String stepId, String stepName, AtomicBoolean cancelled) {
+                                        String taskId, String stepId, String stepName, AtomicBoolean cancelled,
+                                        Duration timeoutOverride) {
 
         LOG.info("Resuming agent step: agent={}, savedTurns={}", agent.name(), savedRun.turns().size());
 
@@ -275,31 +267,32 @@ public class SmacAgentRunner implements AgentRunner {
         taskStateStore.runStarted(taskId, stepId, runId, agent.name());
 
         var agentResult = loop(task, Instant.now(), toolResults, ctx, cancelled, taskId, stepId, stepName, runId,
-                savedRun.turns().size());
+                savedRun.turns().size(), timeoutOverride);
 
         taskStateStore.runCompleted(taskId, runId);
 
         return agentResult;
     }
 
-    private AgentResult loop(String task, Instant startTime, List<ToolResult> toolResults, AgentContext ctx,
+    private AgentResult loop(String task, Instant startTime, List<ToolResult> toolResults, SmacAgentContext ctx,
                              AtomicBoolean cancelled, String taskId, String stepId, String stepName, String runId,
-                             int turnIndex) {
+                             int turnIndex, Duration timeoutOverride) {
 
-        var deadline = timeout != null ? startTime.plus(timeout) : null;
+        var effectiveTimeout = timeoutOverride != null ? timeoutOverride : timeout;
+        var deadline = effectiveTimeout != null ? startTime.plus(effectiveTimeout) : null;
 
         while (true) {
 
             LOG.info(Logs.AGENT_RUNNING_LOOP, turnIndex);
 
             if (turnIndex >= maxTurns)
-                return new AgentResult(AgentStatus.MAX_TURNS, getOrCreateRunLog(taskId, stepId));
+                return AgentResult.builder().status(AgentStatus.MAX_TURNS).run(getOrCreateRunLog(taskId, stepId)).build();
 
             if (cancelled.get())
-                return new AgentResult(AgentStatus.CANCELLED, getOrCreateRunLog(taskId, stepId));
+                return AgentResult.builder().status(AgentStatus.CANCELLED).run(getOrCreateRunLog(taskId, stepId)).build();
 
             if (deadline != null && Instant.now().isAfter(deadline))
-                return new AgentResult(AgentStatus.TIMED_OUT, getOrCreateRunLog(taskId, stepId));
+                return AgentResult.builder().status(AgentStatus.TIMED_OUT).run(getOrCreateRunLog(taskId, stepId)).build();
 
             var turnId = Ids.generate();
 
@@ -331,7 +324,7 @@ public class SmacAgentRunner implements AgentRunner {
 
                 taskStateStore.turnCompleted(taskId, turnId);
 
-                return new AgentResult(AgentStatus.COMPLETED, getOrCreateRunLog(taskId, stepId));
+                return AgentResult.builder().status(AgentStatus.COMPLETED).run(getOrCreateRunLog(taskId, stepId)).build();
             }
 
             var approvalToolCalls = new ArrayList<ToolCall>();
@@ -396,7 +389,7 @@ public class SmacAgentRunner implements AgentRunner {
 
                 var checkpoint = hitlManager.createQuestionCheckpoint(question, context, stepName);
 
-                return new AgentResult(AgentStatus.SUSPENDED, getOrCreateRunLog(taskId, stepId), checkpoint);
+                return AgentResult.builder().status(AgentStatus.SUSPENDED).run(getOrCreateRunLog(taskId, stepId)).checkpoint(checkpoint).build();
             }
 
             if (!approvalToolCalls.isEmpty()) {
@@ -408,7 +401,7 @@ public class SmacAgentRunner implements AgentRunner {
 
                 var checkpoint = hitlManager.createToolApprovalCheckpoint(pendingToolCall, stepName);
 
-                return new AgentResult(AgentStatus.SUSPENDED, getOrCreateRunLog(taskId, stepId), checkpoint);
+                return AgentResult.builder().status(AgentStatus.SUSPENDED).run(getOrCreateRunLog(taskId, stepId)).checkpoint(checkpoint).build();
             }
 
             taskStateStore.turnCompleted(taskId, turnId);
@@ -522,7 +515,7 @@ public class SmacAgentRunner implements AgentRunner {
         }
     }
 
-    private AgentContext buildContext(Agent agent, List<String> activeSkills, Map<String, Toolkit> toolkits) {
+    private SmacAgentContext buildContext(Agent agent, List<String> activeSkills, Map<String, Toolkit> toolkits) {
 
         var activeSkillConfigs = new ArrayList<SkillConfig>();
 
@@ -575,11 +568,17 @@ public class SmacAgentRunner implements AgentRunner {
                         .filter(td -> td.name().equals(e.getKey())))
                 .toList();
 
-        return new AgentContext(systemPrompt, taskToolkits, taskToolDefs,
-                localScratchpad, sharedScratchpad, knowledgeIndex);
+        return SmacAgentContext.builder()
+                .systemPrompt(systemPrompt)
+                .toolkits(taskToolkits)
+                .toolDefs(taskToolDefs)
+                .localScratchpad(localScratchpad)
+                .sharedScratchpad(sharedScratchpad)
+                .knowledgeIndex(knowledgeIndex)
+                .build();
     }
 
-    private List<ProgressEntry> buildProgress(String taskId, String stepId) {
+    private List<AgentToolUse> buildProgress(String taskId, String stepId) {
 
         var taskLog = taskStateStore.load(taskId);
 
@@ -589,7 +588,7 @@ public class SmacAgentRunner implements AgentRunner {
 
         if (stepLog == null) return List.of();
 
-        var progress = new ArrayList<ProgressEntry>();
+        var progress = new ArrayList<AgentToolUse>();
 
         for (var run : stepLog.runs()) {
 
@@ -610,7 +609,7 @@ public class SmacAgentRunner implements AgentRunner {
                     var input = renderArgs(call != null ? call.args() : Map.of());
                     var output = result.content() != null ? result.content() : "";
 
-                    progress.add(new ProgressEntry(result.toolName(), input, output));
+                    progress.add(new AgentToolUse(result.toolName(), input, output));
                 }
             }
         }
@@ -660,6 +659,11 @@ public class SmacAgentRunner implements AgentRunner {
         catch (Exception _) {
             return "{\"error\":\"Tool execution failed\"}";
         }
+    }
+
+    public static Builder builder() {
+
+        return new Builder();
     }
 
     public static class Builder {

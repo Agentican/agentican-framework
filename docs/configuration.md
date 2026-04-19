@@ -1,12 +1,44 @@
 # Configuration
 
-Agentican is configured via `RuntimeConfig`. You can build it programmatically or load from YAML.
+Configure Agentican via the fluent builder, a `RuntimeConfig` record (for programmatic composition), or a YAML file.
 
-## RuntimeConfig
+## Agentican.builder()
+
+Three entry points:
+
+```java
+// Fluent-only
+Agentican.builder()...build();
+
+// Pre-seeded from an existing RuntimeConfig
+Agentican.builder(runtimeConfig)....build();
+
+// Load YAML, then optionally add more
+Agentican.builder(Path.of("agentican.yml"))....build();
+```
+
+Fluent methods mirror the `RuntimeConfig` shape — declare LLMs, MCP servers, agents, skills, plans, Composio, and worker settings directly:
+
+```java
+try (var agentican = Agentican.builder()
+        .llm(LlmConfig.builder().apiKey(apiKey).build())
+        .worker(WorkerConfig.builder().maxTurns(20).build())
+        .agent(AgentConfig.builder()
+                .externalId("agent.researcher.v1").name("researcher").role("...").llm("default")
+                .build())
+        .skill(SkillConfig.builder()
+                .externalId("skill.citations.v1").name("citations").instructions("Always cite sources")
+                .build())
+        .build()) {
+    // use agentican
+}
+```
+
+`RuntimeConfig` itself is still a record — YAML deserializes into it, and you can build one programmatically if you prefer to separate "config" from "wiring." Its shape:
 
 ```java
 record RuntimeConfig(
-    List<LlmConfig> llm,        // at least one required
+    List<LlmConfig> llm,
     List<McpConfig> mcp,
     ComposioConfig composio,
     WorkerConfig agentRunner,
@@ -16,18 +48,7 @@ record RuntimeConfig(
 )
 ```
 
-Build with the fluent API:
-
-```java
-var config = RuntimeConfig.builder()
-        .llm(LlmConfig.builder().apiKey(apiKey).build())
-        .worker(WorkerConfig.builder().maxTurns(20).build())
-        .agent(AgentConfig.forCatalog("agent.researcher.v1", "researcher", "...", "default"))
-        .skill(SkillConfig.forCatalog("skill.citations.v1", "citations", "Always cite sources"))
-        .build();
-```
-
-> **External IDs required.** Any `AgentConfig`, `SkillConfig`, or `PlanConfig` registered via `RuntimeConfig` or the Agentican fluent builder must have an `externalId`. See [External IDs](#external-ids).
+> **External IDs required.** Any `AgentConfig`, `SkillConfig`, or `PlanConfig` registered via the fluent builder must have an `externalId`. See [External IDs](#external-ids).
 
 ## LlmConfig
 
@@ -107,7 +128,7 @@ The framework validates that `baseUrl` is non-blank when `provider == "openai-co
 You can register multiple LLMs — mixing providers freely — and assign them to specific agents:
 
 ```java
-RuntimeConfig.builder()
+Agentican.builder()
         .llm(LlmConfig.builder().name("default").apiKey(anthropicKey).model("claude-sonnet-4-5").build())
         .llm(LlmConfig.builder().name("fast").provider("openai").apiKey(openaiKey).model("gpt-4o-mini").build())
         .llm(LlmConfig.builder().name("grounded").provider("gemini").apiKey(geminiKey).model("gemini-2.5-flash").build())
@@ -189,9 +210,6 @@ record AgentConfig(
 ```
 
 ```java
-AgentConfig.forCatalog("agent.researcher.v1", "researcher",
-        "Expert at finding and synthesizing information", "default");
-
 AgentConfig.builder()
         .externalId("agent.researcher.v1")
         .name("researcher")
@@ -211,7 +229,11 @@ record SkillConfig(String id, String name, String instructions, String externalI
 ```
 
 ```java
-SkillConfig.forCatalog("skill.citations.v1", "citations", "Always include source URLs");
+SkillConfig.builder()
+        .externalId("skill.citations.v1")
+        .name("citations")
+        .instructions("Always include source URLs")
+        .build();
 ```
 
 ## PlanConfig
@@ -294,21 +316,29 @@ Environment variables in `${VAR}` form are resolved at load time.
 
 ## Agentican Builder
 
-The `Agentican.builder()` accepts the runtime config plus optional overrides:
+The `Agentican.builder()` is the one-stop entry for both declarative config and framework wiring. It can start fresh, pre-seed from a `RuntimeConfig`, or load a YAML file:
+
+```java
+Agentican.builder()                               // fresh
+Agentican.builder(runtimeConfig)                  // pre-seeded
+Agentican.builder(Path.of("agentican.yml"))      // YAML → RuntimeConfig → pre-seeded
+```
+
+All fluent methods:
 
 ```java
 Agentican.builder()
-        .config(config)                             // required
-
-        // Catalog entries (parity with RuntimeConfig's lists):
-        .agent(AgentConfig.forCatalog(...))
-        .skill(SkillConfig.forCatalog(...))
+        // Declarative config (parity with RuntimeConfig's lists):
+        .llm(LlmConfig.builder()...build())
+        .agent(AgentConfig.builder().externalId(...).name(...).role(...).build())
+        .skill(SkillConfig.builder().externalId(...).name(...).instructions(...).build())
         .plan(planConfig)
         .mcp(McpConfig.builder()...build())
         .composio(ComposioConfig.builder()...build())
+        .worker(WorkerConfig.builder()...build())
 
-        // LLM + toolkits:
-        .llm("name", llmClient)                     // pre-built LLM client
+        // Pre-built instances (can't live in RuntimeConfig):
+        .llm("name", llmClient)                     // pre-built LLM client (overrides config-built one with same name)
         .toolkit("slug", toolkit)                   // custom toolkit
 
         // Registry overrides (default: in-memory):
@@ -348,7 +378,6 @@ If you want to inject your own `LlmClient` (for testing, custom providers, or to
 LlmClient cachedClient = LlmClient.withLogging(myCustomClient);
 
 Agentican.builder()
-        .config(config)
         .llm("default", cachedClient)
         .build();
 ```
@@ -359,7 +388,6 @@ If not provided, Agentican creates one with a logging notifier (auto-approves, l
 
 ```java
 Agentican.builder()
-        .config(config)
         .hitlManager(new HitlManager(myNotifier, Duration.ofHours(2)))
         .build();
 ```
@@ -370,7 +398,6 @@ If not provided, Agentican creates a `MemTaskStateStore`. Implement your own for
 
 ```java
 Agentican.builder()
-        .config(config)
         .taskStateStore(new DatabaseTaskStateStore(dataSource))
         .build();
 ```
@@ -387,12 +414,24 @@ skills must declare a stable externalId so the catalog can upsert
 consistently across deploys.
 ```
 
-Use the `forCatalog(externalId, ...)` factories or the `externalId(...)` builder method:
+Set `externalId(...)` on the builder:
 
 ```java
-AgentConfig.forCatalog("agent.researcher.v1", "researcher", "Expert researcher", "default");
-SkillConfig.forCatalog("skill.citations.v1",  "citations",  "Always cite sources");
-Plan.withExternalId("plan.research.v1", "research", "...", params, steps);
+AgentConfig.builder()
+        .externalId("agent.researcher.v1").name("researcher")
+        .role("Expert researcher").llm("default")
+        .build();
+
+SkillConfig.builder()
+        .externalId("skill.citations.v1").name("citations")
+        .instructions("Always cite sources")
+        .build();
+
+Plan.builder("research")
+        .externalId("plan.research.v1")
+        .description("...")
+        .param(...).step(...)
+        .build();
 ```
 
 Planner-created agents, skills, and plans have no `externalId` — they're ephemeral, scoped to the run that produced them.
@@ -419,7 +458,7 @@ llm:
 `Agentican` implements `AutoCloseable`. Use try-with-resources:
 
 ```java
-try (var agentican = Agentican.builder().config(config).build()) {
+try (var agentican = Agentican.builder(runtimeConfig).build()) {
     // ...
 } // automatically closes the virtual thread executor and toolkits
 ```

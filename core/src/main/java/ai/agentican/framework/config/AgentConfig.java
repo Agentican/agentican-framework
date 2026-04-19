@@ -30,26 +30,6 @@ public record AgentConfig(
             externalId = null;
     }
 
-    public AgentConfig(String id, String name, String role, String llm) {
-
-        this(id, name, role, llm, null);
-    }
-
-    public static AgentConfig of(String name, String role, String llm) {
-
-        return new AgentConfig(null, name, role, llm, null);
-    }
-
-    public static AgentConfig of(String id, String name, String role, String llm) {
-
-        return new AgentConfig(id, name, role, llm, null);
-    }
-
-    public static AgentConfig forCatalog(String externalId, String name, String role, String llm) {
-
-        return new AgentConfig(null, name, role, llm, externalId);
-    }
-
     public static AgentConfigBuilder builder() {
 
         return new AgentConfigBuilder();

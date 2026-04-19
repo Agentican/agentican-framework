@@ -30,6 +30,7 @@ import java.util.Map;
 import static ai.agentican.framework.MockLlmClient.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+import ai.agentican.framework.config.AgentConfig;
 class SmacAgentRunnerTest {
 
     private HitlManager autoApproveHitl() {
@@ -44,7 +45,7 @@ class SmacAgentRunnerTest {
 
     private Agent agent(SmacAgentRunner runner) {
 
-        return Agent.of("test-agent", "Test role", runner);
+        return Agent.builder().config(AgentConfig.builder().name("test-agent").role("Test role").build()).runner(runner).build();
     }
 
     private Map<String, Toolkit> toolkitMap(MockToolkit toolkit) {
@@ -69,8 +70,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), Map.of(), "test-task",
-                "step-id", "test-step");
+        var result = agent(runner).run("Do something", List.of(), Map.of(), "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.COMPLETED, result.status());
         assertEquals("Hello world", result.text());
@@ -94,8 +94,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task",
-                "step-id", "test-step");
+        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.COMPLETED, result.status());
         assertEquals("Done", result.text());
@@ -119,8 +118,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task",
-                "step-id", "test-step");
+        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.SUSPENDED, result.status());
         assertNotNull(result.checkpoint());
@@ -145,8 +143,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), toolkits, "test-task",
-                "step-id", "test-step");
+        var result = agent(runner).run("Do something", List.of(), toolkits, "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.SUSPENDED, result.status());
         assertNotNull(result.checkpoint());
@@ -178,8 +175,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task",
-                "step-id", "test-step");
+        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.SUSPENDED, result.status());
         assertEquals(1, result.run().turns().getFirst().toolResults().size());
@@ -208,12 +204,12 @@ class SmacAgentRunnerTest {
 
         var agentInstance = agent(runner);
 
-        var suspended = agentInstance.run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step");
+        var suspended = agentInstance.run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.SUSPENDED, suspended.status());
 
         var resumed = runner.resume(agentInstance, "Do something", List.of(), suspended.run(), List.of(),
-                toolkitMap(toolkit), "test-task", "step-id", "test-step");
+                toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.COMPLETED, resumed.status());
         assertEquals("Resumed successfully", resumed.text());
@@ -241,8 +237,7 @@ class SmacAgentRunnerTest {
 
         var agentInstance = agent(runner);
 
-        var suspended = agentInstance.run("Do something", List.of(), toolkitMap(toolkit), "test-task",
-                "step-id", "test-step");
+        var suspended = agentInstance.run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.SUSPENDED, suspended.status());
 
@@ -251,7 +246,7 @@ class SmacAgentRunnerTest {
 
         var resumed = runner.resume(agentInstance, "Do something", List.of(),
                 suspended.run(), List.of(rejectionResult), toolkitMap(toolkit), "test-task",
-                "step-id", "test-step");
+                "step-id", "test-step", null);
 
         assertEquals(AgentStatus.COMPLETED, resumed.status());
         assertEquals("OK, I won't do that", resumed.text());
@@ -275,8 +270,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(3)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task",
-                "step-id", "test-step");
+        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.MAX_TURNS, result.status());
         assertEquals(3, result.run().turns().size());
@@ -314,8 +308,7 @@ class SmacAgentRunnerTest {
         var toolkits = new LinkedHashMap<String, Toolkit>();
         toolkits.put("FAILING_TOOL", toolkit);
 
-        var result = agent(runner).run("Do something", List.of(), toolkits, "test-task",
-                "step-id", "test-step");
+        var result = agent(runner).run("Do something", List.of(), toolkits, "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.COMPLETED, result.status());
         assertEquals("Handled error", result.text());
@@ -340,8 +333,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), Map.of(), "test-task",
-                "step-id", "test-step");
+        var result = agent(runner).run("Do something", List.of(), Map.of(), "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.COMPLETED, result.status());
         assertEquals("done", result.text());
@@ -370,8 +362,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), Map.of(), "test-task",
-                "step-id", "test-step");
+        var result = agent(runner).run("Do something", List.of(), Map.of(), "test-task", "step-id", "test-step", null);
 
         assertEquals(AgentStatus.COMPLETED, result.status());
         assertEquals("got the facts", result.text());
@@ -398,7 +389,7 @@ class SmacAgentRunnerTest {
                 .timeout(Duration.ofMillis(10))
                 .build();
 
-        var result = agent(runner).run("task", List.of(), toolkitMap(toolkit), "test-task", "step-id", "step");
+        var result = agent(runner).run("task", List.of(), toolkitMap(toolkit), "test-task", "step-id", "step", null);
 
         assertEquals(AgentStatus.TIMED_OUT, result.status());
     }

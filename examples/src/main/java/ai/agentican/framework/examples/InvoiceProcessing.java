@@ -21,12 +21,7 @@ public class InvoiceProcessing {
 
         var defs = ExampleLoader.load("invoice-processing.yaml");
 
-        var config = RuntimeConfig.builder()
-                .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
-                .composio(ComposioConfig.of(System.getenv("COMPOSIO_API_KEY"), "user-1"))
-                .build();
-
-        var plan = PlanConfig.builder()
+var plan = PlanConfig.builder()
                 .name("Invoice Processing")
                 .externalId("invoice-processing")
                 .param("email_id", "Gmail message ID with the invoice", null, true)
@@ -69,7 +64,10 @@ public class InvoiceProcessing {
                         .dependencies("route"))
                 .build();
 
-        var builder = Agentican.builder().config(config).plan(plan);
+        var builder = Agentican.builder()
+                .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+                .composio(new ComposioConfig(System.getenv("COMPOSIO_API_KEY"), "user-1"))
+                .plan(plan);
         defs.agents().forEach(builder::agent);
         defs.skills().forEach(builder::skill);
 

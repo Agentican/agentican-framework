@@ -11,7 +11,7 @@ class SkillRegistryTest {
     void registerAndGet() {
 
         var registry = new InMemorySkillRegistry();
-        var skill = new SkillConfig("summarize", "Summarize", "Summarize long text");
+        var skill = new SkillConfig("summarize", "Summarize", "Summarize long text", null);
 
         registry.register(skill);
 
@@ -25,8 +25,8 @@ class SkillRegistryTest {
     void registerIfAbsentIsFirstWins() {
 
         var registry = new InMemorySkillRegistry();
-        var first = new SkillConfig("cite", "Cite Claims", "First version");
-        var second = new SkillConfig("cite", "Cite Claims", "Second version");
+        var first = new SkillConfig("cite", "Cite Claims", "First version", null);
+        var second = new SkillConfig("cite", "Cite Claims", "Second version", null);
 
         var kept = registry.registerIfAbsent(first);
         var rejected = registry.registerIfAbsent(second);
@@ -41,8 +41,8 @@ class SkillRegistryTest {
 
         var registry = new InMemorySkillRegistry();
 
-        registry.register(new SkillConfig("a", "A Skill", "A"));
-        registry.register(new SkillConfig("b", "B Skill", "B"));
+        registry.register(new SkillConfig("a", "A Skill", "A", null));
+        registry.register(new SkillConfig("b", "B Skill", "B", null));
 
         assertEquals(2, registry.getAll().size());
         assertEquals(2, registry.asMap().size());

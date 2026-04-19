@@ -14,21 +14,20 @@ final class RuntimeConfigConverter {
 
     static RuntimeConfig toRuntimeConfig(AgenticanConfig source) {
 
-        var builder = RuntimeConfig.builder();
+        var llms = new java.util.ArrayList<LlmConfig>();
+        var mcps = new java.util.ArrayList<McpConfig>();
+        var agents = new java.util.ArrayList<AgentConfig>();
+        var skills = new java.util.ArrayList<SkillConfig>();
 
-        source.llm().forEach(llm -> builder.llm(toLlmConfig(llm)));
+        source.llm().forEach(llm -> llms.add(toLlmConfig(llm)));
+        source.mcp().forEach(mcp -> mcps.add(toMcpConfig(mcp)));
+        source.agents().forEach(agent -> agents.add(toAgentConfig(agent)));
+        source.skills().forEach(skill -> skills.add(toSkillConfig(skill)));
 
-        source.agentRunner().ifPresent(runner -> builder.worker(toWorkerConfig(runner)));
+        var worker = source.agentRunner().map(RuntimeConfigConverter::toWorkerConfig).orElse(null);
+        var composio = source.composio().map(RuntimeConfigConverter::toComposioConfig).orElse(null);
 
-        source.composio().ifPresent(composio -> builder.composio(toComposioConfig(composio)));
-
-        source.mcp().forEach(mcp -> builder.mcp(toMcpConfig(mcp)));
-
-        source.agents().forEach(agent -> builder.agent(toAgentConfig(agent)));
-
-        source.skills().forEach(skill -> builder.skill(toSkillConfig(skill)));
-
-        return builder.build();
+        return new RuntimeConfig(llms, mcps, composio, worker, agents, skills, java.util.List.of());
     }
 
     private static SkillConfig toSkillConfig(AgenticanConfig.SkillConfig source) {

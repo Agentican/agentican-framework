@@ -27,12 +27,6 @@ public record PlanStepBranch(
             dependencies = List.of();
     }
 
-    public static PlanStepBranch of(String name, String from, List<Path> paths, String defaultPath,
-                                    List<String> dependencies, boolean hitl) {
-
-        return new PlanStepBranch(name, from, paths, defaultPath, dependencies, hitl);
-    }
-
     public record Path(
             String pathName,
             List<PlanStep> body) {
@@ -46,11 +40,6 @@ public record PlanStepBranch(
                 throw new IllegalArgumentException("Body is required for path '" + pathName + "'");
 
             body = List.copyOf(body);
-        }
-
-        public static Path of(String pathName, List<PlanStep> body) {
-
-            return new Path(pathName, body);
         }
     }
 }

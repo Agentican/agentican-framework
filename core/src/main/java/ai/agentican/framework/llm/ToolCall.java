@@ -18,9 +18,4 @@ public record ToolCall(
         if (args == null)
             args = Map.of();
     }
-
-    public static ToolCall of(String id, String toolName, Map<String, Object> args) {
-
-        return new ToolCall(id, toolName, args);
-    }
 }

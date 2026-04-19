@@ -25,12 +25,4 @@ public record LlmResponse(
 
         return new TokenUsage(inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, webSearchRequests);
     }
-
-    public static LlmResponse of(String text, List<ToolCall> toolCalls, StopReason stopReason, long inputTokens,
-                                 long outputTokens, long cacheReadTokens, long cacheWriteTokens,
-                                 long webSearchRequests) {
-
-        return new LlmResponse(text, toolCalls, stopReason, inputTokens, outputTokens, cacheReadTokens,
-                cacheWriteTokens, webSearchRequests);
-    }
 }

@@ -22,12 +22,7 @@ public class CustomerOnboarding {
 
         var defs = ExampleLoader.load("customer-onboarding.yaml");
 
-        var config = RuntimeConfig.builder()
-                .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
-                .composio(ComposioConfig.of(System.getenv("COMPOSIO_API_KEY"), "user-1"))
-                .build();
-
-        var plan = PlanConfig.builder()
+var plan = PlanConfig.builder()
                 .name("Customer Onboarding")
                 .externalId("customer-onboarding")
                 .param("customer_id", "Customer identifier", null, true)
@@ -93,7 +88,10 @@ public class CustomerOnboarding {
                         .dependencies("approval"))
                 .build();
 
-        var builder = Agentican.builder().config(config).plan(plan);
+        var builder = Agentican.builder()
+                .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+                .composio(new ComposioConfig(System.getenv("COMPOSIO_API_KEY"), "user-1"))
+                .plan(plan);
         defs.agents().forEach(builder::agent);
         defs.skills().forEach(builder::skill);
 

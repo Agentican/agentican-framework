@@ -22,7 +22,7 @@ public class ToolsResource {
     @GET
     public List<ToolkitView> list() {
 
-        var registry = agentican.toolkits();
+        var registry = agentican.registry().toolkits();
 
         return registry.slugs().stream().map(slug -> {
 

@@ -23,6 +23,7 @@ import java.util.Map;
 import static ai.agentican.framework.MockLlmClient.endTurn;
 import static org.junit.jupiter.api.Assertions.*;
 
+import ai.agentican.framework.config.AgentConfig;
 class StepCodeRunnerTest {
 
     record AmountIn(String amount) { }
@@ -42,7 +43,7 @@ class StepCodeRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        return Agent.of(name, "Test agent for " + name, runner);
+        return Agent.builder().config(AgentConfig.builder().name(name).role("Test agent for " + name).build()).runner(runner).build();
     }
 
     private TaskRunner taskRunner(InMemoryAgentRegistry agents, CodeStepRegistry codeSteps) {
@@ -62,7 +63,7 @@ class StepCodeRunnerTest {
 
         var codeSteps = new CodeStepRegistry();
         CodeStep<AmountIn, String> step = (input, ctx) -> "final output (amount=" + input.amount() + ")";
-        codeSteps.register(CodeStepSpec.of("make-output", AmountIn.class, String.class), step);
+        codeSteps.register(new CodeStepSpec<>("make-output", null, AmountIn.class, String.class), step);
 
         var runner = taskRunner(agents, codeSteps);
 
@@ -97,7 +98,7 @@ class StepCodeRunnerTest {
 
         var codeSteps = new CodeStepRegistry();
         CodeStep<Void, HttpOut> step = (input, ctx) -> new HttpOut("response body", 200);
-        codeSteps.register(CodeStepSpec.of("http", Void.class, HttpOut.class), step);
+        codeSteps.register(new CodeStepSpec<>("http", null, Void.class, HttpOut.class), step);
 
         var runner = taskRunner(agents, codeSteps);
 
@@ -127,7 +128,7 @@ class StepCodeRunnerTest {
         agents.register(createAgent("reader", mockLlm));
 
         var codeSteps = new CodeStepRegistry();
-        codeSteps.register(CodeStepSpec.of("make", Void.class, HttpOut.class),
+        codeSteps.register(new CodeStepSpec<>("make", null, Void.class, HttpOut.class),
                 (CodeStep<Void, HttpOut>) (input, ctx) -> new HttpOut("hello world", 201));
 
         var runner = taskRunner(agents, codeSteps);
@@ -153,7 +154,7 @@ class StepCodeRunnerTest {
 
         var codeSteps = new CodeStepRegistry();
         @SuppressWarnings({"unchecked", "rawtypes"})
-        var spec = (CodeStepSpec) CodeStepSpec.of("raw", Map.class, String.class);
+        var spec = (CodeStepSpec) new CodeStepSpec<>("raw", null, Map.class, String.class);
         @SuppressWarnings({"unchecked", "rawtypes"})
         CodeStep step = (input, ctx) -> {
             captured.set(input);
@@ -184,7 +185,7 @@ class StepCodeRunnerTest {
         var agents = new InMemoryAgentRegistry();
 
         var codeSteps = new CodeStepRegistry();
-        codeSteps.register(CodeStepSpec.of("noop", Void.class, Void.class),
+        codeSteps.register(new CodeStepSpec<>("noop", null, Void.class, Void.class),
                 (CodeStep<Void, Void>) (input, ctx) -> { ran.set(true); return null; });
 
         var runner = taskRunner(agents, codeSteps);
@@ -227,7 +228,7 @@ class StepCodeRunnerTest {
 
         var agents = new InMemoryAgentRegistry();
         var codeSteps = new CodeStepRegistry();
-        codeSteps.register(CodeStepSpec.of("boom", Void.class, String.class),
+        codeSteps.register(new CodeStepSpec<>("boom", null, Void.class, String.class),
                 (CodeStep<Void, String>) (input, ctx) -> { throw new IllegalStateException("kaboom"); });
 
         var runner = taskRunner(agents, codeSteps);
@@ -247,7 +248,7 @@ class StepCodeRunnerTest {
 
         var agents = new InMemoryAgentRegistry();
         var codeSteps = new CodeStepRegistry();
-        codeSteps.register(CodeStepSpec.of("speak", Void.class, String.class),
+        codeSteps.register(new CodeStepSpec<>("speak", null, Void.class, String.class),
                 (CodeStep<Void, String>) (input, ctx) -> "hello world");
 
         var runner = taskRunner(agents, codeSteps);

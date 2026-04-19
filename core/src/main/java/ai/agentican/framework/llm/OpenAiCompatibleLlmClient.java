@@ -162,7 +162,7 @@ public class OpenAiCompatibleLlmClient {
     private LlmResponse translate(ChatCompletion completion) {
 
         if (completion.choices().isEmpty())
-            return LlmResponse.of("", List.of(), StopReason.END_TURN, 0, 0, 0, 0, 0);
+            return new LlmResponse("", List.of(), StopReason.END_TURN, 0, 0, 0, 0, 0);
 
         var choice = completion.choices().get(0);
         var message = choice.message();
@@ -178,7 +178,7 @@ public class OpenAiCompatibleLlmClient {
             var fn = call.asFunction();
             var args = parseArgs(fn.function().arguments());
 
-            toolCalls.add(ToolCall.of(fn.id(), fn.function().name(), args));
+            toolCalls.add(new ToolCall(fn.id(), fn.function().name(), args));
         }));
 
         var stopReason = resolveStopReason(choice, !toolCalls.isEmpty());
@@ -193,7 +193,7 @@ public class OpenAiCompatibleLlmClient {
         long inputTokens = Math.max(0, promptTotal - cacheReadTokens);
         long outputTokens = usage.map(u -> u.completionTokens()).orElse(0L);
 
-        return LlmResponse.of(text, toolCalls, stopReason,
+        return new LlmResponse(text, toolCalls, stopReason,
                 inputTokens, outputTokens, cacheReadTokens, 0L, 0L);
     }
 

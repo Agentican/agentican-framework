@@ -1,7 +1,7 @@
 package ai.agentican.framework.util;
 
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.ProgressEntry;
+import ai.agentican.framework.agent.AgentToolUse;
 import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
 import ai.agentican.framework.knowledge.KnowledgeEntrySummary;
@@ -72,7 +72,7 @@ public class Templates {
     public String renderUserMessage(int iteration,
                                     List<ScratchpadEntry> localScratchpadEntries,
                                     List<ScratchpadEntry> sharedScratchpadEntries,
-                                    List<ProgressEntry> progress,
+                                    List<AgentToolUse> progress,
                                     List<KnowledgeEntry> knowledgeIndex,
                                     List<KnowledgeEntry> recalledKnowledge) {
 

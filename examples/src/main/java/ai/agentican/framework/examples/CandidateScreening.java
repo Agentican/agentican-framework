@@ -21,12 +21,7 @@ public class CandidateScreening {
 
         var defs = ExampleLoader.load("candidate-screening.yaml");
 
-        var config = RuntimeConfig.builder()
-                .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
-                .composio(ComposioConfig.of(System.getenv("COMPOSIO_API_KEY"), "user-1"))
-                .build();
-
-        var plan = PlanConfig.builder()
+var plan = PlanConfig.builder()
                 .name("Candidate Screening Pipeline")
                 .externalId("candidate-screening")
                 .param("candidates", "JSON array of candidate summaries", null, true)
@@ -49,7 +44,10 @@ public class CandidateScreening {
                         .dependencies("rank"))
                 .build();
 
-        var builder = Agentican.builder().config(config).plan(plan);
+        var builder = Agentican.builder()
+                .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+                .composio(new ComposioConfig(System.getenv("COMPOSIO_API_KEY"), "user-1"))
+                .plan(plan);
 
         defs.agents().forEach(builder::agent);
         defs.skills().forEach(builder::skill);

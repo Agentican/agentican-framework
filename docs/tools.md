@@ -102,7 +102,6 @@ Register it with the builder:
 
 ```java
 try (var agentican = Agentican.builder()
-        .config(config)
         .toolkit("weather", new WeatherToolkit())
         .build()) {
 
@@ -155,7 +154,7 @@ The framework will detect the call, create a checkpoint, and pause until your `H
 [Composio](https://composio.dev) provides 200+ pre-built SaaS integrations (Notion, GitHub, Slack, Google Workspace, Linear, Jira, etc.). Agentican wraps them automatically.
 
 ```java
-var config = RuntimeConfig.builder()
+Agentican.builder()
         .llm(LlmConfig.builder().apiKey(anthropicKey).build())
         .composio(ComposioConfig.builder()
                 .apiKey(composioApiKey)
@@ -171,7 +170,7 @@ On startup, Agentican calls Composio's API to discover the user's connected tool
 [Model Context Protocol](https://modelcontextprotocol.io) is an open standard for tool servers. Agentican supports any MCP-compliant server.
 
 ```java
-var config = RuntimeConfig.builder()
+Agentican.builder()
         .llm(...)
         .mcp(McpConfig.builder()
                 .slug("filesystem")

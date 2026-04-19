@@ -49,7 +49,7 @@ public class TaskService {
 
     public TaskHandle submitByPlan(String planId, Map<String, String> inputs) {
 
-        var plan = agentican.plans().getById(planId);
+        var plan = agentican.registry().plans().getById(planId);
 
         if (plan == null)
             throw new jakarta.ws.rs.NotFoundException("No plan definition with id: " + planId);

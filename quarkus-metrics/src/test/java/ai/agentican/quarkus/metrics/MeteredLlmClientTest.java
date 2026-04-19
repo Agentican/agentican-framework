@@ -27,7 +27,7 @@ class MeteredLlmClientTest {
     @Test
     void recordsTokenCountersOnSuccess() {
 
-        var response = LlmResponse.of("hello", List.of(), StopReason.END_TURN, 100, 50, 10, 20, 1);
+        var response = new LlmResponse("hello", List.of(), StopReason.END_TURN, 100, 50, 10, 20, 1);
         LlmClient delegate = request -> response;
 
         var metered = new MeteredLlmClient("default", "claude-sonnet-4-5", delegate, registry);
@@ -44,7 +44,7 @@ class MeteredLlmClientTest {
     @Test
     void recordsDurationTimerOnSuccess() {
 
-        var response = LlmResponse.of("ok", List.of(), StopReason.END_TURN, 10, 10, 0, 0, 0);
+        var response = new LlmResponse("ok", List.of(), StopReason.END_TURN, 10, 10, 0, 0, 0);
         LlmClient delegate = request -> response;
 
         var metered = new MeteredLlmClient("default", "claude-sonnet-4-5", delegate, registry);
@@ -73,7 +73,7 @@ class MeteredLlmClientTest {
     @Test
     void tagsWithLlmNameAndModel() {
 
-        var response = LlmResponse.of("hi", List.of(), StopReason.END_TURN, 5, 5, 0, 0, 0);
+        var response = new LlmResponse("hi", List.of(), StopReason.END_TURN, 5, 5, 0, 0, 0);
         LlmClient delegate = request -> response;
 
         var metered = new MeteredLlmClient("custom", "gpt-4o", delegate, registry);
@@ -85,7 +85,7 @@ class MeteredLlmClientTest {
     @Test
     void accumulatesAcrossMultipleCalls() {
 
-        var response = LlmResponse.of("hi", List.of(), StopReason.END_TURN, 100, 50, 0, 0, 0);
+        var response = new LlmResponse("hi", List.of(), StopReason.END_TURN, 100, 50, 0, 0, 0);
         LlmClient delegate = request -> response;
 
         var metered = new MeteredLlmClient("default", "claude-sonnet-4-5", delegate, registry);

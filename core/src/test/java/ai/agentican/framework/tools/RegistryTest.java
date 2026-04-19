@@ -13,13 +13,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import ai.agentican.framework.config.AgentConfig;
 class RegistryTest {
 
     private Agent dummyAgent(String name) {
 
-        AgentRunner runner = (agent, task, activeSkills, toolkits, taskId, stepId, stepName) -> null;
+        AgentRunner runner = (agent, task, activeSkills, toolkits, taskId, stepId, stepName, timeout) -> null;
 
-        return Agent.of(name, "Role for " + name, runner);
+        return Agent.builder().config(AgentConfig.builder().name(name).role("Role for " + name).build()).runner(runner).build();
     }
 
     @Test

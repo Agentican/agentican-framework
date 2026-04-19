@@ -37,9 +37,9 @@ class EndToEndTaskTest {
 
         mockLlm.queueEndTurn("Here is the research result about agent frameworks.");
 
-        var step = PlanStepAgent.of("research", "researcher", "Find papers on agents",
+        var step = new PlanStepAgent("research", "researcher", "Find papers on agents",
                 List.of(), false, List.of(), List.of());
-        var task = Plan.of("e2e-prebuilt", "E2E test task", List.of(), List.of(step));
+        var task = Plan.builder("e2e-prebuilt").description("E2E test task").step(step).build();
         var taskJson = objectMapper.writeValueAsString(task);
 
         var taskId = given()
@@ -74,9 +74,9 @@ class EndToEndTaskTest {
 
         mockLlm.queueEndTurn("Result from list test.");
 
-        var step = PlanStepAgent.of("work", "researcher", "Do something",
+        var step = new PlanStepAgent("work", "researcher", "Do something",
                 List.of(), false, List.of(), List.of());
-        var task = Plan.of("e2e-list", "List test", List.of(), List.of(step));
+        var task = Plan.builder("e2e-list").description("List test").step(step).build();
         var taskJson = objectMapper.writeValueAsString(task);
 
         var taskId = given()

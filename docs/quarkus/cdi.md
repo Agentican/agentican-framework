@@ -22,6 +22,19 @@ agentican.run(task).resultAsync()
     .thenAccept(result -> log.info("Done: {}", result.status()));
 ```
 
+## `@Inject AgenticanService`
+
+`AgenticanService` is the server-side recovery companion to `Agentican`. The Quarkus runtime produces it as a singleton bean from the injected `Agentican` and disposes it on shutdown:
+
+```java
+@Inject AgenticanService agenticanService;
+
+agenticanService.resumeInterrupted();   // pick up tasks left in-flight after restart
+agenticanService.reapOrphans();         // mark unrecoverable tasks FAILED
+```
+
+You don't usually need to call these yourself — `ResumeOnStartObserver` runs `resumeInterrupted` automatically on `StartupEvent`. Toggle that behavior with `agentican.resume-on-start=false` and tune fan-out with `agentican.resume-max-concurrent`.
+
 ## `@AgenticanAgent` qualifier
 
 Inject pre-registered agents by name without going through the registry:

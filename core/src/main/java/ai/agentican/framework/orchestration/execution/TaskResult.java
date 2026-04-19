@@ -9,11 +9,6 @@ public record TaskResult(
         TaskStatus status,
         List<TaskStepResult> stepResults) {
 
-    public static TaskResult of(String name, TaskStatus status, List<TaskStepResult> stepResults) {
-
-        return new TaskResult(name, status, stepResults);
-    }
-
     public TaskResult {
 
         if (name == null || name.isBlank())

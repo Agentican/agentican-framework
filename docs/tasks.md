@@ -17,12 +17,15 @@ record Plan(
 
 A plan has an auto-generated internal UUID, a name, description, optional parameters, and a list of steps. Steps can depend on each other; the runner builds a dependency graph and executes independent steps in parallel.
 
-Plans registered at boot (via `RuntimeConfig.plans` or `Agentican.builder().plan(...)`) must carry an `externalId` so a catalog can upsert on redeploys. Factories:
+Plans registered at boot (via `RuntimeConfig.plans` or `Agentican.builder().plan(...)`) must carry an `externalId` so a catalog can upsert on redeploys. Use the builder for all construction — pass `.externalId(...)` for cataloged plans, omit it for ephemeral ones (planner output, tests):
 
 ```java
-Plan.of(name, description, params, steps);                        // no externalId (planner output, tests)
-Plan.withExternalId(externalId, name, description, params, steps); // cataloged plan
-Plan.builder(name)....build();                                     // no externalId
+Plan.builder(name)
+    .description(description)
+    .externalId(externalId)         // optional — cataloged plans only
+    .param(...)
+    .step(...)
+    .build();
 ```
 
 ## Step Types
@@ -33,10 +36,19 @@ Plan.builder(name)....build();                                     // no externa
 
 Runs an agent with the given instructions.
 
-Three ways to create one — pick whatever reads best for your case:
+Use the builder — it handles optional fields cleanly and reads naturally:
 
 ```java
-// Direct constructor
+PlanStepAgent.builder("research-llms")
+    .agent("AI Research Specialist")
+    .instructions("Identify the top 3 LLMs for ...")
+    .toolkit("web")
+    .build();
+```
+
+The canonical record constructor is still available for cases where you already have every field (e.g., copy-with operations inside the framework):
+
+```java
 new PlanStepAgent(
     "research-llms",                    // step name
     "AI Research Specialist",           // agent name
@@ -46,17 +58,6 @@ new PlanStepAgent(
     List.of(),                          // skills (subset of agent's skills to enable)
     List.of("web")                      // toolkit slugs available to this step
 );
-
-// Static factory
-PlanStepAgent.of("research-llms", "AI Research Specialist", "Identify the top 3 LLMs for ...",
-    List.of(), false, List.of(), List.of("web"));
-
-// Builder — best when you only set a few fields
-PlanStepAgent.builder("research-llms")
-    .agent("AI Research Specialist")
-    .instructions("Identify the top 3 LLMs for ...")
-    .toolkit("web")
-    .build();
 
 // Builder with per-step overrides
 PlanStepAgent.builder("classify")
@@ -104,18 +105,20 @@ The `shared_context` key (and any other top-level keys) gets merged into each it
 Conditionally executes one of several paths based on an upstream step's output.
 
 ```java
-PlanStepBranch.of(
+new PlanStepBranch(
     "route",                         // step name
     "classify",                      // 'from' — name of producer step
     List.of(
-        PlanStepBranch.Path.of("urgent", urgentBody),
-        PlanStepBranch.Path.of("normal", normalBody)
+        new PlanStepBranch.Path("urgent", urgentBody),
+        new PlanStepBranch.Path("normal", normalBody)
     ),
     "normal",                        // defaultPath (optional)
     List.of(),                       // dependencies
     false                            // hitl
 );
 ```
+
+For plan-level construction the `PlanConfig.builder().branch(...)` sub-builder is typically cleaner (see [Building Plans Manually](#building-plans-manually)).
 
 The producer's output is matched against path names with these strategies (in order):
 1. Exact match (case-insensitive)
@@ -146,7 +149,7 @@ record HttpOutput(String body, int status) { }
 ```java
 Agentican.builder()
     .codeStep(
-        CodeStepSpec.of("http-get", HttpInput.class, HttpOutput.class),
+        new CodeStepSpec<>("http-get", null, HttpInput.class, HttpOutput.class),
         (HttpInput input, StepContext ctx) -> {
             var response = httpClient.send(
                     HttpRequest.newBuilder(URI.create(input.url()))
@@ -194,9 +197,9 @@ recovery they re-run from scratch; make executors idempotent or fast.
 For ad-hoc scripts the typed record can be skipped — pass a `Map` or even a `String`:
 
 ```java
-.codeStep(CodeStepSpec.of("delay", Long.class, Void.class),
+.codeStep(new CodeStepSpec<>("delay", null, Long.class, Void.class),
           (millis, ctx) -> { Thread.sleep(millis); return null; })
-.codeStep(CodeStepSpec.of("raw", Map.class, String.class),
+.codeStep(new CodeStepSpec<>("raw", null, Map.class, String.class),
           (Map<String, Object> in, ctx) -> in.get("key").toString())
 ```
 

@@ -34,10 +34,11 @@ class JpaPlanRegistryTest {
     @Test
     void registerRoundTripsSimplePlan() {
 
-        var step = PlanStepAgent.of("research", "agent-x", "do research",
+        var step = new PlanStepAgent("research", "agent-x", "do research",
                 List.of(), false, List.of("skill-1"), List.of("tool-a"));
 
-        var plan = new Plan("p-" + Ids.generate(), "Research", "desc", List.of(new PlanParam("topic")), List.of(step));
+        var plan = Plan.builder("Research").id("p-" + Ids.generate()).description("desc")
+                .param(new PlanParam("topic", null, null, true)).step(step).build();
         registry.register(plan);
 
         assertSame(plan, registry.getById(plan.id()));
@@ -63,17 +64,17 @@ class JpaPlanRegistryTest {
     @Test
     void registerRoundTripsLoopAndBranchPlan() {
 
-        var produce = PlanStepAgent.of("produce", "finder", "find items",
+        var produce = new PlanStepAgent("produce", "finder", "find items",
                 List.of(), false, List.of(), List.of());
 
-        var workInLoop = PlanStepAgent.of("work", "worker", "handle item",
+        var workInLoop = new PlanStepAgent("work", "worker", "handle item",
                 List.of(), false, List.of(), List.of());
 
         var loop = new PlanStepLoop("loop-step", "produce", List.of(workInLoop), List.of(), false);
 
-        var yesBody = PlanStepAgent.of("yes-step", "yes-agent", "approved branch",
+        var yesBody = new PlanStepAgent("yes-step", "yes-agent", "approved branch",
                 List.of(), false, List.of(), List.of());
-        var noBody = PlanStepAgent.of("no-step", "no-agent", "rejected branch",
+        var noBody = new PlanStepAgent("no-step", "no-agent", "rejected branch",
                 List.of(), false, List.of(), List.of());
 
         var branch = new PlanStepBranch("branch-step", "work",
@@ -81,8 +82,9 @@ class JpaPlanRegistryTest {
                         new PlanStepBranch.Path("no", List.of(noBody))),
                 "no", List.of(), false);
 
-        var plan = new Plan("p-" + Ids.generate(), "LoopAndBranch", "shape test",
-                List.of(), List.of(produce, loop, branch));
+        var plan = Plan.builder("LoopAndBranch").id("p-" + Ids.generate()).description("shape test")
+                .steps(List.of(produce, loop, branch))
+                .build();
 
         registry.register(plan);
 
@@ -109,8 +111,9 @@ class JpaPlanRegistryTest {
     void registerIfAbsentDoesNotOverwrite() {
 
         var first = makePlan("RaceCondition", "first-" + Ids.generate(), "first");
-        var second = new Plan(first.id(), "RaceCondition", "second",
-                List.of(), first.steps());
+        var second = Plan.builder("RaceCondition").id(first.id()).description("second")
+                .steps(first.steps())
+                .build();
 
         registry.registerIfAbsent(first);
         var returned = registry.registerIfAbsent(second);
@@ -119,9 +122,9 @@ class JpaPlanRegistryTest {
 
     private static Plan makePlan(String name, String id, String description) {
 
-        var step = PlanStepAgent.of("s1", "a1", "do work",
+        var step = new PlanStepAgent("s1", "a1", "do work",
                 List.of(), false, List.of(), List.of());
 
-        return new Plan(id, name, description, List.of(), List.of(step));
+        return Plan.builder(name).id(id).description(description).step(step).build();
     }
 }

@@ -22,7 +22,7 @@ public class AgentsResource {
     @GET
     public List<AgentSummary> list() {
 
-        return agentican.agents().getAll().stream()
+        return agentican.registry().agents().getAll().stream()
                 .map(AgentSummary::of)
                 .toList();
     }
@@ -31,9 +31,9 @@ public class AgentsResource {
     @Path("/{ref}")
     public AgentSummary get(@PathParam("ref") String ref) {
 
-        var agent = agentican.agents().get(ref);
+        var agent = agentican.registry().agents().get(ref);
 
-        if (agent == null) agent = agentican.agents().getByName(ref);
+        if (agent == null) agent = agentican.registry().agents().getByName(ref);
 
         if (agent == null)
             throw new NotFoundException("No agent with id or name: " + ref);

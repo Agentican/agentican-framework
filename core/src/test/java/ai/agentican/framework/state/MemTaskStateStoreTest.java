@@ -15,8 +15,9 @@ class MemTaskStateStoreTest {
 
     private Plan dummyTask() {
 
-        return new Plan(null, "test-task", "desc", List.of(),
-                List.of(new PlanStepAgent("step-1", "agent-1", "do it", null, false, null, null)));
+        return Plan.builder("test-task").description("desc")
+                .step(new PlanStepAgent("step-1", "agent-1", "do it", null, false, null, null))
+                .build();
     }
 
     @Test

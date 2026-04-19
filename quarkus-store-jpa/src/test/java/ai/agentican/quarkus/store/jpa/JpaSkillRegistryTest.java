@@ -28,7 +28,7 @@ class JpaSkillRegistryTest {
     @Test
     void registerPersistsAndExposesInMemory() {
 
-        var skill = SkillConfig.of("sk-" + Ids.generate(), "Summarize", "Condense a passage");
+        var skill = new SkillConfig("sk-" + Ids.generate(), "Summarize", "Condense a passage", null);
 
         registry.register(skill);
 
@@ -41,8 +41,8 @@ class JpaSkillRegistryTest {
     void registerIfAbsentKeepsFirstWrite() {
 
         var id = "sk-" + Ids.generate();
-        var first = SkillConfig.of(id, "Outline", "first description");
-        var second = SkillConfig.of(id, "Outline", "second description");
+        var first = new SkillConfig(id, "Outline", "first description", null);
+        var second = new SkillConfig(id, "Outline", "second description", null);
 
         var stored = registry.registerIfAbsent(first);
         assertEquals(first, stored);
@@ -55,7 +55,7 @@ class JpaSkillRegistryTest {
     void seedRehydratesFromCatalog() {
 
         var id = "sk-" + Ids.generate();
-        registry.register(SkillConfig.of(id, "Translate", "Translate between languages"));
+        registry.register(new SkillConfig(id, "Translate", "Translate between languages", null));
 
         var fresh = new JpaSkillRegistry();
         fresh.seed();

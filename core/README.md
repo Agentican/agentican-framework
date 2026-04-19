@@ -21,11 +21,9 @@ Requires Java 25.
 ## Quickstart
 
 ```java
-var config = RuntimeConfig.builder()
-    .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
-    .build();
-
-try (var agentican = Agentican.builder().config(config).build()) {
+try (var agentican = Agentican.builder()
+        .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+        .build()) {
     var task = agentican.run("Research the top 5 CDC tools and compare them");
     System.out.println(task.result().output());
 }
@@ -78,7 +76,7 @@ Everything is under `ai.agentican.framework.*`.
 ## Runtime characteristics
 
 - **Virtual threads** — task execution defaults to `Executors.newVirtualThreadPerTaskExecutor()`. Parks during HITL without tying up platform threads.
-- **Resumable** — `agentican.resumeInterrupted()` + `reapOrphans()` pick up tasks left in flight after a restart at turn-boundary granularity (pair with a persistent `TaskStateStore`).
+- **Resumable** — `new AgenticanService(agentican).resumeInterrupted()` / `.reapOrphans()` pick up tasks left in flight after a restart at turn-boundary granularity (pair with a persistent `TaskStateStore`). The Quarkus runtime exposes `AgenticanService` as a CDI bean and runs it on `StartupEvent`.
 - **Observable** — plug in `TaskListener`s and `TaskDecorator`s via the builder; the Quarkus metrics / OTel modules are built on exactly these hooks.
 
 ## When to reach for a peer module instead

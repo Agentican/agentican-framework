@@ -211,10 +211,10 @@ class JpaTaskStateStoreTest {
     @Test
     void planSnapshotIsPersistedOnTaskStarted() {
 
-        var step = ai.agentican.framework.orchestration.model.PlanStepAgent.of(
+        var step = new ai.agentican.framework.orchestration.model.PlanStepAgent(
                 "work", "worker-agent", "do it", List.of(), false, List.of(), List.of());
-        var plan = ai.agentican.framework.orchestration.model.Plan.of(
-                "Snapshot Plan", "test", List.of(), List.of(step));
+        var plan = ai.agentican.framework.orchestration.model.Plan.builder("Snapshot Plan")
+                .description("test").step(step).build();
 
         var taskId = "t-" + Ids.generate();
         store.taskStarted(taskId, "snap", plan, Map.of());

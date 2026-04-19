@@ -19,13 +19,11 @@ public class QuickTask {
 
     public static void main(String[] args) {
 
-        var config = RuntimeConfig.builder()
+try (var agentican = Agentican.builder()
                 .llm(LlmConfig.builder()
                         .apiKey(System.getenv("ANTHROPIC_API_KEY"))
                         .build())
-                .build();
-
-        try (var agentican = Agentican.builder().config(config).build()) {
+                .build()) {
 
             var task = agentican.run(
                     "Compare the pros and cons of event sourcing vs. traditional CRUD " +

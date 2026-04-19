@@ -14,7 +14,7 @@ class CodeStepRegistryTest {
         var registry = new CodeStepRegistry();
 
         CodeStep<Greeting, String> step = (input, ctx) -> "hi " + input.name();
-        var spec = CodeStepSpec.of("greet", Greeting.class, String.class);
+        var spec = new CodeStepSpec<>("greet", null, Greeting.class, String.class);
 
         registry.register(spec, step);
 
@@ -30,11 +30,11 @@ class CodeStepRegistryTest {
 
         var registry = new CodeStepRegistry();
 
-        registry.register(CodeStepSpec.of("slug", Void.class, String.class),
+        registry.register(new CodeStepSpec<>("slug", null, Void.class, String.class),
                 (input, ctx) -> "a");
 
         assertThrows(IllegalStateException.class, () ->
-                registry.register(CodeStepSpec.of("slug", Void.class, String.class),
+                registry.register(new CodeStepSpec<>("slug", null, Void.class, String.class),
                         (input, ctx) -> "b"));
     }
 
@@ -53,7 +53,7 @@ class CodeStepRegistryTest {
         var registry = new CodeStepRegistry();
 
         assertThrows(IllegalArgumentException.class, () ->
-                registry.register(CodeStepSpec.of("slug", Void.class, String.class), null));
+                registry.register(new CodeStepSpec<>("slug", null, Void.class, String.class), null));
     }
 
     @Test

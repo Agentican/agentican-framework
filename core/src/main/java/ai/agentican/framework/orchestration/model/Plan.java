@@ -35,22 +35,6 @@ public record Plan(
             externalId = null;
     }
 
-    public Plan(String id, String name, String description, List<PlanParam> params, List<PlanStep> steps) {
-
-        this(id, name, description, params, steps, null);
-    }
-
-    public static Plan of(String name, String description, List<PlanParam> params, List<PlanStep> steps) {
-
-        return new Plan(null, name, description, params, steps, null);
-    }
-
-    public static Plan withExternalId(String externalId, String name, String description,
-                                      List<PlanParam> params, List<PlanStep> steps) {
-
-        return new Plan(null, name, description, params, steps, externalId);
-    }
-
     public static PlanBuilder builder(String name) {
 
         return new PlanBuilder(name);
@@ -63,20 +47,26 @@ public record Plan(
         private final List<PlanParam> params = new ArrayList<>();
         private final List<PlanStep> steps = new ArrayList<>();
 
+        private String id;
         private String description;
+        private String externalId;
 
         PlanBuilder(String name) {
 
             this.name = name;
         }
 
+        public PlanBuilder id(String id) { this.id = id; return this; }
         public PlanBuilder description(String description) { this.description = description; return this; }
+        public PlanBuilder externalId(String externalId) { this.externalId = externalId; return this; }
 
-        public PlanBuilder param(String paramName) { params.add(new PlanParam(paramName)); return this;}
-        public PlanBuilder param(String paramName, String description) { params.add(new PlanParam(paramName, description)); return this; }
-        public PlanBuilder param(String paramName, String description, String defaultValue) { params.add(new PlanParam(paramName, description, defaultValue)); return this; }
+        public PlanBuilder param(String paramName) { params.add(new PlanParam(paramName, null, null, true)); return this; }
+        public PlanBuilder param(String paramName, String description) { params.add(new PlanParam(paramName, description, null, true)); return this; }
+        public PlanBuilder param(String paramName, String description, String defaultValue) { params.add(new PlanParam(paramName, description, defaultValue, false)); return this; }
         public PlanBuilder param(PlanParam param) { params.add(param); return this; }
+
         public PlanBuilder step(PlanStep node) { steps.add(node); return this; }
+        public PlanBuilder steps(List<PlanStep> bodySteps) { this.steps.addAll(bodySteps); return this; }
 
         public PlanBuilder step(String stepName, String agentName, String instructions) {
 
@@ -120,7 +110,7 @@ public record Plan(
 
         public Plan build() {
 
-            return new Plan(null, name, description, params, steps);
+            return new Plan(id, name, description, params, steps, externalId);
         }
     }
 

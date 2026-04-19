@@ -31,8 +31,8 @@ public class AgenticanReadinessCheck implements HealthCheck {
 
         for (var agentConfig : config.agents()) {
 
-            var byId = agentConfig.id().map(id -> agentican.agents().get(id)).orElse(null);
-            var byName = agentican.agents().getByName(agentConfig.name());
+            var byId = agentConfig.id().map(id -> agentican.registry().agents().get(id)).orElse(null);
+            var byName = agentican.registry().agents().getByName(agentConfig.name());
 
             if (byId == null && byName == null) {
 

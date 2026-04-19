@@ -47,7 +47,9 @@ This page explains the core abstractions in Agentican and how they fit together.
 The main entry point. Owns the runtime configuration, registries, planner, and task runner. Build it with `Agentican.builder()` and use it via `run(String)` or `run(Plan)`.
 
 ```java
-try (var agentican = Agentican.builder().config(config).build()) {
+try (var agentican = Agentican.builder()
+        .llm(LlmConfig.builder().apiKey(apiKey).build())
+        .build()) {
 
     var handle = agentican.run("Do something useful");
 
@@ -58,6 +60,23 @@ try (var agentican = Agentican.builder().config(config).build()) {
 `Agentican` is `AutoCloseable` — close it to release the virtual thread executor and any toolkits that hold resources.
 
 At `build()` time, the framework validates that every `AgentConfig`, `SkillConfig`, and `PlanConfig` supplied via the config file or the fluent builder declares an `externalId`. See [External IDs](#external-ids) below.
+
+### AgenticanService
+
+A separate, server-oriented companion to `Agentican` that owns the recovery surface — `resumeInterrupted(...)` and `reapOrphans(...)`. Construct it by composing onto an Agentican:
+
+```java
+try (var agentican = Agentican.builder()...build();
+     var service = new AgenticanService(agentican)) {
+
+    service.resumeInterrupted();   // pick up tasks left in flight after restart
+    // agentican.run(...) calls happen as before
+}
+```
+
+`AgenticanService` is also `AutoCloseable` — declare it after the `Agentican` in try-with-resources so it closes first (it awaits in-flight knowledge re-ingestion using the shared executor before the executor shuts down).
+
+In Quarkus, `AgenticanService` is a CDI bean produced from the injected `Agentican`; the framework's `ResumeOnStartObserver` invokes `resumeInterrupted` on `StartupEvent` (toggleable via `agentican.resume-on-start`).
 
 ### Plan
 
@@ -74,12 +93,15 @@ record Plan(
 )
 ```
 
-Factories:
+Construction:
 
 ```java
-Plan.of(name, description, params, steps);                      // no externalId
-Plan.withExternalId(externalId, name, description, params, steps);
-Plan.builder(name)...build();                                    // no externalId
+Plan.builder(name)
+    .description(description)
+    .externalId(externalId)   // optional — cataloged plans only
+    .param(...)
+    .step(...)
+    .build();
 ```
 
 You can build a `Plan` manually with the builder, or let the planner create one from a natural language description.
@@ -97,24 +119,19 @@ Steps can depend on each other. The runner builds a dependency graph and execute
 
 ### Agent
 
-An `Agent` is a record carrying the identity, the runner, and (for catalog-backed agents) the `AgentConfig` it was built from.
+An `Agent` is a record pairing an `AgentConfig` (identity + role + LLM choice) with an `AgentRunner` (execution strategy). `id()`, `name()`, and `role()` are accessors that delegate to the config.
 
 ```java
 record Agent(
-    String id,
-    String name,
-    String role,
-    AgentRunner runner,
-    AgentConfig config   // null for test-fixture agents built via Agent.of(name, role, runner)
+    AgentConfig config,
+    AgentRunner runner
 )
 ```
 
-Factories:
+Construction is builder-only:
 
 ```java
-Agent.of(name, role, runner);                // config == null, won't persist to a catalog
-Agent.of(id, name, role, runner);            // config == null
-Agent.of(AgentConfig, AgentRunner);          // preferred — runtime agent tied to its config
+Agent.builder().config(agentConfig).runner(runner).build();
 ```
 
 The `AgentRunner` is the actual execution strategy. The default is `SmacAgentRunner`, which runs the standard agent loop: send LLM request → execute returned tool calls → repeat until the LLM returns text.
@@ -124,9 +141,15 @@ The `AgentRunner` is the actual execution strategy. The default is `SmacAgentRun
 `AgentFactory` turns an `AgentConfig` into a runtime `Agent`. It's a separate class wired with everything an agent needs — LLM clients, the HITL manager, the knowledge store, the task state store, the skill registry, and the task listener.
 
 ```java
-var factory = new AgentFactory(
-        config, llms, hitlManager, knowledgeStore,
-        taskStateStore, skillRegistry, taskListener);
+var factory = AgentFactory.builder()
+        .config(runtimeConfig)
+        .llms(llms)
+        .hitlManager(hitlManager)
+        .knowledgeStore(knowledgeStore)
+        .taskStateStore(taskStateStore)
+        .skillRegistry(skillRegistry)
+        .taskListener(taskListener)
+        .build();
 
 Agent agent = factory.build(agentConfig);
 ```
@@ -188,16 +211,17 @@ A `TaskStateStore` persists execution state. `MemTaskStateStore` is provided; yo
 
 ### Registries
 
-- **`PlanRegistry`** — plans by name and internal id. Pre-built plans from config + planner-generated plans. Access via `agentican.plans()`.
-- **`AgentRegistry`** — agents by id and name. Populated from config, the fluent builder, and planner-created agents. Access via `agentican.agents()`.
-- **`SkillRegistry`** — skills by id and name. Populated from config, the fluent builder, and planner-created skills. Access via `agentican.skills()`.
-- **`ToolkitRegistry`** — slug → Toolkit. Populated from MCP, Composio, custom toolkits, and built-ins. Access via `agentican.toolkits()`.
+All four registries are bundled on `agentican.registry()` (an `AgenticanRegistry` record):
+
+- **`PlanRegistry`** — plans by name and internal id. Pre-built plans from config + planner-generated plans. Access via `agentican.registry().plans()`.
+- **`AgentRegistry`** — agents by id and name. Populated from config, the fluent builder, and planner-created agents. Access via `agentican.registry().agents()`.
+- **`SkillRegistry`** — skills by id and name. Populated from config, the fluent builder, and planner-created skills. Access via `agentican.registry().skills()`.
+- **`ToolkitRegistry`** — slug → Toolkit. Populated from MCP, Composio, custom toolkits, and built-ins. Access via `agentican.registry().toolkits()`.
 
 All three of `AgentRegistry`, `SkillRegistry`, and `PlanRegistry` are **interfaces** with an `InMemory*` implementation as the default. A persistent backend (e.g., the JPA-backed registries in `agentican-quarkus`) plugs in via the builder:
 
 ```java
 Agentican.builder()
-        .config(config)
         .agentRegistry(myJpaAgentRegistry)
         .skillRegistry(myJpaSkillRegistry)
         .planRegistry(myJpaPlanRegistry)
@@ -212,14 +236,24 @@ Every `AgentConfig`, `SkillConfig`, `PlanConfig`, and `Plan` has an optional `ex
 
 Anything declared via the config file or the fluent builder **must** set an `externalId`. The framework throws `IllegalStateException` at `Agentican.build()` if it's missing, because without it every boot would auto-generate a fresh UUID and pile up duplicate catalog rows.
 
-Use the `forCatalog(externalId, ...)` factories or `externalId(...)` on the config builders:
+Set `externalId(...)` on the builder:
 
 ```java
-AgentConfig.forCatalog("agent.researcher.v1", "researcher", "Expert researcher", "default");
-SkillConfig.forCatalog("skill.citations.v1",  "citations",  "Always cite sources");
-Plan.withExternalId("plan.research.v1", "research", "...", params, steps);
+AgentConfig.builder()
+        .externalId("agent.researcher.v1")
+        .name("researcher").role("Expert researcher").llm("default")
+        .build();
 
-AgentConfig.builder().externalId("agent.writer.v1").name("writer").role("...").build();
+SkillConfig.builder()
+        .externalId("skill.citations.v1")
+        .name("citations").instructions("Always cite sources")
+        .build();
+
+Plan.builder("research")
+        .externalId("plan.research.v1")
+        .description("...")
+        .param(...).step(...)
+        .build();
 ```
 
 Planner-created agents, skills, and plans legitimately have no `externalId` — they're ephemeral, scoped to the run that produced them.
@@ -241,6 +275,17 @@ When you call `agentican.run("description")`:
    - Handle HITL suspension by parking on `awaitResponse()`
    - Save `TaskLog` after each step
 3. **Return** — final `TaskResult` with status and per-step results
+
+### Recovery flow
+
+When the server starts and a task was left in-flight (e.g., a previous JVM was killed mid-run), `AgenticanService` is responsible for picking it up:
+
+1. **Classify** — `ResumeClassifier.classify(taskLog, plan)` walks the persisted `TaskLog` to decide what to do: drive the in-flight step forward, or reap it if it can't be resumed (corrupt state, missing plan, etc.).
+2. **Rehydrate** — pending HITL checkpoints are restored to the `HitlManager`; persisted HITL responses are replayed; completed-step outputs are re-ingested into the knowledge store.
+3. **Submit** — the resumable task is handed back to `TaskRunner.resume(...)` on the same executor, gated by a configurable concurrency semaphore.
+4. **Reap** — unrecoverable parents and any dangling sub-tasks are marked FAILED with a reason (`SERVER_RESTARTED`, `DANGLING_PARENT_TERMINAL`, `PARENT_REAPED`, etc.) and the listener is notified via `onTaskReaped`.
+
+Server applications wire this in by calling `service.resumeInterrupted()` on startup; the Quarkus runtime does this automatically.
 
 ## Threading Model
 

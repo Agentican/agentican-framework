@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static ai.agentican.framework.MockLlmClient.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+import ai.agentican.framework.config.AgentConfig;
 class TaskRunnerTest {
 
     private HitlManager autoApproveHitl() {
@@ -42,7 +43,7 @@ class TaskRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        return Agent.of(name, "Test agent for " + name, runner);
+        return Agent.builder().config(AgentConfig.builder().name(name).role("Test agent for " + name).build()).runner(runner).build();
     }
 
     @Test
@@ -56,7 +57,7 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var runner = TaskRunner.of(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore);
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("test-task")
                 .step("step-a", "agent-a", "Do the thing")
@@ -84,7 +85,7 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var runner = TaskRunner.of(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore);
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("dep-task")
                 .step("step-a", "agent-a", "Produce output")
@@ -113,7 +114,7 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var runner = TaskRunner.of(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore);
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("parallel-task")
                 .step("step-a", "agent-a", "Do A")
@@ -135,7 +136,7 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var runner = TaskRunner.of(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore);
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("fail-task")
                 .step("step-a", "missing-agent", "This will fail")
@@ -163,7 +164,7 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var runner = TaskRunner.of(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore);
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("cancel-task")
                 .step("step-a", "agent-a", "Do something")
@@ -194,7 +195,7 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var runner = TaskRunner.of(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore);
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("hitl-task")
                 .step("step-a", "agent-a", "Write a draft", true)
@@ -234,7 +235,7 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var runner = TaskRunner.of(registry, hitlManager, new ToolkitRegistry(), taskStateStore);
+        var runner = new TaskRunner(registry, hitlManager, new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("retry-task")
                 .step("step-a", "agent-a", "Write a draft", true)
@@ -267,7 +268,7 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var runner = TaskRunner.of(registry, hitlManager, new ToolkitRegistry(), taskStateStore);
+        var runner = new TaskRunner(registry, hitlManager, new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("max-retry-task")
                 .step("step-a", "agent-a", "Write something", true)
@@ -289,11 +290,12 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var runner = TaskRunner.of(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore);
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = new Plan(null, "cycle-task", "Circular deps", List.of(), List.of(
+        var task = Plan.builder("cycle-task").description("Circular deps").steps(List.of(
                 new PlanStepAgent("step-a", "agent-a", "Do A", List.of("step-b"), false, null, null),
-                new PlanStepAgent("step-b", "agent-a", "Do B", List.of("step-a"), false, null, null)));
+                new PlanStepAgent("step-b", "agent-a", "Do B", List.of("step-a"), false, null, null)))
+                .build();
 
         assertThrows(IllegalStateException.class, () -> runner.run(task));
     }
@@ -313,7 +315,7 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var runner = TaskRunner.of(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore);
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("log-task")
                 .step("step-a", "agent-a", "First step")
@@ -352,14 +354,14 @@ class TaskRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var agent = Agent.of("agent-a", "Slow agent", runner);
+        var agent = Agent.builder().config(AgentConfig.builder().name("agent-a").role("Slow agent").build()).runner(runner).build();
 
         var registry = new InMemoryAgentRegistry();
         registry.register(agent);
 
         var taskStateStore = new MemTaskStateStore();
 
-        var taskRunner = TaskRunner.of(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, Duration.ofMillis(50));
+        var taskRunner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, Duration.ofMillis(50), 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("timeout-task")
                 .step("step-a", "agent-a", "Do something slow")
@@ -382,11 +384,12 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var runner = TaskRunner.of(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore);
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = new Plan(null, "default-param-task", "Test defaults",
-                List.of(new PlanParam("count", "Number of items", "5")),
-                List.of(new PlanStepAgent("step-a", "agent-a", "Process {{param.count}} items", List.of(), false, List.of(), List.of())));
+        var task = Plan.builder("default-param-task").description("Test defaults")
+                .param(new PlanParam("count", "Number of items", "5", false))
+                .step(new PlanStepAgent("step-a", "agent-a", "Process {{param.count}} items", List.of(), false, List.of(), List.of()))
+                .build();
 
         var result = runner.run(task);
 
@@ -404,11 +407,12 @@ class TaskRunnerTest {
 
         var taskStateStore = new MemTaskStateStore();
 
-        var taskRunner = TaskRunner.of(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore);
+        var taskRunner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = new Plan(null, "required-param-task", "Test required",
-                List.of(new PlanParam("required_param", "desc", null, true)),
-                List.of(new PlanStepAgent("step-a", "agent-a", "Do {{param.required_param}}", List.of(), false, List.of(), List.of())));
+        var task = Plan.builder("required-param-task").description("Test required")
+                .param(new PlanParam("required_param", "desc", null, true))
+                .step(new PlanStepAgent("step-a", "agent-a", "Do {{param.required_param}}", List.of(), false, List.of(), List.of()))
+                .build();
 
         assertThrows(IllegalArgumentException.class, () -> taskRunner.run(task));
     }

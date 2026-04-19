@@ -51,12 +51,8 @@ class StepAgentRunner {
 
         LOG.info(Logs.RUNNER_RUN_AGENT_STEP, taskStep.name());
 
-        var runner = taskStep.timeout() != null
-                ? agent.runner().withTimeout(taskStep.timeout())
-                : agent.runner();
-
-        var taskStepResult = runner.run(agent, instructions, taskStep.skills(), taskStepToolkits,
-                taskId, stepId, taskStep.name());
+        var taskStepResult = agent.run(instructions, taskStep.skills(), taskStepToolkits,
+                taskId, stepId, taskStep.name(), taskStep.timeout());
 
         var stepResultStatus = taskStepResult.isCompleted() ? TaskStatus.COMPLETED
                 : taskStepResult.isSuspended() ? TaskStatus.SUSPENDED

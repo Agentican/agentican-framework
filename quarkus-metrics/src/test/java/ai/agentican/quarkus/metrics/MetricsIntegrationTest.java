@@ -34,9 +34,9 @@ class MetricsIntegrationTest {
 
         mockLlm.queueEndTurn("Test result");
 
-        var step = PlanStepAgent.of("research", "researcher", "do something",
+        var step = new PlanStepAgent("research", "researcher", "do something",
                 List.of(), false, List.of(), List.of());
-        var task = Plan.of("metrics-test", "test", List.of(), List.of(step));
+        var task = Plan.builder("metrics-test").description("test").step(step).build();
 
         var handle = agentican.run(task);
         handle.result();

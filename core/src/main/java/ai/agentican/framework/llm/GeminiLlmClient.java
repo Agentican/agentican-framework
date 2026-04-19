@@ -141,7 +141,7 @@ public class GeminiLlmClient {
                         var name = fc.name().orElse("");
                         var args = fc.args().orElse(Map.of());
 
-                        toolCalls.add(ToolCall.of(id, name, args));
+                        toolCalls.add(new ToolCall(id, name, args));
                     });
                 }
             });
@@ -161,7 +161,7 @@ public class GeminiLlmClient {
         long inputTokens = Math.max(0, promptTotal - cacheReadTokens);
         long outputTokens = usage.flatMap(u -> u.candidatesTokenCount()).orElse(0).longValue();
 
-        return LlmResponse.of(
+        return new LlmResponse(
                 textBuilder.toString(),
                 toolCalls,
                 stopReason,

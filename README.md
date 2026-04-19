@@ -11,11 +11,9 @@ Describe a task in natural language and the built-in Planner breaks it into a st
 ## Quick start
 
 ```java
-var config = RuntimeConfig.builder()
-    .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
-    .build();
-
-try (var agentican = Agentican.builder().config(config).build()) {
+try (var agentican = Agentican.builder()
+        .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+        .build()) {
 
     var task = agentican.run("Research the top 5 CDC tools and compare them");
     System.out.println(task.result().output());

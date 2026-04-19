@@ -173,12 +173,13 @@ public class PlannerAgent {
 
             var params = refinement.paramConfigs != null
                     ? refinement.paramConfigs.stream().map(pc ->
-                            PlanParam.of(pc.name(), pc.description(), pc.defaultValue(), pc.required())).toList()
+                            new PlanParam(pc.name(), pc.description(), pc.defaultValue(), pc.required())).toList()
                     : initial.params();
 
             var steps = refinement.stepConfigs.stream().map(PlanConfig.PlanStepConfig::toPlanStep).toList();
 
-            return new Plan(initial.id(), initial.name(), initial.description(), params, steps);
+            return new Plan(initial.id(), initial.name(), initial.description(),
+                    params, steps, initial.externalId());
         }
         catch (Exception e) {
 
@@ -207,7 +208,8 @@ public class PlannerAgent {
 
         var reconciledSteps = plan.steps().stream().map(this::reconcileStep).toList();
 
-        return new Plan(plan.id(), plan.name(), plan.description(), plan.params(), reconciledSteps);
+        return new Plan(plan.id(), plan.name(), plan.description(),
+                plan.params(), reconciledSteps, plan.externalId());
     }
 
     private PlanStep reconcileStep(PlanStep step) {

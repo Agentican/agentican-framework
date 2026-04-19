@@ -134,7 +134,7 @@ public class AnthropicLlmClient {
 
                     Map<String, Object> toolArgs = toolUse._input().convert(new TypeReference<>() {});
 
-                    return ToolCall.of(toolUse.id(), toolUse.name(), toolArgs != null ? toolArgs : Map.of());
+                    return new ToolCall(toolUse.id(), toolUse.name(), toolArgs != null ? toolArgs : Map.of());
 
                 }).toList();
 
@@ -154,7 +154,7 @@ public class AnthropicLlmClient {
         long webSearchRequests =
                 usage.serverToolUse().map(stu -> (long) stu.webSearchRequests()).orElse(0L);
 
-        return LlmResponse.of(responseText, toolCalls, stopReason, inputTokens, outputTokens,
+        return new LlmResponse(responseText, toolCalls, stopReason, inputTokens, outputTokens,
                 cacheReadTokens, cacheWriteTokens, webSearchRequests);
     }
 

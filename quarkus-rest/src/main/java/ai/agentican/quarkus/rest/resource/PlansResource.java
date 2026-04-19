@@ -22,7 +22,7 @@ public class PlansResource {
     @GET
     public List<PlanView> list() {
 
-        return agentican.plans().getAll().stream()
+        return agentican.registry().plans().getAll().stream()
                 .map(PlanView::of)
                 .toList();
     }
@@ -31,7 +31,7 @@ public class PlansResource {
     @Path("/{planId}")
     public PlanView get(@PathParam("planId") String planId) {
 
-        var plan = agentican.plans().getById(planId);
+        var plan = agentican.registry().plans().getById(planId);
 
         if (plan == null)
             throw new NotFoundException("No plan definition with id: " + planId);

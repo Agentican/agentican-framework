@@ -1,6 +1,6 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.Agentican;
+import ai.agentican.framework.AgenticanService;
 
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
@@ -17,7 +17,7 @@ public class ResumeOnStartObserver {
     private static final Logger LOG = LoggerFactory.getLogger(ResumeOnStartObserver.class);
 
     @Inject
-    Agentican agentican;
+    AgenticanService agenticanService;
 
     @Inject
     AgenticanConfig config;
@@ -30,7 +30,7 @@ public class ResumeOnStartObserver {
         }
 
         try {
-            agentican.resumeInterrupted(config.resumeMaxConcurrent());
+            agenticanService.resumeInterrupted(config.resumeMaxConcurrent());
         }
         catch (RuntimeException ex) {
             LOG.error("Resume-interrupted failed on startup: {}", ex.getMessage(), ex);

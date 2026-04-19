@@ -52,11 +52,6 @@ public record PlanStepCode<I>(
         return false;
     }
 
-    public static <I> PlanStepCode<I> of(String name, String codeSlug, I inputs, List<String> dependencies) {
-
-        return new PlanStepCode<>(name, codeSlug, inputs, dependencies);
-    }
-
     public static <I> Builder<I> builder(String name) {
 
         return new Builder<>(name);

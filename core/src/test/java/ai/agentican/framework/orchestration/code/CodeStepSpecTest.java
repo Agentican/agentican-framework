@@ -30,13 +30,13 @@ class CodeStepSpecTest {
     @Test
     void factoriesProduceEquivalentSpecs() {
 
-        var a = CodeStepSpec.of("slug", In.class, Out.class);
+        var a = new CodeStepSpec<>("slug", null, In.class, Out.class);
         assertEquals("slug", a.slug());
         assertNull(a.description());
         assertEquals(In.class, a.inputType());
         assertEquals(Out.class, a.outputType());
 
-        var b = CodeStepSpec.of("slug", "desc", In.class, Out.class);
+        var b = new CodeStepSpec<>("slug", "desc", In.class, Out.class);
         assertEquals("desc", b.description());
     }
 }

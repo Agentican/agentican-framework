@@ -57,13 +57,16 @@ public record  PlanConfig(
 
     public Plan toPlan(CodeStepRegistry codeStepRegistry) {
 
-        var params = paramConfigs.stream().map(tpc ->
-                        PlanParam.of(tpc.name(), tpc.description(), tpc.defaultValue(), tpc.required()))
-                .toList();
+        var builder = Plan.builder(name)
+                .description(description)
+                .externalId(externalId);
 
-        var steps = stepConfigs.stream().map(s -> s.toPlanStep(codeStepRegistry)).toList();
+        paramConfigs.forEach(tpc ->
+                builder.param(new PlanParam(tpc.name(), tpc.description(), tpc.defaultValue(), tpc.required())));
 
-        return Plan.withExternalId(externalId, name, description, params, steps);
+        stepConfigs.forEach(s -> builder.step(s.toPlanStep(codeStepRegistry)));
+
+        return builder.build();
     }
 
     public static class PlanConfigBuilder {
@@ -338,7 +341,7 @@ public record  PlanConfig(
 
                         var stepName = name + "-body";
 
-                        var step = PlanStepAgent.of(stepName, agent, instructions, List.of(), false, skills, tools);
+                        var step = new PlanStepAgent(stepName, agent, instructions, List.of(), false, skills, tools);
 
                         steps = List.of(step);
                     }
@@ -349,15 +352,15 @@ public record  PlanConfig(
                 case "branch" -> {
 
                     var paths = this.pathConfigs.stream()
-                            .map(bpc -> PlanStepBranch.Path.of(bpc.pathName(), bpc.toPlanStep(codeStepRegistry)))
+                            .map(bpc -> new PlanStepBranch.Path(bpc.pathName(), bpc.toPlanStep(codeStepRegistry)))
                             .toList();
 
-                    yield PlanStepBranch.of(name, from, paths, defaultPath, dependencies, hitl);
+                    yield new PlanStepBranch(name, from, paths, defaultPath, dependencies, hitl);
                 }
 
                 case "code" -> buildCodeStep(codeStepRegistry);
 
-                default -> PlanStepAgent.of(name, agent, instructions, dependencies, hitl, skills, tools);
+                default -> new PlanStepAgent(name, agent, instructions, dependencies, hitl, skills, tools);
             };
         }
 
@@ -378,7 +381,7 @@ public record  PlanConfig(
                 }
             }
 
-            return PlanStepCode.of(name, codeSlug, typedInputs, dependencies);
+            return new PlanStepCode<>(name, codeSlug, typedInputs, dependencies);
         }
     }
 
@@ -412,7 +415,7 @@ public record  PlanConfig(
             var stepName = pathName + "-body";
 
             var agentStep =
-                    PlanStepAgent.of(stepName, agent, instructions, List.of(), false, List.of(), tools);
+                    new PlanStepAgent(stepName, agent, instructions, List.of(), false, List.of(), tools);
 
             return List.of(agentStep);
         }

@@ -55,9 +55,10 @@ class TracingIntegrationTest {
 
         mockLlm.queueEndTurn("Traced result");
 
-        var task = Plan.of("otel-test", "test", List.of(),
-                List.of(PlanStepAgent.of("research", "researcher", "do something",
-                        List.of(), false, List.of(), List.of())));
+        var task = Plan.builder("otel-test").description("test")
+                .step(new PlanStepAgent("research", "researcher", "do something",
+                        List.of(), false, List.of(), List.of()))
+                .build();
 
         var handle = agentican.run(task);
         var result = handle.result();
@@ -71,9 +72,10 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("Step 1 result");
         mockLlm.queueEndTurn("Step 2 result");
 
-        var task = Plan.of("multi-step-trace", "test", List.of(), List.of(
-                PlanStepAgent.of("step1", "researcher", "do step 1", List.of(), false, List.of(), List.of()),
-                PlanStepAgent.of("step2", "researcher", "do step 2", List.of("step1"), false, List.of(), List.of())));
+        var task = Plan.builder("multi-step-trace").description("test").steps(List.of(
+                new PlanStepAgent("step1", "researcher", "do step 1", List.of(), false, List.of(), List.of()),
+                new PlanStepAgent("step2", "researcher", "do step 2", List.of("step1"), false, List.of(), List.of())))
+                .build();
 
         var handle = agentican.run(task);
 
@@ -86,9 +88,10 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("Step 1 done");
         mockLlm.queueEndTurn("Step 2 done");
 
-        var task = Plan.of("trace-id-test", "test", List.of(), List.of(
-                PlanStepAgent.of("alpha", "researcher", "do alpha", List.of(), false, List.of(), List.of()),
-                PlanStepAgent.of("beta", "researcher", "do beta", List.of("alpha"), false, List.of(), List.of())));
+        var task = Plan.builder("trace-id-test").description("test").steps(List.of(
+                new PlanStepAgent("alpha", "researcher", "do alpha", List.of(), false, List.of(), List.of()),
+                new PlanStepAgent("beta", "researcher", "do beta", List.of("alpha"), false, List.of(), List.of())))
+                .build();
 
         var handle = agentican.run(task);
         assertEquals("COMPLETED", handle.result().status().name());
@@ -117,9 +120,10 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("Step A result");
         mockLlm.queueEndTurn("Step B result");
 
-        var task = Plan.of("full-tree-test", "test", List.of(), List.of(
-                PlanStepAgent.of("step-a", "researcher", "do A", List.of(), false, List.of(), List.of()),
-                PlanStepAgent.of("step-b", "researcher", "do B", List.of("step-a"), false, List.of(), List.of())));
+        var task = Plan.builder("full-tree-test").description("test").steps(List.of(
+                new PlanStepAgent("step-a", "researcher", "do A", List.of(), false, List.of(), List.of()),
+                new PlanStepAgent("step-b", "researcher", "do B", List.of("step-a"), false, List.of(), List.of())))
+                .build();
 
         var handle = agentican.run(task);
         assertEquals("COMPLETED", handle.result().status().name());
@@ -163,9 +167,10 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("First done");
         mockLlm.queueEndTurn("Second done");
 
-        var task = Plan.of("nesting-test", "test", List.of(), List.of(
-                PlanStepAgent.of("first", "researcher", "do first", List.of(), false, List.of(), List.of()),
-                PlanStepAgent.of("second", "researcher", "do second", List.of("first"), false, List.of(), List.of())));
+        var task = Plan.builder("nesting-test").description("test").steps(List.of(
+                new PlanStepAgent("first", "researcher", "do first", List.of(), false, List.of(), List.of()),
+                new PlanStepAgent("second", "researcher", "do second", List.of("first"), false, List.of(), List.of())))
+                .build();
 
         var handle = agentican.run(task);
         handle.result();

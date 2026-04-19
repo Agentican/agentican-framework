@@ -22,6 +22,13 @@ Complete list of all `agentican.*` configuration properties across all Quarkus m
 | `agentican.agent-runner.timeout` | Duration | `PT30M` | Per-step timeout |
 | `agentican.agent-runner.task-timeout` | Duration | — | Per-task overall timeout (omit for no limit) |
 
+### Recovery
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `agentican.resume-on-start` | boolean | `true` | When `true`, `AgenticanService.resumeInterrupted` runs on `StartupEvent` to pick up tasks left in-flight after a restart |
+| `agentican.resume-max-concurrent` | int | `10` | Max concurrent task resumes during startup recovery |
+
 ### Composio Integration
 
 | Property | Type | Default | Description |

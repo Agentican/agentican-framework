@@ -1,5 +1,6 @@
 package ai.agentican.framework.util;
 
+import ai.agentican.framework.agent.AgentToolUse;
 import ai.agentican.framework.config.SkillConfig;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +24,7 @@ class TemplatesTest {
     @Test
     void renderSystemPromptWithSkills() {
 
-        var skills = List.of(SkillConfig.of("summarize", "Summarize long text"));
+        var skills = List.of(new SkillConfig(null, "summarize", "Summarize long text", null));
 
         var result = templates.renderSystemPrompt("TestBot", "A helper", skills);
 
@@ -44,7 +45,7 @@ class TemplatesTest {
     void renderUserMessageWithProgress() {
 
         var progress = List.of(
-                new ai.agentican.framework.agent.ProgressEntry("web_search", "{\"q\":\"foo\"}", "{\"results\":[]}"));
+                new AgentToolUse("web_search", "{\"q\":\"foo\"}", "{\"results\":[]}"));
 
         var result = templates.renderUserMessage(1, List.of(), List.of(), progress, List.of(), List.of());
 

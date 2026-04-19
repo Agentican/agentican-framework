@@ -26,26 +26,6 @@ public record SkillConfig(
             externalId = null;
     }
 
-    public SkillConfig(String id, String name, String instructions) {
-
-        this(id, name, instructions, null);
-    }
-
-    public static SkillConfig of(String name, String instructions) {
-
-        return new SkillConfig(null, name, instructions, null);
-    }
-
-    public static SkillConfig of(String id, String name, String instructions) {
-
-        return new SkillConfig(id, name, instructions, null);
-    }
-
-    public static SkillConfig forCatalog(String externalId, String name, String instructions) {
-
-        return new SkillConfig(null, name, instructions, externalId);
-    }
-
     public static SkillConfigBuilder builder() {
 
         return new SkillConfigBuilder();

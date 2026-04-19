@@ -171,7 +171,6 @@ Register via the Agentican builder:
 
 ```java
 Agentican.builder()
-        .config(config)
         .stepListener(myListener)
         .build();
 ```
@@ -209,7 +208,6 @@ Register via the builder:
 
 ```java
 Agentican.builder()
-        .config(config)
         .taskDecorator(myDecorator)
         .build();
 ```

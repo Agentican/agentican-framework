@@ -39,7 +39,6 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
 });
 
 try (var agentican = Agentican.builder()
-        .config(config)
         .hitlManager(hitlManager)
         .build()) {
 

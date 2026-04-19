@@ -1,6 +1,7 @@
 package ai.agentican.quarkus;
 
 import ai.agentican.framework.Agentican;
+import ai.agentican.framework.AgenticanService;
 import ai.agentican.framework.agent.AgentRegistry;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.knowledge.KnowledgeStore;
@@ -69,8 +70,7 @@ public class AgenticanProducer {
 
         var runtimeConfig = RuntimeConfigConverter.toRuntimeConfig(config);
 
-        var builder = Agentican.builder()
-                .config(runtimeConfig)
+        var builder = Agentican.builder(runtimeConfig)
                 .hitlManager(hitlManager)
                 .knowledgeStore(knowledgeStore)
                 .taskStateStore(taskStateStore)
@@ -203,6 +203,18 @@ public class AgenticanProducer {
     public void disposeAgentican(@Disposes Agentican agentican) {
 
         agentican.close();
+    }
+
+    @Produces
+    @ApplicationScoped
+    public AgenticanService agenticanService(Agentican agentican) {
+
+        return new AgenticanService(agentican);
+    }
+
+    public void disposeAgenticanService(@Disposes AgenticanService service) {
+
+        service.close();
     }
 
     private static String beanName(Bean<?> bean) {

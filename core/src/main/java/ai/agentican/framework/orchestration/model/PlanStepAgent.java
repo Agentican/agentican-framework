@@ -52,12 +52,6 @@ public record PlanStepAgent(
                 maxRetries, timeout, null, null);
     }
 
-    public static PlanStepAgent of(String name, String agentId, String instructions, List<String> dependencies,
-                                   boolean hitl, List<String> skills, List<String> tools) {
-
-        return new PlanStepAgent(name, agentId, instructions, dependencies, hitl, skills, tools);
-    }
-
     public static Builder builder(String name) {
 
         return new Builder(name);

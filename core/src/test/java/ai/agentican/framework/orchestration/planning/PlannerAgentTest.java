@@ -29,9 +29,8 @@ class PlannerAgentTest {
 
     private Function<AgentConfig, Agent> dummyAgentFactory() {
 
-        return config -> Agent.of(config.id(), config.name(), config.role(),
-                (agent, task, activeSkills, toolkits, taskId, stepId, stepName) ->
-                        new AgentResult(AgentStatus.COMPLETED, new RunLog(Ids.generate(), 0, (String) null)));
+        return config -> new Agent(config, (agent, task, activeSkills, toolkits, taskId, stepId, stepName, timeout) ->
+                        AgentResult.builder().status(AgentStatus.COMPLETED).run(new RunLog(Ids.generate(), 0, (String) null)).build());
     }
 
     @Test
@@ -201,10 +200,13 @@ class PlannerAgentTest {
     @Test
     void planReusesExistingPlanWhenLlmReturnsReuseDecision() {
 
-        var existing = new Plan("plan-cataloged-id", "Research Plan", "Research any topic",
-                List.of(new PlanParam("topic")),
-                List.of(PlanStepAgent.of("research", "researcher", "research {{param.topic}}",
-                        List.of(), false, List.of(), List.of())));
+        var existing = Plan.builder("Research Plan")
+                .id("plan-cataloged-id")
+                .description("Research any topic")
+                .param(new PlanParam("topic", null, null, true))
+                .step(new PlanStepAgent("research", "researcher", "research {{param.topic}}",
+                        List.of(), false, List.of(), List.of()))
+                .build();
 
         var planRegistry = new InMemoryPlanRegistry();
         planRegistry.register(existing);

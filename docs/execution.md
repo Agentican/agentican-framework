@@ -190,7 +190,6 @@ For durable storage, implement the full `TaskStateStore` interface against your 
 
 ```java
 Agentican.builder()
-        .config(config)
         .taskStateStore(myDatabaseStore)
         .build();
 ```

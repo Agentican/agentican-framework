@@ -43,10 +43,12 @@ That's it. The framework plans, executes, and returns — with CDI lifecycle, he
 ## What's in the box
 
 - **`@Inject Agentican`** — singleton CDI bean with full lifecycle management.
+- **`@Inject AgenticanService`** — server-side recovery surface (`resumeInterrupted`, `reapOrphans`); produced from the injected `Agentican` and disposed alongside it.
 - **`@AgenticanAgent("name")`** — qualifier for injecting individual agents by name.
 - **`ReactiveAgentican`** — Mutiny `Uni`-based API for reactive / Vert.x callers.
 - **Config binding** — `RuntimeConfig` → `application.properties` via SmallRye `@ConfigMapping`, validated at boot.
 - **Lifecycle events** — `StartupEvent` / `ShutdownEvent` observers drive `Agentican` construction and `AutoCloseable` teardown.
+- **Resume on start** — `ResumeOnStartObserver` invokes `AgenticanService.resumeInterrupted` on `StartupEvent` to pick up tasks left in flight after a restart (toggleable via `agentican.resume-on-start`).
 - **Health checks** — liveness + readiness at `/q/health`.
 - **CDI event bridge** — task / step / HITL lifecycle events published to the CDI bus so other modules can observe them.
 - **Native image hints** — reflection registration is contributed by the sibling [`quarkus-deployment`](../quarkus-deployment/) module.

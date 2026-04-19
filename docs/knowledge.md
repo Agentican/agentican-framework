@@ -72,7 +72,6 @@ import ai.agentican.framework.knowledge.*;
 var knowledgeStore = new MemKnowledgeStore();
 
 try (var agentican = Agentican.builder()
-        .config(config)
         .knowledgeStore(knowledgeStore)
         .build()) {
 

@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static ai.agentican.framework.MockLlmClient.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+import ai.agentican.framework.config.AgentConfig;
 class SmacAgentRunnerResumeTest {
 
     private static Map<String, Toolkit> toolkitMap(MockToolkit t) {
@@ -31,7 +32,7 @@ class SmacAgentRunnerResumeTest {
         return m;
     }
 
-    private static Agent agent(SmacAgentRunner r) { return Agent.of("resume-agent", "Test role", r); }
+    private static Agent agent(SmacAgentRunner r) { return Agent.builder().config(AgentConfig.builder().name("resume-agent").role("Test role").build()).runner(r).build(); }
 
     @Test
     void resumeWithNoSavedTurnsBehavesAsFreshRun() {
@@ -88,9 +89,10 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.Plan.of("p", "", List.of(),
-                        List.of(ai.agentican.framework.orchestration.model.PlanStepAgent.of(
-                                "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))));
+                ai.agentican.framework.orchestration.model.Plan.builder("p").description("")
+                        .step(new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                                "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
+                        .build());
 
         assertEquals(TurnResumeState.STARTED_NO_MESSAGE, resumePlan.turnState());
 
@@ -150,9 +152,10 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.Plan.of("p", "", List.of(),
-                        List.of(ai.agentican.framework.orchestration.model.PlanStepAgent.of(
-                                "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))));
+                ai.agentican.framework.orchestration.model.Plan.builder("p").description("")
+                        .step(new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                                "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
+                        .build());
 
         assertEquals(TurnResumeState.TOOLS_PARTIAL, resumePlan.turnState());
         assertEquals(1, resumePlan.toolsToExecute().size());
@@ -214,9 +217,10 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.Plan.of("p", "", List.of(),
-                        List.of(ai.agentican.framework.orchestration.model.PlanStepAgent.of(
-                                "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))));
+                ai.agentican.framework.orchestration.model.Plan.builder("p").description("")
+                        .step(new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                                "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
+                        .build());
 
         assertEquals(TurnResumeState.RESPONSE_RECEIVED, resumePlan.turnState());
 
@@ -260,9 +264,10 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.Plan.of("p", "", List.of(),
-                        List.of(ai.agentican.framework.orchestration.model.PlanStepAgent.of(
-                                "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))));
+                ai.agentican.framework.orchestration.model.Plan.builder("p").description("")
+                        .step(new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                                "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
+                        .build());
 
         assertEquals(TurnResumeState.MESSAGE_SENT, resumePlan.turnState());
 
@@ -312,9 +317,10 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.Plan.of("p", "", List.of(),
-                        List.of(ai.agentican.framework.orchestration.model.PlanStepAgent.of(
-                                "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))));
+                ai.agentican.framework.orchestration.model.Plan.builder("p").description("")
+                        .step(new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                                "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
+                        .build());
 
         assertEquals(TurnResumeState.CLOSED, resumePlan.turnState());
 

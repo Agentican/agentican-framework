@@ -7,7 +7,6 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,9 +26,7 @@ public record RuntimeConfig(
 
     public RuntimeConfig {
 
-        if (llm == null || llm.isEmpty())
-            throw new IllegalArgumentException("At least one LLM configuration is required");
-
+        if (llm == null) llm = List.of();
         if (mcp == null) mcp = List.of();
         if (agentRunner == null) agentRunner = new WorkerConfig(0, null);
         if (agents == null) agents = List.of();
@@ -44,36 +41,6 @@ public record RuntimeConfig(
         var resolved = resolveEnvVars(raw);
 
         return YAML_MAPPER.readValue(resolved, RuntimeConfig.class);
-    }
-
-    public static RuntimeConfigBuilder builder() {
-
-        return new RuntimeConfigBuilder();
-    }
-
-    public static class RuntimeConfigBuilder {
-
-        private final List<LlmConfig> llm = new ArrayList<>();
-        private final List<McpConfig> mcp = new ArrayList<>();
-        private final List<AgentConfig> agents = new ArrayList<>();
-        private final List<SkillConfig> skills = new ArrayList<>();
-        private final List<PlanConfig> plans = new ArrayList<>();
-
-        private ComposioConfig composio;
-        private WorkerConfig worker;
-
-        public RuntimeConfigBuilder llm(LlmConfig llm) { this.llm.add(llm); return this; }
-        public RuntimeConfigBuilder composio(ComposioConfig composio) { this.composio = composio; return this; }
-        public RuntimeConfigBuilder worker(WorkerConfig worker) { this.worker = worker; return this; }
-        public RuntimeConfigBuilder mcp(McpConfig mcp) { this.mcp.add(mcp); return this; }
-        public RuntimeConfigBuilder agent(AgentConfig agent) { this.agents.add(agent); return this; }
-        public RuntimeConfigBuilder skill(SkillConfig skill) { this.skills.add(skill); return this; }
-        public RuntimeConfigBuilder plan(PlanConfig plan) { this.plans.add(plan); return this; }
-
-        public RuntimeConfig build() {
-
-            return new RuntimeConfig(llm, mcp, composio, worker, agents, skills, plans);
-        }
     }
 
     private static String resolveEnvVars(String input) {

@@ -30,14 +30,4 @@ public record CodeStepSpec<I, O>(
             outputType = (Class<O>) (Class<?>) Void.class;
     }
 
-    public static <I, O> CodeStepSpec<I, O> of(String slug, Class<I> inputType, Class<O> outputType) {
-
-        return new CodeStepSpec<>(slug, null, inputType, outputType);
-    }
-
-    public static <I, O> CodeStepSpec<I, O> of(String slug, String description,
-                                                Class<I> inputType, Class<O> outputType) {
-
-        return new CodeStepSpec<>(slug, description, inputType, outputType);
-    }
 }

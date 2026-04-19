@@ -7,11 +7,9 @@ Common patterns and recipes for using Agentican.
 Plan and execute a task from natural language:
 
 ```java
-var config = RuntimeConfig.builder()
+try (var agentican = Agentican.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
-        .build();
-
-try (var agentican = Agentican.builder().config(config).build()) {
+        .build()) {
 
     var result = agentican.run("Summarize the latest news about quantum computing").result();
 
@@ -90,7 +88,6 @@ public class DbToolkit implements Toolkit {
 
 // Register and use:
 try (var agentican = Agentican.builder()
-        .config(config)
         .toolkit("db", new DbToolkit(myDataSource))
         .build()) {
 
@@ -123,7 +120,6 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
 });
 
 try (var agentican = Agentican.builder()
-        .config(config)
         .toolkit("email", new EmailToolkit())  // send_email is HitlType.APPROVAL
         .hitlManager(hitlManager)
         .build()) {
@@ -195,7 +191,6 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
 });
 
 try (var agentican = Agentican.builder()
-        .config(config)
         .hitlManager(hitlManager)
         .build()) {
 
@@ -261,9 +256,8 @@ record HttpInput(String url, String method) {
 record HttpOutput(String body, int status) { }
 
 var agentican = Agentican.builder()
-        .config(config)
         .codeStep(
-                CodeStepSpec.of("http-get", HttpInput.class, HttpOutput.class),
+                new CodeStepSpec<>("http-get", null, HttpInput.class, HttpOutput.class),
                 (HttpInput input, StepContext ctx) -> {
                     var response = HttpClient.newHttpClient().send(
                             HttpRequest.newBuilder(URI.create(input.url()))
@@ -296,12 +290,20 @@ The agent reads individual fields from the typed JSON output via `{{step.X.outpu
 Use a fast/cheap model for classification and a stronger one for content generation:
 
 ```java
-var config = RuntimeConfig.builder()
+try (var agentican = Agentican.builder()
         .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
         .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
-        .agent(AgentConfig.forCatalog("agent.classifier.v1", "classifier", "Quick classifier", "haiku"))
-        .agent(AgentConfig.forCatalog("agent.writer.v1",     "writer",     "High-quality writer", "default"))
-        .build();
+        .agent(AgentConfig.builder()
+                .externalId("agent.classifier.v1").name("classifier")
+                .role("Quick classifier").llm("haiku")
+                .build())
+        .agent(AgentConfig.builder()
+                .externalId("agent.writer.v1").name("writer")
+                .role("High-quality writer").llm("default")
+                .build())
+        .build()) {
+    // use agentican — classifier uses haiku, writer uses default
+}
 ```
 
 ## Querying Task Logs
@@ -312,7 +314,6 @@ After a task runs, the `TaskLog` contains the full execution history:
 var taskStateStore = new MemTaskStateStore();
 
 try (var agentican = Agentican.builder()
-        .config(config)
         .taskStateStore(taskStateStore)
         .build()) {
 
@@ -343,7 +344,6 @@ LlmClient myClient = request -> {
 };
 
 Agentican.builder()
-        .config(config)
         .llm("default", myClient)  // still gets automatic retry wrapping
         .build();
 ```

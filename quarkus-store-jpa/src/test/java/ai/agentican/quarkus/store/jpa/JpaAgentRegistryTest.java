@@ -22,7 +22,7 @@ class JpaAgentRegistryTest {
     AgentRegistry registryInterface;
 
     private static final AgentRunner NOOP_RUNNER =
-            (agent, task, activeSkills, toolkits, taskId, stepId, stepName) -> null;
+            (agent, task, activeSkills, toolkits, taskId, stepId, stepName, timeout) -> null;
 
     @Test
     void interfaceResolvesToJpaBean() {
@@ -33,8 +33,8 @@ class JpaAgentRegistryTest {
     @Test
     void registerPersistsCatalogAndExposesInMemory() {
 
-        var cfg = AgentConfig.of("ag-" + Ids.generate(), "Researcher", "Investigates topics", "claude");
-        var agent = Agent.of(cfg, NOOP_RUNNER);
+        var cfg = new AgentConfig("ag-" + Ids.generate(), "Researcher", "Investigates topics", "claude", null);
+        var agent = Agent.builder().config(cfg).runner(NOOP_RUNNER).build();
 
         registry.register(agent);
 
@@ -47,11 +47,11 @@ class JpaAgentRegistryTest {
     void seedRehydratesFromCatalogViaFactory() {
 
         var id = "ag-" + Ids.generate();
-        var cfg = AgentConfig.of(id, "Archivist", "Keeps records", "claude");
-        registry.register(Agent.of(cfg, NOOP_RUNNER));
+        var cfg = new AgentConfig(id, "Archivist", "Keeps records", "claude", "agent.archivist.v1");
+        registry.register(Agent.builder().config(cfg).runner(NOOP_RUNNER).build());
 
         var fresh = new JpaAgentRegistry();
-        fresh.seed(config -> Agent.of(config, NOOP_RUNNER));
+        fresh.seed(config -> Agent.builder().config(config).runner(NOOP_RUNNER).build());
 
         var rehydrated = fresh.get(id);
         assertNotNull(rehydrated, "seed() should have rehydrated the agent from the catalog");
@@ -62,12 +62,12 @@ class JpaAgentRegistryTest {
     @Test
     void externalIdUpsertPreservesInternalIdAcrossDeploys() {
 
-        var cfg1 = AgentConfig.forCatalog("researcher", "Researcher", "Investigates topics", "claude");
-        registry.register(Agent.of(cfg1, NOOP_RUNNER));
+        var cfg1 = new AgentConfig(null, "Researcher", "Investigates topics", "claude", "researcher");
+        registry.register(Agent.builder().config(cfg1).runner(NOOP_RUNNER).build());
         var firstInternalId = registry.getByExternalId("researcher").id();
 
-        var cfg2 = AgentConfig.forCatalog("researcher", "Researcher", "Investigates topics, v2", "claude");
-        registry.register(Agent.of(cfg2, NOOP_RUNNER));
+        var cfg2 = new AgentConfig(null, "Researcher", "Investigates topics, v2", "claude", "researcher");
+        registry.register(Agent.builder().config(cfg2).runner(NOOP_RUNNER).build());
         var secondInternalId = registry.getByExternalId("researcher").id();
 
         assertEquals(firstInternalId, secondInternalId,
@@ -75,16 +75,18 @@ class JpaAgentRegistryTest {
     }
 
     @Test
-    void customRunnerAgentsWithoutConfigAreNotPersisted() {
+    void agentsWithoutExternalIdAreNotPersisted() {
 
-        var agent = Agent.of("ag-" + Ids.generate(), "Ad-hoc", "No config", NOOP_RUNNER);
+        var agent = new Agent(
+                AgentConfig.builder().id("ag-" + Ids.generate()).name("Ad-hoc").role("No catalog").build(),
+                NOOP_RUNNER);
         registry.register(agent);
 
         assertTrue(registry.isRegistered(agent.id()));
 
         var fresh = new JpaAgentRegistry();
-        fresh.seed(config -> Agent.of(config, NOOP_RUNNER));
+        fresh.seed(config -> Agent.builder().config(config).runner(NOOP_RUNNER).build());
         assertNull(fresh.get(agent.id()),
-                "Agents registered without AgentConfig shouldn't appear in the catalog");
+                "Agents without an externalId shouldn't appear in the catalog");
     }
 }

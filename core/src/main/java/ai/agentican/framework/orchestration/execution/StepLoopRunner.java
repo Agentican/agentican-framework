@@ -68,8 +68,10 @@ class StepLoopRunner {
 
             var resolvedBody = resolveLoopBody(step.body(), indexed.item(), params);
 
-            var subPlan = new Plan(
-                    null, step.name() + "-iter-" + (indexed.index() + 1), "", List.of(), resolvedBody);
+            var subPlan = Plan.builder(step.name() + "-iter-" + (indexed.index() + 1))
+                    .description("")
+                    .steps(resolvedBody)
+                    .build();
 
             LOG.info(Logs.RUNNER_RUN_LOOP_STEP_ITEM, step.name(), indexed.index() + 1);
 

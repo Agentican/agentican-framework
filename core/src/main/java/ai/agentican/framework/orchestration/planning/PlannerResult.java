@@ -11,11 +11,6 @@ public record PlannerResult(
         List<AgentConfig> agents,
         List<SkillConfig> skills) {
 
-    public static PlannerResult of(Plan plan, List<AgentConfig> agents, List<SkillConfig> skills) {
-
-        return new PlannerResult(plan, agents, skills);
-    }
-
     public PlannerResult {
 
         if (plan == null)

@@ -21,10 +21,10 @@ class SubmitPreBuiltTaskTest {
     @Test
     void submitWithPreBuiltTaskReturnsTaskId() throws Exception {
 
-        var step = PlanStepAgent.of("research", "researcher", "do something",
+        var step = new PlanStepAgent("research", "researcher", "do something",
                 List.of(), false, List.of(), List.of());
 
-        var task = Plan.of("rest-prebuilt-task", "test description", List.of(), List.of(step));
+        var task = Plan.builder("rest-prebuilt-task").description("test description").step(step).build();
 
         var taskJson = objectMapper.writeValueAsString(task);
 

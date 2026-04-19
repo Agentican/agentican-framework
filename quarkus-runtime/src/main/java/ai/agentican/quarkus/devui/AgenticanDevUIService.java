@@ -27,7 +27,7 @@ public class AgenticanDevUIService {
 
     public List<Map<String, Object>> getAgents() {
 
-        return agentican.agents().getAll().stream()
+        return agentican.registry().agents().getAll().stream()
                 .map(agent -> Map.<String, Object>of(
                         "name", agent.name(),
                         "role", agent.role()))
@@ -36,7 +36,7 @@ public class AgenticanDevUIService {
 
     public List<Map<String, Object>> getSkills() {
 
-        return agentican.skills().getAll().stream()
+        return agentican.registry().skills().getAll().stream()
                 .map(skill -> Map.<String, Object>of(
                         "name", skill.name(),
                         "instructions", skill.instructions()))

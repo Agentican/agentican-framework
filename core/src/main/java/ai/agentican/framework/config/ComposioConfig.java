@@ -16,11 +16,6 @@ public record ComposioConfig(
             throw new IllegalArgumentException("Composio user ID is required");
     }
 
-    public static ComposioConfig of(String apiKey, String userId) {
-
-        return new ComposioConfig(apiKey, userId);
-    }
-
     public static ComposioConfigBuilder builder() {
 
         return new ComposioConfigBuilder();
@@ -36,7 +31,7 @@ public record ComposioConfig(
 
         public ComposioConfig build() {
 
-            return ComposioConfig.of(apiKey, userId);
+            return new ComposioConfig(apiKey, userId);
         }
     }
 }

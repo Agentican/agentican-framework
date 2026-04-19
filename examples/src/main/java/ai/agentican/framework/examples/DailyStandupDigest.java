@@ -21,12 +21,7 @@ public class DailyStandupDigest {
 
         var defs = ExampleLoader.load("daily-standup-digest.yaml");
 
-        var config = RuntimeConfig.builder()
-                .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
-                .composio(ComposioConfig.of(System.getenv("COMPOSIO_API_KEY"), "user-1"))
-                .build();
-
-        var plan = PlanConfig.builder()
+var plan = PlanConfig.builder()
                 .name("Daily Standup Digest")
                 .externalId("daily-standup-digest")
                 .param("team", "Team or repo name", null, true)
@@ -44,7 +39,10 @@ public class DailyStandupDigest {
                                 "4. Post it to {{param.channel}} on Slack"))
                 .build();
 
-        var builder = Agentican.builder().config(config).plan(plan);
+        var builder = Agentican.builder()
+                .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+                .composio(new ComposioConfig(System.getenv("COMPOSIO_API_KEY"), "user-1"))
+                .plan(plan);
         defs.agents().forEach(builder::agent);
 
         try (var agentican = builder.build()) {

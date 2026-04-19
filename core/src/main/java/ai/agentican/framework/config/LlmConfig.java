@@ -45,13 +45,6 @@ public record LlmConfig(
                     "baseUrl is required when provider is 'openai-compatible'");
     }
 
-    public static LlmConfig of(String name, String provider, String model, String apiKey,
-                               String secretKey, String region, long maxTokens,
-                               Double temperature, String baseUrl) {
-
-        return new LlmConfig(name, provider, model, apiKey, secretKey, region, maxTokens, temperature, baseUrl);
-    }
-
     public static LlmConfigBuilder builder() {
 
         return new LlmConfigBuilder();
@@ -83,7 +76,7 @@ public record LlmConfig(
 
         public LlmConfig build() {
 
-            return LlmConfig.of(name, provider, model, apiKey, secretKey, region, maxTokens, temperature, baseUrl);
+            return new LlmConfig(name, provider, model, apiKey, secretKey, region, maxTokens, temperature, baseUrl);
         }
     }
 }

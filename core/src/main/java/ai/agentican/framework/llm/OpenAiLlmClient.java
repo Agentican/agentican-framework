@@ -162,7 +162,7 @@ public class OpenAiLlmClient {
                 var call = item.asFunctionCall();
                 var args = parseArgs(call.arguments());
 
-                toolCalls.add(ToolCall.of(call.callId(), call.name(), args));
+                toolCalls.add(new ToolCall(call.callId(), call.name(), args));
 
             } else if (item.isWebSearchCall()) {
 
@@ -181,7 +181,7 @@ public class OpenAiLlmClient {
         long inputTokens = Math.max(0, inputTotal - cacheReadTokens);
         long outputTokens = usage.map(u -> u.outputTokens()).orElse(0L);
 
-        return LlmResponse.of(
+        return new LlmResponse(
                 textBuilder.toString(),
                 toolCalls,
                 stopReason,

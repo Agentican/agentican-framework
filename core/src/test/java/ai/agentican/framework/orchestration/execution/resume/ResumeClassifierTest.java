@@ -179,10 +179,11 @@ class ResumeClassifierTest {
     @Test
     void completedStepsAreCollectedInOrder() {
 
-        var plan = Plan.of("t", "", List.of(), List.of(
-                PlanStepAgent.of("a", "x", "do a", List.of(), false, List.of(), List.of()),
-                PlanStepAgent.of("b", "x", "do b", List.of("a"), false, List.of(), List.of()),
-                PlanStepAgent.of("c", "x", "do c", List.of("b"), false, List.of(), List.of())));
+        var plan = Plan.builder("t").description("").steps(List.of(
+                new PlanStepAgent("a", "x", "do a", List.of(), false, List.of(), List.of()),
+                new PlanStepAgent("b", "x", "do b", List.of("a"), false, List.of(), List.of()),
+                new PlanStepAgent("c", "x", "do c", List.of("b"), false, List.of(), List.of())))
+                .build();
 
         var taskLog = new TaskLog("t-1", "t", null, Map.of());
 
@@ -204,9 +205,10 @@ class ResumeClassifierTest {
 
     private static Plan fakePlan() {
 
-        return Plan.of("t", "", List.of(), List.of(
-                PlanStepAgent.of("research", "researcher", "do it",
-                        List.of(), false, List.of(), List.of())));
+        return Plan.builder("t").description("")
+                .step(new PlanStepAgent("research", "researcher", "do it",
+                        List.of(), false, List.of(), List.of()))
+                .build();
     }
 
     private static TaskLog taskWithInFlightTurn(java.util.function.Consumer<TurnLog> setup) {

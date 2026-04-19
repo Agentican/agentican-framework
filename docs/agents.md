@@ -7,16 +7,19 @@ An `Agent` represents a specialized worker — a name, role, an `AgentRunner` th
 The simplest way to define an agent is via configuration:
 
 ```java
-var researcher = AgentConfig.forCatalog(
-        "agent.researcher.v1",                         // externalId — required for catalog agents
-        "researcher",                                  // name
-        "Expert researcher who finds and synthesizes information",
-        "default");                                    // llm name
+var researcher = AgentConfig.builder()
+        .externalId("agent.researcher.v1")             // required for catalog agents
+        .name("researcher")
+        .role("Expert researcher who finds and synthesizes information")
+        .llm("default")
+        .build();
 
-var config = RuntimeConfig.builder()
+try (var agentican = Agentican.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
         .agent(researcher)
-        .build();
+        .build()) {
+    // use agentican
+}
 ```
 
 Any agent you register at startup — through `RuntimeConfig.agents` or `Agentican.builder().agent(...)` — must declare an `externalId`. Planner-created agents don't need one.
@@ -41,24 +44,20 @@ Any planner-introduced `AgentConfig` that isn't already in the registry is passe
 
 ```java
 record Agent(
-    String id,
-    String name,
-    String role,
-    AgentRunner runner,
-    AgentConfig config   // null for Agent.of(name, role, runner) — typically only in tests
+    AgentConfig config,
+    AgentRunner runner
 )
 ```
 
-- **`id`** — internal UUID (auto-generated if null)
-- **`name`** — display name, used in plan step references
-- **`role`** — short description of the agent's expertise (used in the system prompt)
-- **`runner`** — the execution strategy (almost always `SmacAgentRunner`)
-- **`config`** — the `AgentConfig` this agent was built from; `null` if built via the legacy `Agent.of(name, role, runner)` / `Agent.of(id, name, role, runner)` factories (used in test fixtures — these agents do not persist to a catalog)
+- **`config`** — the `AgentConfig` carrying id, name, role, and LLM choice. Required.
+- **`runner`** — the execution strategy (almost always `SmacAgentRunner`). Required.
 
-Preferred factory:
+`Agent` exposes `id()`, `name()`, and `role()` as delegating accessors that read from `config`.
+
+Construction is builder-only:
 
 ```java
-Agent.of(agentConfig, runner);    // preserves config on the Agent record
+Agent.builder().config(agentConfig).runner(runner).build();
 ```
 
 ## AgentFactory
@@ -66,9 +65,15 @@ Agent.of(agentConfig, runner);    // preserves config on the Agent record
 `AgentFactory` turns an `AgentConfig` into a runtime `Agent`. It's wired with the LLM clients, the HITL manager, the knowledge store, the task state store, the skill registry, and the task listener:
 
 ```java
-var factory = new AgentFactory(
-        config, llms, hitlManager, knowledgeStore,
-        taskStateStore, skillRegistry, taskListener);
+var factory = AgentFactory.builder()
+        .config(runtimeConfig)
+        .llms(llms)
+        .hitlManager(hitlManager)
+        .knowledgeStore(knowledgeStore)
+        .taskStateStore(taskStateStore)
+        .skillRegistry(skillRegistry)
+        .taskListener(taskListener)
+        .build();
 
 Agent agent = factory.build(agentConfig);
 ```
@@ -80,13 +85,20 @@ Agent agent = factory.build(agentConfig);
 Skills are reusable instruction blocks. They live in a top-level `SkillRegistry` (seeded from `RuntimeConfig.skills` and the fluent builder) and are referenced by plan steps.
 
 ```java
-var config = RuntimeConfig.builder()
+Agentican.builder()
         .llm(...)
-        .skill(SkillConfig.forCatalog("skill.statistical-rigor.v1", "statistical-rigor",
-                "Use p-values, confidence intervals, and explain assumptions"))
-        .skill(SkillConfig.forCatalog("skill.plain-english.v1", "plain-english",
-                "Translate findings into non-technical language"))
-        .agent(AgentConfig.forCatalog("agent.analyst.v1", "analyst", "Data analyst", "default"))
+        .skill(SkillConfig.builder()
+                .externalId("skill.statistical-rigor.v1").name("statistical-rigor")
+                .instructions("Use p-values, confidence intervals, and explain assumptions")
+                .build())
+        .skill(SkillConfig.builder()
+                .externalId("skill.plain-english.v1").name("plain-english")
+                .instructions("Translate findings into non-technical language")
+                .build())
+        .agent(AgentConfig.builder()
+                .externalId("agent.analyst.v1").name("analyst")
+                .role("Data analyst").llm("default")
+                .build())
         .build();
 ```
 
@@ -111,16 +123,26 @@ public interface AgentRunner {
 
     AgentResult run(Agent agent, String task, List<String> activeSkills,
                     Map<String, Toolkit> toolkits, String taskId,
-                    String stepId, String stepName);
+                    String stepId, String stepName, Duration timeoutOverride);
 
     default AgentResult resume(Agent agent, String task, List<String> activeSkills,
                                RunLog savedRun, List<ToolResult> hitlToolResults,
                                Map<String, Toolkit> toolkits, String taskId,
-                               String stepId, String stepName) {
+                               String stepId, String stepName, Duration timeoutOverride) {
         throw new UnsupportedOperationException("This runner does not support HITL resume");
+    }
+
+    default AgentResult resumeAfterCrash(Agent agent, String task, List<String> activeSkills,
+                                         RunLog savedRun, ResumePlan resumePlan,
+                                         Map<String, Toolkit> toolkits, String taskId,
+                                         String stepId, String stepName,
+                                         AtomicBoolean cancelled) {
+        return AgentResult.builder().status(AgentStatus.FAILED).run(savedRun).build();
     }
 }
 ```
+
+`timeoutOverride` lets a step override the runner's default timeout; pass `null` to use the runner's configured value. `resumeAfterCrash` is invoked by `AgenticanService` for crash recovery and has a sensible default — only override it if your runner has special crash-recovery semantics.
 
 The default `SmacAgentRunner` handles:
 - Multi-turn LLM conversations
@@ -137,7 +159,7 @@ For most cases, you don't need a custom runner. If you build one, the framework 
 The default runner. Configurable via `WorkerConfig`:
 
 ```java
-var config = RuntimeConfig.builder()
+Agentican.builder()
         .llm(...)
         .worker(WorkerConfig.builder()
                 .maxTurns(20)                    // max LLM turns per step
@@ -182,7 +204,7 @@ AgentConfig.builder()
 Define the LLMs in config:
 
 ```java
-RuntimeConfig.builder()
+Agentican.builder()
         .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
         .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
         .build();
@@ -192,7 +214,6 @@ Or supply pre-built `LlmClient` instances via the builder:
 
 ```java
 Agentican.builder()
-        .config(config)
         .llm("custom", myLlmClient)
         .build();
 ```

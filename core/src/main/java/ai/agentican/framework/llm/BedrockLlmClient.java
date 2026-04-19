@@ -156,7 +156,7 @@ public class BedrockLlmClient {
                 } else if (block.toolUse() != null) {
 
                     var use = block.toolUse();
-                    toolCalls.add(ToolCall.of(use.toolUseId(), use.name(), asMap(use.input())));
+                    toolCalls.add(new ToolCall(use.toolUseId(), use.name(), asMap(use.input())));
                 }
             }
         }
@@ -171,7 +171,7 @@ public class BedrockLlmClient {
         long outputTokens = usage != null && usage.outputTokens() != null ? usage.outputTokens() : 0L;
         long inputTokens = Math.max(0, inputTotal - cacheRead);
 
-        return LlmResponse.of(
+        return new LlmResponse(
                 textBuilder.toString(),
                 toolCalls,
                 stopReason,

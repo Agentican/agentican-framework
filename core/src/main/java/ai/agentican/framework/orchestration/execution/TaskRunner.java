@@ -60,28 +60,6 @@ public class TaskRunner {
     private final StepBranchRunner stepBranchRunner;
     private final StepCodeRunner stepCodeRunner;
 
-    public static TaskRunner of(AgentRegistry agentRegistry, HitlManager hitlManager,
-                                ToolkitRegistry toolkitRegistry, TaskStateStore taskStateStore) {
-
-        return new TaskRunner(agentRegistry, hitlManager, toolkitRegistry, taskStateStore, null, 0, null,
-                new ai.agentican.framework.orchestration.code.CodeStepRegistry());
-    }
-
-    public static TaskRunner of(AgentRegistry agentRegistry, HitlManager hitlManager,
-                                ToolkitRegistry toolkitRegistry, TaskStateStore taskStateStore, Duration taskTimeout) {
-
-        return new TaskRunner(agentRegistry, hitlManager, toolkitRegistry, taskStateStore, taskTimeout, 0, null,
-                new ai.agentican.framework.orchestration.code.CodeStepRegistry());
-    }
-
-    public TaskRunner(AgentRegistry agentRegistry, HitlManager hitlManager,
-                      ToolkitRegistry toolkitRegistry, TaskStateStore taskStateStore, Duration taskTimeout,
-                      int maxStepRetries, TaskDecorator taskDecorator) {
-
-        this(agentRegistry, hitlManager, toolkitRegistry, taskStateStore, taskTimeout,
-                maxStepRetries, taskDecorator, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
-    }
-
     public TaskRunner(AgentRegistry agentRegistry, HitlManager hitlManager,
                       ToolkitRegistry toolkitRegistry, TaskStateStore taskStateStore, Duration taskTimeout,
                       int maxStepRetries, TaskDecorator taskDecorator,
@@ -151,7 +129,7 @@ public class TaskRunner {
             var reapName = classified.reapReason() != null ? classified.reapReason().name() : "UNKNOWN";
             LOG.warn("Resuming task {}: classifier says reap ({})", taskId, reapName);
             failTask(taskId, taskLog, reapName);
-            return TaskResult.of(plan.name(), TaskStatus.FAILED, List.of());
+            return new TaskResult(plan.name(), TaskStatus.FAILED, List.of());
         }
 
         LOG.info("Resuming task {}: completedSteps={}, inFlightStep={}, turnState={}, pendingTools={}",
@@ -183,7 +161,7 @@ public class TaskRunner {
 
                 LOG.warn("Task {}: in-flight step '{}' missing from plan; reaping", taskId, stepLog.stepName());
                 failTask(taskId, taskLog, "in_flight_step_missing_from_plan");
-                return TaskResult.of(plan.name(), TaskStatus.FAILED, List.of());
+                return new TaskResult(plan.name(), TaskStatus.FAILED, List.of());
             }
 
             var resumeStepResult = resumeInFlightStep(planStep, stepLog, classified, parentOutputs,
@@ -194,7 +172,7 @@ public class TaskRunner {
             if (resumeStepResult.status() != TaskStatus.COMPLETED) {
 
                 taskStateStore.taskCompleted(taskId, TaskStatus.FAILED);
-                return TaskResult.of(plan.name(), TaskStatus.FAILED, stepResults);
+                return new TaskResult(plan.name(), TaskStatus.FAILED, stepResults);
             }
 
             parentOutputs.put(planStep.name(), resumeStepResult.output() != null ? resumeStepResult.output() : "");
@@ -330,8 +308,9 @@ public class TaskRunner {
         LOG.info("Resuming SUSPENDED step '{}' via HITL path (approved={})",
                 agentStep.name(), persistedResponse.approved());
 
-        var agentResult = agent.runner().resume(agent, instructions, agentStep.skills(),
-                savedRun, hitlToolResults, scopedToolkits, taskId, stepLog.id(), agentStep.name());
+        var agentResult = agent.resume(instructions, agentStep.skills(),
+                savedRun, hitlToolResults, scopedToolkits, taskId, stepLog.id(), agentStep.name(),
+                agentStep.timeout());
 
         var status = agentResult.status() == AgentStatus.COMPLETED ? TaskStatus.COMPLETED
                 : agentResult.status() == AgentStatus.SUSPENDED ? TaskStatus.SUSPENDED
@@ -409,7 +388,8 @@ public class TaskRunner {
             else {
 
                 var resolvedBody = stepLoopRunner.resolveLoopBody(loopStep.body(), items.get(i), taskParams);
-                var subPlan = new Plan(null, loopStep.name() + "-iter-" + (i + 1), "", List.of(), resolvedBody);
+                var subPlan = Plan.builder(loopStep.name() + "-iter-" + (i + 1))
+                        .description("").steps(resolvedBody).build();
 
                 LOG.info("Loop step '{}': dispatching fresh iteration {}", loopStep.name(), i);
 
@@ -485,7 +465,8 @@ public class TaskRunner {
                     List.of());
         }
 
-        var subPlan = new Plan(null, branchStep.name() + "-" + chosenPath, "", List.of(), path.body());
+        var subPlan = Plan.builder(branchStep.name() + "-" + chosenPath)
+                .description("").steps(path.body()).build();
         var subResult = run(subPlan, newTaskId(), taskId, stepLog.id(), 0,
                 taskParams, cancelled, parentOutputs);
 
@@ -577,7 +558,7 @@ public class TaskRunner {
 
             taskStateStore.taskCompleted(taskId, taskStatus);
 
-            return TaskResult.of(taskName, taskStatus, List.copyOf(taskStepResults));
+            return new TaskResult(taskName, taskStatus, List.copyOf(taskStepResults));
         };
 
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -805,7 +786,7 @@ public class TaskRunner {
                             : taskStepResult.agentResults().getLast().run();
                     taskStepResult = new TaskStepResult(taskStep.name(), TaskStatus.SUSPENDED,
                             taskStepResult.output(),
-                            List.of(new AgentResult(AgentStatus.SUSPENDED, lastRun, checkpoint)));
+                            List.of(AgentResult.builder().status(AgentStatus.SUSPENDED).run(lastRun).checkpoint(checkpoint).build()));
                 }
 
                 finishedTaskSteps.put(taskStepResult);
@@ -949,9 +930,9 @@ public class TaskRunner {
                             Placeholders.resolveParams(agentStep.instructions(), taskParams), parentStepOutputs);
 
                     var stepId = stepNameToStepId.get(agentStep.name());
-                    var agentResult = agent.runner().resume(
-                            agent, resolvedTask, agentStep.skills(), savedRun, hitlToolResults, scopedToolkits,
-                            taskId, stepId, agentStep.name());
+                    var agentResult = agent.resume(
+                            resolvedTask, agentStep.skills(), savedRun, hitlToolResults, scopedToolkits,
+                            taskId, stepId, agentStep.name(), agentStep.timeout());
 
                     var status = agentResult.isCompleted() ? TaskStatus.COMPLETED
                             : agentResult.isSuspended() ? TaskStatus.SUSPENDED

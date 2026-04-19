@@ -21,7 +21,7 @@ class AgenticanProducerTest {
     void agenticanIsProducedAsApplicationScopedBean() {
 
         assertNotNull(agentican, "Agentican bean should be injected");
-        assertNotNull(agentican.agents(), "Agent registry should be initialized");
+        assertNotNull(agentican.registry().agents(), "Agent registry should be initialized");
     }
 
     @Test
@@ -59,6 +59,6 @@ class AgenticanProducerTest {
     @Test
     void preRegisteredAgentsAreAvailableInRegistry() {
 
-        assertNotNull(agentican.agents().getByName("researcher"));
+        assertNotNull(agentican.registry().agents().getByName("researcher"));
     }
 }

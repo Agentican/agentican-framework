@@ -36,51 +36,28 @@ public class JpaAgentRegistry implements AgentRegistry {
 
         var cfg = agent.config();
 
-        if (cfg == null) {
-            LOG.debug("Agent '{}' has no config — skipping catalog persistence", agent.name());
+        if (cfg.externalId() == null) {
+            LOG.debug("Agent '{}' has no externalId — skipping catalog persistence", agent.name());
             byId.put(agent.id(), agent);
             idByName.put(agent.name(), agent.id());
             return;
         }
 
-        if (cfg.externalId() != null) {
+        var existing = (AgentEntity) AgentEntity.find("externalId", cfg.externalId()).firstResult();
+        AgentEntity e;
+        Agent canonical = agent;
 
-            var existing = (AgentEntity) AgentEntity.find("externalId", cfg.externalId()).firstResult();
-            AgentEntity e;
-            Agent canonical = agent;
-
-            if (existing != null) {
-                e = existing;
-                if (!e.id.equals(agent.id())) {
-                    var alignedCfg = new AgentConfig(e.id, cfg.name(), cfg.role(), cfg.llm(), cfg.externalId());
-                    canonical = new Agent(e.id, agent.name(), agent.role(), agent.runner(), alignedCfg);
-                }
+        if (existing != null) {
+            e = existing;
+            if (!e.id.equals(agent.id())) {
+                var alignedCfg = new AgentConfig(e.id, cfg.name(), cfg.role(), cfg.llm(), cfg.externalId());
+                canonical = new Agent(alignedCfg, agent.runner());
             }
-            else {
-                e = new AgentEntity();
-                e.id = agent.id();
-                e.externalId = cfg.externalId();
-                e.createdAt = Instant.now();
-            }
-
-            e.name = cfg.name();
-            e.role = cfg.role();
-            e.llm = cfg.llm();
-            e.updatedAt = Instant.now();
-
-            e.persist();
-
-            byId.put(canonical.id(), canonical);
-            idByName.put(canonical.name(), canonical.id());
-            idByExternalId.put(cfg.externalId(), canonical.id());
-            return;
         }
-
-        var existing = (AgentEntity) AgentEntity.findById(cfg.id());
-        var e = existing != null ? existing : new AgentEntity();
-
-        if (existing == null) {
-            e.id = cfg.id();
+        else {
+            e = new AgentEntity();
+            e.id = agent.id();
+            e.externalId = cfg.externalId();
             e.createdAt = Instant.now();
         }
 
@@ -91,8 +68,9 @@ public class JpaAgentRegistry implements AgentRegistry {
 
         e.persist();
 
-        byId.put(agent.id(), agent);
-        idByName.put(agent.name(), agent.id());
+        byId.put(canonical.id(), canonical);
+        idByName.put(canonical.name(), canonical.id());
+        idByExternalId.put(cfg.externalId(), canonical.id());
     }
 
     @Override

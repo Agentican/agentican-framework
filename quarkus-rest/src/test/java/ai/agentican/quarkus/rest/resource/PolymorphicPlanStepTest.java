@@ -26,7 +26,7 @@ class PolymorphicPlanStepTest {
     @Test
     void agentStepRoundTrips() throws Exception {
 
-        var step = PlanStepAgent.of("s1", "researcher", "do research", List.of(), false, List.of(), List.of());
+        var step = new PlanStepAgent("s1", "researcher", "do research", List.of(), false, List.of(), List.of());
         var json = objectMapper.writeValueAsString(step);
         var deserialized = objectMapper.readValue(json, PlanStep.class);
 
@@ -40,7 +40,7 @@ class PolymorphicPlanStepTest {
     @Test
     void loopStepRoundTrips() throws Exception {
 
-        var body = PlanStepAgent.of("body", "worker", "process item", List.of(), false, List.of(), List.of());
+        var body = new PlanStepAgent("body", "worker", "process item", List.of(), false, List.of(), List.of());
         var loop = new PlanStepLoop("loop1", "producer", List.of(body), List.of(), false);
 
         var json = objectMapper.writeValueAsString(loop);
@@ -58,12 +58,12 @@ class PolymorphicPlanStepTest {
     @Test
     void branchStepRoundTrips() throws Exception {
 
-        var pathA = PlanStepBranch.Path.of("yes", List.of(
-                PlanStepAgent.of("a1", "researcher", "investigate", List.of(), false, List.of(), List.of())));
-        var pathB = PlanStepBranch.Path.of("no", List.of(
-                PlanStepAgent.of("b1", "writer", "skip", List.of(), false, List.of(), List.of())));
+        var pathA = new PlanStepBranch.Path("yes", List.of(
+                new PlanStepAgent("a1", "researcher", "investigate", List.of(), false, List.of(), List.of())));
+        var pathB = new PlanStepBranch.Path("no", List.of(
+                new PlanStepAgent("b1", "writer", "skip", List.of(), false, List.of(), List.of())));
 
-        var branch = PlanStepBranch.of("branch1", "classifier", List.of(pathA, pathB), "no", List.of(), false);
+        var branch = new PlanStepBranch("branch1", "classifier", List.of(pathA, pathB), "no", List.of(), false);
 
         var json = objectMapper.writeValueAsString(branch);
         var deserialized = objectMapper.readValue(json, PlanStep.class);
@@ -79,11 +79,11 @@ class PolymorphicPlanStepTest {
     @Test
     void fullTaskWithMixedStepsRoundTrips() throws Exception {
 
-        var producer = PlanStepAgent.of("produce", "researcher", "find items", List.of(), false, List.of(), List.of());
-        var loopBody = PlanStepAgent.of("process", "worker", "handle item", List.of(), false, List.of(), List.of());
+        var producer = new PlanStepAgent("produce", "researcher", "find items", List.of(), false, List.of(), List.of());
+        var loopBody = new PlanStepAgent("process", "worker", "handle item", List.of(), false, List.of(), List.of());
         var loop = new PlanStepLoop("loop", "produce", List.of(loopBody), List.of(), false);
 
-        var task = Plan.of("mixed-task", "test", List.of(), List.of(producer, loop));
+        var task = Plan.builder("mixed-task").description("test").steps(List.of(producer, loop)).build();
 
         var json = objectMapper.writeValueAsString(task);
         var deserialized = objectMapper.readValue(json, Plan.class);
@@ -97,11 +97,11 @@ class PolymorphicPlanStepTest {
     @Test
     void submitTaskWithLoopStepViaRest() throws Exception {
 
-        var producer = PlanStepAgent.of("produce", "researcher", "find items", List.of(), false, List.of(), List.of());
-        var loopBody = PlanStepAgent.of("process", "researcher", "handle item", List.of(), false, List.of(), List.of());
+        var producer = new PlanStepAgent("produce", "researcher", "find items", List.of(), false, List.of(), List.of());
+        var loopBody = new PlanStepAgent("process", "researcher", "handle item", List.of(), false, List.of(), List.of());
         var loop = new PlanStepLoop("loop", "produce", List.of(loopBody), List.of(), false);
 
-        var task = Plan.of("rest-loop-task", "test with loop", List.of(), List.of(producer, loop));
+        var task = Plan.builder("rest-loop-task").description("test with loop").steps(List.of(producer, loop)).build();
 
         var taskJson = objectMapper.writeValueAsString(task);
 

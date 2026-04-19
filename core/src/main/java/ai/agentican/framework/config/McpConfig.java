@@ -28,12 +28,6 @@ public record McpConfig(
         if (headers == null) headers = Map.of();
     }
 
-    public static McpConfig of(String slug, String name, String url, Map<String, String> queryParams,
-                               Map<String, String> headers) {
-
-        return new McpConfig(slug, name, url, queryParams, headers);
-    }
-
     public static McpConfigBuilder builder() {
 
         return new McpConfigBuilder();
@@ -56,7 +50,7 @@ public record McpConfig(
 
         public McpConfig build() {
 
-            return McpConfig.of(slug, name, url, queryParams, headers);
+            return new McpConfig(slug, name, url, queryParams, headers);
         }
     }
 }

@@ -11,27 +11,28 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import ai.agentican.framework.config.AgentConfig;
 class RecordValidationTest {
 
-    private final AgentRunner dummyRunner = (agent, task, activeSkills, toolkits, taskId, stepId, stepName) -> null;
+    private final AgentRunner dummyRunner = (agent, task, activeSkills, toolkits, taskId, stepId, stepName, timeout) -> null;
 
     @Test
     void agentRequiresName() {
 
-        assertThrows(IllegalArgumentException.class, () -> Agent.of(null, "role", dummyRunner));
+        assertThrows(IllegalArgumentException.class, () -> Agent.builder().config(AgentConfig.builder().name(null).role("role").build()).runner(dummyRunner).build());
     }
 
     @Test
     void agentRequiresRole() {
 
-        assertThrows(IllegalArgumentException.class, () -> Agent.of("name", null, dummyRunner));
+        assertThrows(IllegalArgumentException.class, () -> Agent.builder().config(AgentConfig.builder().name("name").role(null).build()).runner(dummyRunner).build());
     }
 
     @Test
     void taskRequiresSteps() {
 
         assertThrows(IllegalArgumentException.class, () ->
-                new Plan(null, "name", "desc", List.of(), List.of()));
+                Plan.builder("name").description("desc").build());
     }
 
     @Test

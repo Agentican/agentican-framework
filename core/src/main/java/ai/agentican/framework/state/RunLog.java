@@ -14,11 +14,6 @@ public class RunLog {
     private final String agentName;
     private final List<TurnLog> turns;
 
-    public static RunLog of(String id, int index, String agentName) {
-
-        return new RunLog(id, index, agentName);
-    }
-
     public RunLog(String id, int index, String agentName) {
 
         this.id = id;
