@@ -42,9 +42,11 @@ final class AgenticanOutputReader {
         if (outputType == String.class) return (R) raw;
 
         try {
+
             return Json.mapper().readValue(raw, outputType);
         }
         catch (Exception e) {
+
             throw new OutputParseException(raw, outputType, e);
         }
     }

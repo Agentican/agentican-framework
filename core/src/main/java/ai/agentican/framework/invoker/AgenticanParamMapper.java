@@ -19,7 +19,9 @@ final class AgenticanParamMapper {
         if (params instanceof Map<?, ?> m) {
 
             var out = new LinkedHashMap<String, String>(m.size());
+
             m.forEach((k, v) -> out.put(String.valueOf(k), v == null ? null : String.valueOf(v)));
+
             return out;
         }
 
@@ -30,10 +32,13 @@ final class AgenticanParamMapper {
                     "Params must be a record, POJO, or Map — got " + params.getClass().getName());
 
         var out = new LinkedHashMap<String, String>();
+
         tree.properties().forEach(entry -> {
+
             var node = (JsonNode) entry.getValue();
             out.put(entry.getKey(), stringify(node));
         });
+
         return out;
     }
 
@@ -42,6 +47,7 @@ final class AgenticanParamMapper {
         if (node == null || node.isNull()) return null;
         if (node.isTextual()) return node.asText();
         if (node.isNumber() || node.isBoolean()) return node.asText();
+
         return node.toString();
     }
 

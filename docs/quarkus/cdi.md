@@ -120,6 +120,54 @@ public Uni<String> research(String topic) {
 All task execution runs on the framework's virtual thread executor, never on the Vert.x
 event loop.
 
+## Typed reactive invoker — `ReactiveAgentican<P, R>`
+
+The reactive counterpart to `@AgenticanPlan("name") Agentican<P, R>`. Same qualifier, same generic params, just returns `Uni<...>` so you can compose without blocking:
+
+```java
+@Inject @AgenticanPlan("triage")
+ReactiveAgentican<TriageParams, TriageOutput> triage;
+
+@GET
+@Path("/triage/{customer}")
+public Uni<TriageOutput> triage(@PathParam("customer") String customerId) {
+
+    return triage.runAndAwait(new TriageParams(customerId, "HIGH"));
+}
+```
+
+Same three method shapes as the synchronous variant:
+
+| Method | Returns |
+|---|---|
+| `run(P)` | `Uni<TaskHandle>` — resolves once submission lands |
+| `awaitTaskResult(P)` | `Uni<TaskResult>` — resolves when the task completes |
+| `runAndAwait(P)` | `Uni<R>` — resolves with the typed, schema-validated result |
+
+The `Uni` is lazy — subscription is what actually triggers submission. Task execution stays on virtual threads; the `Uni` simply surfaces completion to reactive pipelines.
+
+## Reactive HITL notifier
+
+If your HITL notifier posts to a reactive backend (Vert.x event bus, reactive Redis, a Mutiny-returning messaging client), declare a `ReactiveHitlNotifier` bean instead of a sync `HitlNotifier`:
+
+```java
+@ApplicationScoped
+public class MyHitlNotifier implements ReactiveHitlNotifier {
+
+    @Inject Mailer mailer;
+
+    @Override
+    public Uni<Void> onCheckpoint(HitlManager manager, HitlCheckpoint checkpoint) {
+
+        return mailer.send(Mail.withText("ops@company.com",
+                "Approval needed: " + checkpoint.description(),
+                checkpoint.content()));
+    }
+}
+```
+
+The default `HitlManager` producer auto-detects a CDI bean of either type (prefers sync if both are declared) and wires it. No custom `HitlManager` producer is required. When the framework fires a checkpoint it subscribes to the returned `Uni` and waits for completion — which is fine on a virtual thread, since the task is about to park anyway waiting for the human response.
+
 ## CDI lifecycle events
 
 Events are fired by the `CdiEventBridge`, which bridges framework `StepListener` callbacks

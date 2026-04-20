@@ -10,6 +10,7 @@ public class TaskFailedException extends RuntimeException {
 
         super("Task " + (taskResult != null ? taskResult.name() : "<unknown>")
                 + " did not complete: status=" + (taskResult != null ? taskResult.status() : "<unknown>"));
+
         this.taskResult = taskResult;
     }
 

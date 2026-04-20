@@ -12,14 +12,6 @@ import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-
-/**
- * Produces typed {@link Agentican} beans for injection points qualified with
- * {@link AgenticanPlan}. The produced invoker resolves its plan by name on each
- * call, so plans registered at runtime (DB, programmatic) are honored.
- */
 @ApplicationScoped
 public class AgenticanPlanProducer {
 
@@ -33,15 +25,9 @@ public class AgenticanPlanProducer {
     @AgenticanPlan("")
     public <P, R> Agentican<P, R> produce(InjectionPoint ip) {
 
-        var planName = ip.getQualifiers().stream()
-                .filter(AgenticanPlan.class::isInstance)
-                .map(AgenticanPlan.class::cast)
-                .map(AgenticanPlan::value)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "@AgenticanPlan qualifier missing on injection point: " + ip));
+        var planName = AgenticanPlanInjection.planName(ip);
+        var typeArgs = AgenticanPlanInjection.typeArgs(ip);
 
-        var typeArgs = resolveTypeArgs(ip);
         @SuppressWarnings("unchecked") Class<P> paramsType = (Class<P>) typeArgs[0];
         @SuppressWarnings("unchecked") Class<R> outputType = (Class<R>) typeArgs[1];
 
@@ -55,27 +41,5 @@ public class AgenticanPlanProducer {
         }
 
         return runtime.agentican(planName, paramsType, outputType);
-    }
-
-    private static Class<?>[] resolveTypeArgs(InjectionPoint ip) {
-
-        Type type = ip.getType();
-
-        if (type instanceof ParameterizedType pt && pt.getActualTypeArguments().length == 2) {
-
-            return new Class<?>[]{ asClass(pt.getActualTypeArguments()[0]),
-                                   asClass(pt.getActualTypeArguments()[1]) };
-        }
-
-        throw new IllegalStateException(
-                "@AgenticanPlan injection point must declare two type parameters, e.g. "
-                        + "Agentican<MyParams, MyOutput>. Use Void for either if not needed. Got: " + type);
-    }
-
-    private static Class<?> asClass(Type arg) {
-
-        if (arg instanceof Class<?> c) return c;
-        if (arg instanceof ParameterizedType pa && pa.getRawType() instanceof Class<?> c) return c;
-        throw new IllegalStateException("Unsupported type argument: " + arg);
     }
 }

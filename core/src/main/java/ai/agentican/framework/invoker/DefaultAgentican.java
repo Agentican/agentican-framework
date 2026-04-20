@@ -9,11 +9,6 @@ import ai.agentican.framework.orchestration.model.Plan;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
-/**
- * Single implementation of {@link Agentican} — the plan is obtained via
- * {@link #planSource}, which can either return a captured {@link Plan} reference
- * or resolve from the registry by name each call.
- */
 record DefaultAgentican<P, R>(
         AgenticanRuntime runtime,
         Supplier<Plan> planSource,
@@ -69,6 +64,7 @@ record DefaultAgentican<P, R>(
         if (outputType == String.class) return null;   // free-text expected
 
         var schema = SchemaGenerator.schemaFor(outputType);
+
         if (schema == null) return null;
 
         return new OutputBinding(stepName, new StructuredOutput(outputType.getSimpleName(), schema));

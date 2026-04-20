@@ -17,8 +17,8 @@ final class SchemaGenerator {
 
     static {
 
-        var configBuilder = new SchemaGeneratorConfigBuilder(
-                SchemaVersion.DRAFT_2020_12, OptionPreset.PLAIN_JSON);
+        var configBuilder = new SchemaGeneratorConfigBuilder(SchemaVersion.DRAFT_2020_12, OptionPreset.PLAIN_JSON);
+
         configBuilder.with(new JacksonModule());
 
         GENERATOR = new com.github.victools.jsonschema.generator.SchemaGenerator(configBuilder.build());
@@ -27,6 +27,7 @@ final class SchemaGenerator {
     static JsonNode schemaFor(Class<?> type) {
 
         if (type == null || type == Void.class) return null;
+
         return CACHE.computeIfAbsent(type, GENERATOR::generateSchema);
     }
 

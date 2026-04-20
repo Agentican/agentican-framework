@@ -14,6 +14,7 @@ import ai.agentican.framework.store.TaskStateStoreMemory;
 import ai.agentican.framework.store.TaskStateStore;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.Produces;
 
 @ApplicationScoped
@@ -22,7 +23,14 @@ public class AgenticanBeansProducer {
     @Produces
     @ApplicationScoped
     @DefaultBean
-    public HitlManager defaultHitlManager() {
+    public HitlManager defaultHitlManager(Instance<HitlNotifier> syncNotifier,
+                                          Instance<ReactiveHitlNotifier> reactiveNotifier) {
+
+        if (syncNotifier.isResolvable())
+            return new HitlManager(syncNotifier.get());
+
+        if (reactiveNotifier.isResolvable())
+            return new HitlManager(ReactiveHitlNotifier.toSync(reactiveNotifier.get()));
 
         return new HitlManager(HitlNotifier.logging());
     }

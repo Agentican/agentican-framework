@@ -8,6 +8,7 @@ public class OutputParseException extends RuntimeException {
     public OutputParseException(String rawOutput, Class<?> targetType, Throwable cause) {
 
         super(buildMessage(rawOutput, targetType, cause), cause);
+
         this.rawOutput = rawOutput;
         this.targetType = targetType;
     }

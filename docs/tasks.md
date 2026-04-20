@@ -313,6 +313,8 @@ Under Quarkus, inject the typed invoker directly:
 Agentican<TriageParams, TriageOutput> triage;
 ```
 
+For reactive composition (returns `Uni<R>` instead of blocking), inject `ReactiveAgentican<P, R>` with the same qualifier — see [CDI Integration — typed reactive invoker](quarkus/cdi.md#typed-reactive-invoker--reactiveagenticanp-r).
+
 ## Placeholder Resolution
 
 Step instructions and code-step inputs support these placeholder types:

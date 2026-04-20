@@ -40,7 +40,6 @@ public interface Agentican<P, R> {
         return awaitTaskResult(null);
     }
 
-    /** Captures a {@link Plan} reference. Eagerly validates the plan has a resolvable output step. */
     static <P, R> Agentican<P, R> forPlan(AgenticanRuntime runtime, Plan plan,
                                           Class<P> paramsType, Class<R> outputType) {
 
@@ -49,15 +48,16 @@ public interface Agentican<P, R> {
         return new DefaultAgentican<>(runtime, () -> plan, paramsType, outputType);
     }
 
-    /** Resolves the plan from the registry by name on each invocation. */
     static <P, R> Agentican<P, R> byName(AgenticanRuntime runtime, String planName,
                                          Class<P> paramsType, Class<R> outputType) {
 
         return new DefaultAgentican<>(runtime, () -> {
 
             var plan = runtime.registry().plans().get(planName);
+
             if (plan == null)
                 throw new IllegalStateException("No plan named '" + planName + "' in the registry");
+
             return plan;
 
         }, paramsType, outputType);
