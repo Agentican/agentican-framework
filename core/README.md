@@ -21,7 +21,7 @@ Requires Java 25.
 ## Quickstart
 
 ```java
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
         .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
         .build()) {
     var task = agentican.run("Research the top 5 CDC tools and compare them");
@@ -36,7 +36,10 @@ No agents, skills, or plans registered — the built-in `PlannerAgent` creates t
 Everything is under `ai.agentican.framework.*`.
 
 **Entry point**
-- `Agentican` — orchestrator, `AutoCloseable`; fluent builder for decorators, listeners, registries, and state stores.
+- `AgenticanRuntime` — orchestrator, `AutoCloseable`; fluent builder for decorators, listeners, registries, and state stores.
+- `invoker.Agentican<P, R>` — typed invoker bound to a plan: turns typed params (`P`) into a `TaskHandle` with a typed result (`R`). Structured output on the plan's designated step is enforced via native provider JSON-schema modes.
+- `invoker.AgenticanRegistry` — read-only view over `plans()`, `agents()`, `toolkits()`, `skills()`.
+- `AgenticanRecovery` — crash-recovery helper: `resumeInterrupted()` / `reapOrphans()` pick up tasks left in flight after a restart.
 
 **Orchestration model** (`orchestration`)
 - `Plan`, `PlanStep`, `PlanStepAgent`, `PlanStepBranch`, `PlanStepLoop`, `PlanStepCode<I>` — the declarative workflow AST.
@@ -48,11 +51,12 @@ Everything is under `ai.agentican.framework.*`.
 
 **Agents & skills** (`agent`, `skill`)
 - `Agent`, `AgentRunner`, `SmacAgentRunner` — agent abstraction and the production tool-calling loop.
-- `AgentRegistry`, `SkillRegistry` — pluggable in-memory implementations included; swap for persistent registries via the builder.
+- `registry.AgentRegistry`, `registry.SkillRegistry`, `registry.PlanRegistry` — pluggable in-memory implementations included; swap for persistent registries via the builder.
 
 **LLM clients** (`llm`)
 - `LlmClient` — single SPI; one `send(LlmRequest)` call per provider.
-- `AnthropicLlmClient`, `OpenAiLlmClient` (Responses API; powers `openai` and `groq`), `GeminiLlmClient`, `BedrockLlmClient` (Converse API; Claude / Llama / Nova / Mistral / Cohere / DeepSeek / AI21), `OpenAiCompatibleLlmClient` (Chat Completions; powers `sambanova`, `together`, `fireworks`, and the `openai-compatible` escape hatch for Ollama / vLLM / LiteLLM / corporate proxies).
+- Providers under `llm.provider`: `AnthropicLlmClient`, `OpenAiLlmClient` (Responses API; powers `openai` and `groq`), `GeminiLlmClient`, `BedrockLlmClient` (Converse API; Claude / Llama / Nova / Mistral / Cohere / DeepSeek / AI21), `OpenAiCompatibleLlmClient` (Chat Completions; powers `sambanova`, `together`, `fireworks`, and the `openai-compatible` escape hatch for Ollama / vLLM / LiteLLM / corporate proxies).
+- Native structured output on every provider: Anthropic `output_config.format`, OpenAI `response_format: json_schema`, Gemini `responseJsonSchema`, OpenAI-compatible `response_format` passthrough.
 - `RetryingLlmClient`, `LlmClientDecorator` — decorator chain for retries, caching, metering.
 
 **Tools** (`tools`)
@@ -64,11 +68,11 @@ Everything is under `ai.agentican.framework.*`.
 **HITL** (`hitl`)
 - `HitlManager`, `HitlNotifier` — checkpoint-based tool approval, step approval, and free-form questions with durable resume.
 
-**Knowledge** (`knowledge`)
-- `KnowledgeStore`, `MemKnowledgeStore`, `KnowledgeIngestor`, `LlmKnowledgeExtractor` — persistent agent facts + `RECALL_KNOWLEDGE` tool.
+**Knowledge** (`knowledge`, `store`)
+- `store.KnowledgeStore`, `store.KnowledgeStoreMemory`, `knowledge.KnowledgeIngestor`, `knowledge.LlmKnowledgeExtractor` — persistent agent facts + `RECALL_KNOWLEDGE` tool.
 
-**State** (`state`)
-- `TaskStateStore`, `MemTaskStateStore`, `NotifyingTaskStateStore` — the durable record of every task → step → run → turn → tool call.
+**State** (`store`, `orchestration.execution`)
+- `store.TaskStateStore`, `store.TaskStateStoreMemory`, `orchestration.execution.TaskStateStoreNotifying` — the durable record of every task → step → run → turn → tool call.
 
 **Config** (`config`) — plain records, all builder-based:
 - `RuntimeConfig` · `LlmConfig` · `AgentConfig` · `SkillConfig` · `PlanConfig` · `McpConfig` · `ComposioConfig` · `WorkerConfig`
@@ -76,12 +80,12 @@ Everything is under `ai.agentican.framework.*`.
 ## Runtime characteristics
 
 - **Virtual threads** — task execution defaults to `Executors.newVirtualThreadPerTaskExecutor()`. Parks during HITL without tying up platform threads.
-- **Resumable** — `new AgenticanService(agentican).resumeInterrupted()` / `.reapOrphans()` pick up tasks left in flight after a restart at turn-boundary granularity (pair with a persistent `TaskStateStore`). The Quarkus runtime exposes `AgenticanService` as a CDI bean and runs it on `StartupEvent`.
+- **Resumable** — `new AgenticanRecovery(runtime).resumeInterrupted()` / `.reapOrphans()` pick up tasks left in flight after a restart at turn-boundary granularity (pair with a persistent `TaskStateStore`). The Quarkus runtime exposes `AgenticanRecovery` as a CDI bean and runs it on `StartupEvent`.
 - **Observable** — plug in `TaskListener`s and `TaskDecorator`s via the builder; the Quarkus metrics / OTel modules are built on exactly these hooks.
 
 ## When to reach for a peer module instead
 
-If your app already runs on Quarkus, use [`agentican-quarkus-runtime`](../quarkus-runtime/) — it injects `Agentican` as a CDI bean, reads `RuntimeConfig` from `application.properties`, and unlocks the REST / metrics / tracing / JPA / scheduler modules. This core module is the engine underneath; you don't need to depend on it directly when using the Quarkus stack.
+If your app already runs on Quarkus, use [`agentican-quarkus-runtime`](../quarkus-runtime/) — it injects `AgenticanRuntime` as a CDI bean, reads `RuntimeConfig` from `application.properties`, and unlocks the REST / metrics / tracing / JPA / scheduler modules. This core module is the engine underneath; you don't need to depend on it directly when using the Quarkus stack.
 
 ## Documentation
 

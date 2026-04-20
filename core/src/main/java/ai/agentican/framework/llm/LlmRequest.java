@@ -12,7 +12,16 @@ public record LlmRequest(
         int iteration,
         String llmName,
         String provider,
-        String model) {
+        String model,
+        StructuredOutput structuredOutput) {
+
+    public LlmRequest(
+            String systemPrompt, String userTask, String userMessage,
+            List<ToolDefinition> tools, int iteration,
+            String llmName, String provider, String model) {
+
+        this(systemPrompt, userTask, userMessage, tools, iteration, llmName, provider, model, null);
+    }
 
     public LlmRequest {
 

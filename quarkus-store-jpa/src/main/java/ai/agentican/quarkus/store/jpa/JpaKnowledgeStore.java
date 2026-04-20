@@ -3,7 +3,7 @@ package ai.agentican.quarkus.store.jpa;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
 import ai.agentican.framework.knowledge.KnowledgeFact;
 import ai.agentican.framework.knowledge.KnowledgeStatus;
-import ai.agentican.framework.knowledge.KnowledgeStore;
+import ai.agentican.framework.store.KnowledgeStore;
 import ai.agentican.framework.util.Json;
 import ai.agentican.quarkus.store.jpa.entity.KnowledgeEntryEntity;
 import ai.agentican.quarkus.store.jpa.entity.KnowledgeFactEntity;

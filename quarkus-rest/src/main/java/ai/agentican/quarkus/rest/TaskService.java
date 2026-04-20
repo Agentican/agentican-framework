@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.rest;
 
-import ai.agentican.framework.Agentican;
+import ai.agentican.framework.AgenticanRuntime;
 import ai.agentican.framework.orchestration.execution.TaskHandle;
 import ai.agentican.framework.orchestration.model.Plan;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentMap;
 public class TaskService {
 
     @Inject
-    Agentican agentican;
+    AgenticanRuntime agentican;
 
     private final ConcurrentMap<String, TaskHandle> handles = new ConcurrentHashMap<>();
 

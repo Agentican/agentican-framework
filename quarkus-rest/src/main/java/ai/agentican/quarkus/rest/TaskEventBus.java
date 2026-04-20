@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.rest;
 
 import ai.agentican.framework.hitl.HitlCheckpoint;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
 import ai.agentican.quarkus.event.*;
 import ai.agentican.quarkus.rest.sse.EventTimeline;
 import ai.agentican.quarkus.rest.sse.SequencedEvent;

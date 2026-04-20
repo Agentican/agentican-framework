@@ -1,23 +1,24 @@
 package ai.agentican.framework.agent;
 
-import ai.agentican.framework.TaskListener;
+import ai.agentican.framework.orchestration.execution.TaskListener;
 import ai.agentican.framework.config.SkillConfig;
-import ai.agentican.framework.hitl.AskQuestionToolkit;
+import ai.agentican.framework.tools.hitl.AskQuestionToolkit;
 import ai.agentican.framework.hitl.HitlManager;
-import ai.agentican.framework.skill.InMemorySkillRegistry;
-import ai.agentican.framework.skill.SkillRegistry;
+import ai.agentican.framework.registry.SkillRegistryMemory;
+import ai.agentican.framework.registry.SkillRegistry;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
-import ai.agentican.framework.knowledge.KnowledgeStore;
-import ai.agentican.framework.knowledge.KnowledgeToolkit;
+import ai.agentican.framework.store.KnowledgeStore;
+import ai.agentican.framework.tools.knowledge.KnowledgeToolkit;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmRequest;
 import ai.agentican.framework.llm.StopReason;
+import ai.agentican.framework.llm.StructuredOutput;
 import ai.agentican.framework.llm.ToolCall;
 import ai.agentican.framework.orchestration.execution.resume.ResumePlan;
 import ai.agentican.framework.orchestration.execution.resume.TurnResumeState;
-import ai.agentican.framework.state.MemTaskStateStore;
+import ai.agentican.framework.store.TaskStateStoreMemory;
 import ai.agentican.framework.state.RunLog;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
 import ai.agentican.framework.orchestration.execution.TaskRunner;
 import ai.agentican.framework.tools.ToolResult;
 import ai.agentican.framework.tools.Toolkit;
@@ -72,40 +73,40 @@ public class SmacAgentRunner implements AgentRunner {
         this.taskListener = taskListener != null ? taskListener : NO_OP_LISTENER;
         this.hitlManager = hitlManager;
         this.knowledgeStore = knowledgeStore;
-        this.skillRegistry = skillRegistry != null ? skillRegistry : new InMemorySkillRegistry();
+        this.skillRegistry = skillRegistry != null ? skillRegistry : new SkillRegistryMemory();
 
         this.timeout = timeout;
         this.maxTurns = maxTurns;
     }
 
     @Override
-    public AgentResult run(Agent agent, String task, List<String> activeSkills, Map<String, Toolkit> toolkits,
-                           String taskId, String stepId, String stepName, Duration timeoutOverride) {
+    public AgentResult run(Agent agent, String task, String taskId, String stepId, String stepName, Duration timeout,
+                           List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema) {
 
         var taskCancelled = new AtomicBoolean(false);
 
-        return execute(agent, task, activeSkills, toolkits, taskId, stepId, stepName, taskCancelled, timeoutOverride);
+        return execute(agent, task, taskId, stepId, stepName, taskCancelled, timeout, skills, toolkits, outputSchema);
     }
 
     @Override
-    public AgentResult resume(Agent agent, String task, List<String> activeSkills, RunLog savedRun,
-                              List<ToolResult> hitlToolResults, Map<String, Toolkit> toolkits, String taskId,
-                              String stepId, String stepName, Duration timeoutOverride) {
+    public AgentResult resume(Agent agent, String task, String taskId, String stepId, String stepName, Duration timeout,
+                              List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema,
+                              RunLog savedRun, List<ToolResult> hitlToolResults) {
 
         var taskCancelled = new AtomicBoolean(false);
 
-        return resumeExecution(agent, task, activeSkills, savedRun, hitlToolResults, toolkits, taskId, stepId, stepName,
-                taskCancelled, timeoutOverride);
+        return resumeExecution(agent, task, taskId, stepId, stepName, taskCancelled, timeout, skills, toolkits,
+                savedRun, hitlToolResults, outputSchema);
     }
 
-    private AgentResult execute(Agent agent, String task, List<String> activeSkills, Map<String, Toolkit> toolkits,
-                                String taskId, String stepId, String stepName, AtomicBoolean cancelled,
-                                Duration timeoutOverride) {
+    private AgentResult execute(Agent agent, String task, String taskId, String stepId, String stepName,
+                                AtomicBoolean cancelled, Duration timeout, List<String> skills,
+                                Map<String, Toolkit> toolkits, StructuredOutput outputSchema) {
 
-        LOG.info(Logs.AGENT_RUNNING_STEP, agent.name(), activeSkills.size(), toolkits.size());
+        LOG.info(Logs.AGENT_RUNNING_STEP, agent.name(), skills.size(), toolkits.size());
         LOG.debug(Logs.AGENT_RUNNING_STEP_FULL, task);
 
-        var ctx = buildContext(agent, activeSkills, toolkits);
+        var ctx = buildContext(agent, skills, toolkits, outputSchema);
 
         ensureTaskLog(taskId, stepId, stepName);
 
@@ -115,24 +116,23 @@ public class SmacAgentRunner implements AgentRunner {
         taskStateStore.runStarted(taskId, stepId, runId, agentName);
 
         var agentResult = loop(task, Instant.now(), List.of(), ctx, cancelled, taskId, stepId, stepName, runId, 0,
-                timeoutOverride);
+                timeout, outputSchema);
 
         taskStateStore.runCompleted(taskId, runId);
 
         return agentResult;
     }
 
-    public AgentResult resumeAfterCrash(Agent agent, String task, List<String> activeSkills,
-                                        RunLog savedRun, ResumePlan resumePlan,
-                                        Map<String, Toolkit> toolkits,
-                                        String taskId, String stepId, String stepName,
-                                        AtomicBoolean cancelled) {
+    @Override
+    public AgentResult resumeAfterCrash(Agent agent, String task, String taskId, String stepId, String stepName,
+                                        List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema,
+                                        RunLog savedRun, AtomicBoolean cancelled, ResumePlan resumePlan) {
 
         LOG.info("Resuming agent step after crash: agent={}, savedTurns={}, turnState={}",
                 agent.name(), savedRun != null ? savedRun.turns().size() : 0,
                 resumePlan != null ? resumePlan.turnState() : "<no plan>");
 
-        var ctx = buildContext(agent, activeSkills, toolkits);
+        var ctx = buildContext(agent, skills, toolkits, outputSchema);
 
         ensureTaskLog(taskId, stepId, stepName);
 
@@ -186,21 +186,21 @@ public class SmacAgentRunner implements AgentRunner {
         taskStateStore.runStarted(taskId, stepId, runId, agent.name());
 
         var agentResult = loop(task, Instant.now(), List.of(), ctx, cancelled, taskId, stepId, stepName, runId, 0,
-                null);
+                null, outputSchema);
 
         taskStateStore.runCompleted(taskId, runId);
 
         return agentResult;
     }
 
-    private AgentResult resumeExecution(Agent agent, String task, List<String> activeSkills, RunLog savedRun,
-                                        List<ToolResult> approvalToolResults, Map<String, Toolkit> toolkits,
-                                        String taskId, String stepId, String stepName, AtomicBoolean cancelled,
-                                        Duration timeoutOverride) {
+    private AgentResult resumeExecution(Agent agent, String task, String taskId, String stepId, String stepName,
+                                        AtomicBoolean cancelled, Duration timeout, List<String> skills,
+                                        Map<String, Toolkit> toolkits, RunLog savedRun,
+                                        List<ToolResult> approvalToolResults, StructuredOutput outputSchema) {
 
         LOG.info("Resuming agent step: agent={}, savedTurns={}", agent.name(), savedRun.turns().size());
 
-        var ctx = buildContext(agent, activeSkills, toolkits);
+        var ctx = buildContext(agent, skills, toolkits, outputSchema);
 
         ensureTaskLog(taskId, stepId, stepName);
 
@@ -267,7 +267,7 @@ public class SmacAgentRunner implements AgentRunner {
         taskStateStore.runStarted(taskId, stepId, runId, agent.name());
 
         var agentResult = loop(task, Instant.now(), toolResults, ctx, cancelled, taskId, stepId, stepName, runId,
-                savedRun.turns().size(), timeoutOverride);
+                savedRun.turns().size(), timeout, outputSchema);
 
         taskStateStore.runCompleted(taskId, runId);
 
@@ -276,7 +276,7 @@ public class SmacAgentRunner implements AgentRunner {
 
     private AgentResult loop(String task, Instant startTime, List<ToolResult> toolResults, SmacAgentContext ctx,
                              AtomicBoolean cancelled, String taskId, String stepId, String stepName, String runId,
-                             int turnIndex, Duration timeoutOverride) {
+                             int turnIndex, Duration timeoutOverride, StructuredOutput outputSchema) {
 
         var effectiveTimeout = timeoutOverride != null ? timeoutOverride : timeout;
         var deadline = effectiveTimeout != null ? startTime.plus(effectiveTimeout) : null;
@@ -308,7 +308,7 @@ public class SmacAgentRunner implements AgentRunner {
                     progress, ctx.knowledgeIndex(), recalledKnowledge);
 
             var llmRequest = new LlmRequest(ctx.systemPrompt(), userTask, userMessage, ctx.toolDefs(), turnIndex,
-                    llmName, llmProvider, llmModel);
+                    llmName, llmProvider, llmModel, outputSchema);
 
             LOG.info(Logs.AGENT_SEND_LLM, turnIndex);
 
@@ -517,6 +517,12 @@ public class SmacAgentRunner implements AgentRunner {
 
     private SmacAgentContext buildContext(Agent agent, List<String> activeSkills, Map<String, Toolkit> toolkits) {
 
+        return buildContext(agent, activeSkills, toolkits, null);
+    }
+
+    private SmacAgentContext buildContext(Agent agent, List<String> activeSkills, Map<String, Toolkit> toolkits,
+                                          StructuredOutput structuredOutput) {
+
         var activeSkillConfigs = new ArrayList<SkillConfig>();
 
         for (var skillId : activeSkills) {
@@ -534,7 +540,8 @@ public class SmacAgentRunner implements AgentRunner {
         var agentName = agent.name();
         var agentRole = agent.role();
 
-        var systemPrompt = TEMPLATES.renderSystemPrompt(agentName, agentRole, activeSkillConfigs);
+        var systemPrompt = TEMPLATES.renderSystemPrompt(agentName, agentRole, activeSkillConfigs,
+                structuredOutput != null);
 
         var taskToolkits = new LinkedHashMap<>(toolkits);
 
@@ -703,7 +710,7 @@ public class SmacAgentRunner implements AgentRunner {
 
             if (llm == null) throw new IllegalStateException("llmClient is required");
 
-            var finalTaskStateStore = taskStateStore != null ? taskStateStore : new MemTaskStateStore();
+            var finalTaskStateStore = taskStateStore != null ? taskStateStore : new TaskStateStoreMemory();
 
             return new SmacAgentRunner(llm, llmName, llmProvider, llmModel, hitlManager, knowledgeStore,
                     finalTaskStateStore, skillRegistry, maxTurns, timeout, stepListener);

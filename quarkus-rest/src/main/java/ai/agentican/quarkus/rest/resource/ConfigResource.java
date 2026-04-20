@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.rest.resource;
 
-import ai.agentican.framework.Agentican;
+import ai.agentican.framework.AgenticanRuntime;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -15,7 +15,7 @@ import java.util.List;
 public class ConfigResource {
 
     @Inject
-    Agentican agentican;
+    AgenticanRuntime agentican;
 
     @Inject
     org.eclipse.microprofile.config.Config mpConfig;

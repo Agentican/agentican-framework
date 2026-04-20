@@ -1,6 +1,6 @@
 package ai.agentican.framework.tools.composio;
 
-import ai.agentican.framework.tools.HitlType;
+import ai.agentican.framework.hitl.HitlType;
 import ai.agentican.framework.tools.Tool;
 
 import java.util.List;

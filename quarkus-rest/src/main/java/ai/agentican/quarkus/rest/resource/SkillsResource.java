@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.rest.resource;
 
-import ai.agentican.framework.Agentican;
+import ai.agentican.framework.AgenticanRuntime;
 import ai.agentican.quarkus.rest.dto.SkillSummary;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -17,7 +17,7 @@ import java.util.List;
 public class SkillsResource {
 
     @Inject
-    Agentican agentican;
+    AgenticanRuntime agentican;
 
     @GET
     public List<SkillSummary> list() {

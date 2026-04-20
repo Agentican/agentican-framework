@@ -1,7 +1,6 @@
 package ai.agentican.quarkus.rest;
 
 import ai.agentican.framework.hitl.HitlCheckpoint;
-import ai.agentican.framework.hitl.HitlCheckpointType;
 import ai.agentican.framework.state.TaskLog;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
@@ -59,7 +58,7 @@ class TaskEventBusTest {
     void hitlCheckpointEventTracksPendingByTask() {
 
         var checkpoint = new HitlCheckpoint(
-                "ck-1", HitlCheckpointType.STEP_OUTPUT, "step-a", "Approve?", "...");
+                "ck-1", HitlCheckpoint.Type.STEP_OUTPUT, "step-a", "Approve?", "...");
 
         bus.onHitlCheckpoint(new HitlCheckpointEvent("t1", "step-id-a", "step-a", checkpoint));
 
@@ -72,7 +71,7 @@ class TaskEventBusTest {
     void clearCheckpointRemovesFromPending() {
 
         var checkpoint = new HitlCheckpoint(
-                "ck-1", HitlCheckpointType.QUESTION, "step-a", "Q?", "...");
+                "ck-1", HitlCheckpoint.Type.QUESTION, "step-a", "Q?", "...");
 
         bus.onHitlCheckpoint(new HitlCheckpointEvent("t1", "step-id-a", "step-a", checkpoint));
         assertEquals(1, bus.pendingFor("t1").size());
@@ -90,7 +89,7 @@ class TaskEventBusTest {
         bus.stream("t1").subscribe().with(collected::add, t -> {}, () -> completed[0] = true);
 
         bus.onHitlCheckpoint(new HitlCheckpointEvent("t1", "sid", "s",
-                new HitlCheckpoint("ck-1", HitlCheckpointType.STEP_OUTPUT, "s", "d", "c")));
+                new HitlCheckpoint("ck-1", HitlCheckpoint.Type.STEP_OUTPUT, "s", "d", "c")));
 
         bus.onTaskCompleted(new TaskCompletedEvent("t1", "demo", TaskStatus.COMPLETED,
                 new TaskLog("t1", "demo", task("demo"), Map.of())));
@@ -103,9 +102,9 @@ class TaskEventBusTest {
     void allPendingReturnsAllTasksWithCheckpoints() {
 
         bus.onHitlCheckpoint(new HitlCheckpointEvent("t1", "sid", "s",
-                new HitlCheckpoint("ck-1", HitlCheckpointType.STEP_OUTPUT, "s", "d", "c")));
+                new HitlCheckpoint("ck-1", HitlCheckpoint.Type.STEP_OUTPUT, "s", "d", "c")));
         bus.onHitlCheckpoint(new HitlCheckpointEvent("t2", "sid", "s",
-                new HitlCheckpoint("ck-2", HitlCheckpointType.STEP_OUTPUT, "s", "d", "c")));
+                new HitlCheckpoint("ck-2", HitlCheckpoint.Type.STEP_OUTPUT, "s", "d", "c")));
 
         var all = bus.allPending();
 

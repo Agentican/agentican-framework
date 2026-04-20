@@ -5,13 +5,13 @@
  * Tools: None required (Planner creates agents and skills from scratch)
  * Features: PlannerAgent, agent/skill synthesis
  *
- * The simplest possible Agentican usage. No agents, skills, plans or tools registered.
+ * The simplest possible AgenticanRuntime usage. No agents, skills, plans or tools registered.
  * The built-in Planner reads the task description, invents the agents and skills it needs,
  * builds a plan, and executes it.
  */
 package ai.agentican.framework.examples;
 
-import ai.agentican.framework.Agentican;
+import ai.agentican.framework.AgenticanRuntime;
 import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.config.RuntimeConfig;
 
@@ -19,7 +19,7 @@ public class QuickTask {
 
     public static void main(String[] args) {
 
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
                 .llm(LlmConfig.builder()
                         .apiKey(System.getenv("ANTHROPIC_API_KEY"))
                         .build())

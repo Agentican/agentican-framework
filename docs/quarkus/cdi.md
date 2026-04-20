@@ -1,12 +1,12 @@
 # CDI Integration
 
-## `@Inject Agentican`
+## `@Inject AgenticanRuntime`
 
 The core module produces a singleton `Agentican` bean via `AgenticanProducer`. It's built
 from your `agentican.*` config at startup and disposed on shutdown.
 
 ```java
-@Inject Agentican agentican;
+@Inject AgenticanRuntime agentican;
 
 var handle = agentican.run("Find papers on agents");
 var taskId = handle.taskId();      // available immediately
@@ -22,18 +22,54 @@ agentican.run(task).resultAsync()
     .thenAccept(result -> log.info("Done: {}", result.status()));
 ```
 
-## `@Inject AgenticanService`
+## `@Inject AgenticanRecovery`
 
-`AgenticanService` is the server-side recovery companion to `Agentican`. The Quarkus runtime produces it as a singleton bean from the injected `Agentican` and disposes it on shutdown:
+`AgenticanRecovery` is the server-side recovery companion to `Agentican`. The Quarkus runtime produces it as a singleton bean from the injected `Agentican` and disposes it on shutdown:
 
 ```java
-@Inject AgenticanService agenticanService;
+@Inject AgenticanRecovery agenticanService;
 
 agenticanService.resumeInterrupted();   // pick up tasks left in-flight after restart
 agenticanService.reapOrphans();         // mark unrecoverable tasks FAILED
 ```
 
 You don't usually need to call these yourself — `ResumeOnStartObserver` runs `resumeInterrupted` automatically on `StartupEvent`. Toggle that behavior with `agentican.resume-on-start=false` and tune fan-out with `agentican.resume-max-concurrent`.
+
+## `@AgenticanPlan` qualifier — typed `Agentican<P, R>`
+
+Inject a typed, reusable caller bound to a specific plan. Two type parameters: input record `P` and output record `R` (`Void` for either if not needed).
+
+```java
+record TriageParams(String customerId, String priority) {}
+record TriageOutput(String classification, String reason) {}
+
+@Inject @AgenticanPlan("triage")
+Agentican<TriageParams, TriageOutput> triage;
+
+TriageOutput out = triage.runAndAwait(new TriageParams("cust-42", "HIGH"));
+```
+
+- The qualifier value is the plan **name** (not `externalId`). Any plan in `AgenticanRuntime.registry().plans()` qualifies — YAML, fluent builder, JPA catalog, programmatic registration, or planner output (if it has a known name).
+- The plan is resolved from the registry on each invocation, so plans added or updated at runtime are honored.
+- `P` is the typed params record. Jackson's `SNAKE_CASE` strategy maps `customerId` → `customer_id`. Use `Void` for parameterless plans; use `Map<String, Object>` as a dynamic-map escape hatch.
+- `R` is the typed output. The framework reads the plan's output step (declared via `Plan.builder(...).outputStep(name)` or implicit when the plan has one step) and Jackson-parses the text into `R`. Use `Void` to skip output parsing.
+- If the plan isn't in the registry at boot, the producer logs a WARN and defers resolution to the first `run()` — at which point a missing plan throws `IllegalStateException`.
+
+Failure modes from `runAndAwait`:
+- Task didn't complete → `TaskFailedException` (carries the failed `TaskResult`).
+- Output isn't valid JSON for `R` → `OutputParseException` (carries the raw output + target class).
+
+For dynamic plan lookups, construct in code instead of injecting:
+
+```java
+@Inject AgenticanRuntime runtime;
+
+// Typed output
+var invoker = runtime.agentican("some-runtime-plan", MyParams.class, MyOutput.class);
+
+// Untyped output (current behavior)
+var invoker = runtime.agentican("some-runtime-plan", MyParams.class);
+```
 
 ## `@AgenticanAgent` qualifier
 
@@ -50,13 +86,13 @@ log.info("Agent: {} — {}", researcher.name(), researcher.role());
 
 The agent must be declared in `agentican.agents[*]` configuration.
 
-## ReactiveAgentican
+## ReactiveAgenticanRuntime
 
 Mutiny-native wrapper for reactive Quarkus applications. Returns `Uni<T>` for natural
 composition with Vert.x, RESTEasy Reactive, and reactive pipelines.
 
 ```java
-@Inject ReactiveAgentican agentican;
+@Inject ReactiveAgenticanRuntime agentican;
 
 // Non-blocking: returns Uni<TaskHandle> immediately
 public Uni<Response> submit(String description) {
@@ -124,7 +160,7 @@ Events fire exactly once per lifecycle callback.
 ## Bean overrides
 
 `AgenticanProducer` injects every framework collaborator and passes it to the
-`Agentican.builder()`. `AgenticanBeansProducer` supplies in-memory `@DefaultBean`
+`AgenticanRuntime.builder()`. `AgenticanBeansProducer` supplies in-memory `@DefaultBean`
 fallbacks for all of them, so an app with only `agentican-quarkus-runtime` on
 the classpath still works.
 
@@ -146,11 +182,11 @@ public HitlManager myHitlManager() {
 | Bean | `@DefaultBean` | Superseded by |
 |---|---|---|
 | `HitlManager` | Logging notifier | your `@Produces HitlManager` |
-| `KnowledgeStore` | `MemKnowledgeStore` | `JpaKnowledgeStore` (store-jpa) or your own |
-| `TaskStateStore` | `MemTaskStateStore` | `JpaTaskStateStore` (store-jpa) or your own |
-| `AgentRegistry` | `InMemoryAgentRegistry` | `JpaAgentRegistry` (store-jpa) or your own |
-| `SkillRegistry` | `InMemorySkillRegistry` | `JpaSkillRegistry` (store-jpa) or your own |
-| `PlanRegistry` | `InMemoryPlanRegistry` | `JpaPlanRegistry` (store-jpa) or your own |
+| `KnowledgeStore` | `KnowledgeStoreMemory` | `JpaKnowledgeStore` (store-jpa) or your own |
+| `TaskStateStore` | `TaskStateStoreMemory` | `JpaTaskStateStore` (store-jpa) or your own |
+| `AgentRegistry` | `AgentRegistryMemory` | `JpaAgentRegistry` (store-jpa) or your own |
+| `SkillRegistry` | `SkillRegistryMemory` | `JpaSkillRegistry` (store-jpa) or your own |
+| `PlanRegistry` | `PlanRegistryMemory` | `JpaPlanRegistry` (store-jpa) or your own |
 
 The JPA beans in `agentican-quarkus-store-jpa` are gated with
 `@IfBuildProperty(name = "agentican.store.backend", stringValue = "jpa",

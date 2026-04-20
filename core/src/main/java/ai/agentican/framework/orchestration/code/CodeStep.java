@@ -3,7 +3,7 @@ package ai.agentican.framework.orchestration.code;
 /**
  * A deterministic step in a {@link ai.agentican.framework.orchestration.model.Plan}
  * that runs plain Java instead of going through an LLM. Registered with the
- * {@code Agentican} builder via {@link CodeStepSpec} and referenced from
+ * {@code AgenticanRuntime} builder via {@link CodeStepSpec} and referenced from
  * {@code PlanStepCode<I>}.
  *
  * <p>{@code I} is the typed input record (or {@code Void} / {@code Map} /

@@ -1,5 +1,7 @@
 package ai.agentican.framework.tools;
 
+import ai.agentican.framework.hitl.HitlType;
+
 import java.util.List;
 import java.util.Map;
 

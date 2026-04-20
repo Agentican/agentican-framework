@@ -1,6 +1,8 @@
 package ai.agentican.framework.knowledge;
 
-import ai.agentican.framework.tools.HitlType;
+import ai.agentican.framework.store.KnowledgeStoreMemory;
+import ai.agentican.framework.hitl.HitlType;
+import ai.agentican.framework.tools.knowledge.KnowledgeToolkit;
 import ai.agentican.framework.util.Json;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -29,7 +31,7 @@ class KnowledgeToolkitTest {
     @Test
     void recallSingleEntry() throws Exception {
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
         var entry = new KnowledgeEntry("entry-1", "Customer Data", "All about customers");
 
         entry.addFact(KnowledgeFact.of("Fact One", "Content one", List.of("tag1")));
@@ -62,7 +64,7 @@ class KnowledgeToolkitTest {
     @Test
     void recallMultipleEntries() throws Exception {
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
         var entry1 = new KnowledgeEntry("id-1", "Entry One", "d1");
         var entry2 = new KnowledgeEntry("id-2", "Entry Two", "d2");
@@ -82,7 +84,7 @@ class KnowledgeToolkitTest {
     @Test
     void recallMissingEntryIgnored() throws Exception {
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
         var toolkit = new KnowledgeToolkit(store);
 
         var result = toolkit.execute(KnowledgeToolkit.TOOL_NAME, Map.of("entry_ids", List.of("does-not-exist")));
@@ -96,7 +98,7 @@ class KnowledgeToolkitTest {
     @Test
     void hitlTypeIsNone() {
 
-        var toolkit = new KnowledgeToolkit(new MemKnowledgeStore());
+        var toolkit = new KnowledgeToolkit(new KnowledgeStoreMemory());
 
         assertEquals(HitlType.NONE, toolkit.hitlType(KnowledgeToolkit.TOOL_NAME));
     }
@@ -104,7 +106,7 @@ class KnowledgeToolkitTest {
     @Test
     void handlesOnlyRecallTool() {
 
-        var toolkit = new KnowledgeToolkit(new MemKnowledgeStore());
+        var toolkit = new KnowledgeToolkit(new KnowledgeStoreMemory());
 
         assertTrue(toolkit.handles(KnowledgeToolkit.TOOL_NAME));
         assertFalse(toolkit.handles("other"));

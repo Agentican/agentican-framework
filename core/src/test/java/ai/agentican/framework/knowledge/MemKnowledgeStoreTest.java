@@ -1,5 +1,6 @@
 package ai.agentican.framework.knowledge;
 
+import ai.agentican.framework.store.KnowledgeStoreMemory;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -9,7 +10,7 @@ class MemKnowledgeStoreTest {
     @Test
     void saveAndGet() {
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
         var entry = KnowledgeEntry.of("entry-1", "desc");
 
         store.save(entry);
@@ -20,7 +21,7 @@ class MemKnowledgeStoreTest {
     @Test
     void getMissingReturnsNull() {
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
         assertNull(store.get("nope"));
     }
@@ -28,7 +29,7 @@ class MemKnowledgeStoreTest {
     @Test
     void allReturnsAllEntries() {
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
         store.save(KnowledgeEntry.of("a", "desc-a"));
         store.save(KnowledgeEntry.of("b", "desc-b"));
@@ -40,7 +41,7 @@ class MemKnowledgeStoreTest {
     @Test
     void indexedReturnsOnlyIndexed() {
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
         var indexing = KnowledgeEntry.of("indexing", "desc");
 
@@ -63,7 +64,7 @@ class MemKnowledgeStoreTest {
     @Test
     void deleteRemovesEntry() {
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
         var entry = KnowledgeEntry.of("entry", "desc");
 
         store.save(entry);
@@ -76,7 +77,7 @@ class MemKnowledgeStoreTest {
     @Test
     void saveOverwritesExisting() {
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
         var entry = KnowledgeEntry.of("original", "desc");
 
         store.save(entry);

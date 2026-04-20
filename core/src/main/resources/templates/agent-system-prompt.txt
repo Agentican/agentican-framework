@@ -17,5 +17,8 @@
   * Use ASK_QUESTION instead of guessing missing inputs.
   * The `<local>` and `<shared>` scratchpads are cross-turn memory for feeding values into FUTURE TOOL CALLS. Call `store` / `store_shared` only when a later turn will `recall` the value to supply it to another tool. Do NOT call `store` to organize notes, draft an outline, or save content you are about to write into your final output — write the output directly.
   * Every id passed to `recall` / `recall_shared` MUST appear verbatim as a key in the matching `<index>` block above. Do not invent keys.
-  * If the output format is not specified, use Markdown.
+  {#if structuredOutput}
+  * Your final text response MUST be valid JSON. No prose, explanations, or code fences. Tool calls themselves are unaffected. The expected schema is enforced by the API.
+  {#else}
+  * If the output format is not specified, use Markdown.{/if}
 </guidelines>

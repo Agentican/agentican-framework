@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.metrics;
 
-import ai.agentican.framework.Agentican;
+import ai.agentican.framework.AgenticanRuntime;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
 import ai.agentican.quarkus.test.MockLlmClient;
@@ -18,7 +18,7 @@ import static org.hamcrest.Matchers.containsString;
 class MetricsIntegrationTest {
 
     @Inject
-    Agentican agentican;
+    AgenticanRuntime agentican;
 
     @Inject
     MockLlmClient mockLlm;

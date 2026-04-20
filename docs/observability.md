@@ -38,7 +38,7 @@ public interface TaskListener {
     default void onToolCallCompleted(String taskId, String toolCallId) {}
 
     // HITL
-    default void onHitlNotified(String taskId, String hitlId, HitlCheckpointType type) {}
+    default void onHitlNotified(String taskId, String hitlId, HitlCheckpoint.Type type) {}
     default void onHitlResponded(String taskId, String hitlId, boolean approved) {}
 
     // Streaming
@@ -105,7 +105,7 @@ onTaskCompleted(taskId, COMPLETED)
 
 ## How Events Are Emitted
 
-Events are a side effect of `TaskStateStore` mutations. The framework wraps your store with `NotifyingTaskStateStore`, a decorator that:
+Events are a side effect of `TaskStateStore` mutations. The framework wraps your store with `TaskStateStoreNotifying`, a decorator that:
 
 1. Delegates the mutation to the underlying store (state is persisted first)
 2. Fires the corresponding `TaskListener` event
@@ -113,7 +113,7 @@ Events are a side effect of `TaskStateStore` mutations. The framework wraps your
 ```
 TaskRunner calls → taskStateStore.stepStarted(taskId, stepId, stepName)
                        ↓
-              NotifyingTaskStateStore
+              TaskStateStoreNotifying
                   ├── delegate.stepStarted(...)   ← state persisted
                   └── listener.onStepStarted(taskId, stepId)  ← event fired
 ```
@@ -170,7 +170,7 @@ public class DetailedListener implements TaskListener {
 Register via the Agentican builder:
 
 ```java
-Agentican.builder()
+AgenticanRuntime.builder()
         .stepListener(myListener)
         .build();
 ```
@@ -207,7 +207,7 @@ Without `snapshot()`, steps dispatched to new threads would lose the parent trac
 Register via the builder:
 
 ```java
-Agentican.builder()
+AgenticanRuntime.builder()
         .taskDecorator(myDecorator)
         .build();
 ```

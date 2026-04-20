@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.store.jpa;
 
 import ai.agentican.framework.config.SkillConfig;
-import ai.agentican.framework.skill.SkillRegistry;
+import ai.agentican.framework.registry.SkillRegistry;
 import ai.agentican.framework.util.Ids;
 
 import io.quarkus.test.junit.QuarkusTest;

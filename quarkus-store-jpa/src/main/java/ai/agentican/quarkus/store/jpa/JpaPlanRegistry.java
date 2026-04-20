@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.store.jpa;
 
-import ai.agentican.framework.orchestration.PlanRegistry;
+import ai.agentican.framework.registry.PlanRegistry;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanCodec;
 import ai.agentican.framework.util.Json;
@@ -134,7 +134,7 @@ public class JpaPlanRegistry implements PlanRegistry {
 
                 Plan canonical = plan.id().equals(existing.id)
                         ? plan
-                        : new Plan(existing.id, plan.name(), plan.description(), plan.params(), plan.steps(), plan.externalId());
+                        : new Plan(existing.id, plan.name(), plan.description(), plan.params(), plan.steps(), plan.externalId(), plan.outputStep());
 
                 existing.name = canonical.name();
                 existing.description = canonical.description();

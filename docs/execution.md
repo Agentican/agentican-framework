@@ -103,12 +103,12 @@ new TurnLog(id, index, messageId, request,
             startedAt, completedAt);
 ```
 
-## MemTaskStateStore
+## TaskStateStoreMemory
 
 The default in-memory implementation. Stores `TaskLog` objects in a `ConcurrentHashMap` keyed by task ID. Uses ID-based lookup to navigate the hierarchy:
 
 ```java
-var store = new MemTaskStateStore();
+var store = new TaskStateStoreMemory();
 
 // After a task runs:
 var taskLog = store.load("a3cc1bf2");
@@ -189,16 +189,16 @@ var duration = Duration.between(stepLog.createdAt(), stepLog.completedAt());
 For durable storage, implement the full `TaskStateStore` interface against your database. The mutation methods are called synchronously on the executing thread — keep them fast. Heavy work (indexing, replication) should be done asynchronously.
 
 ```java
-Agentican.builder()
+AgenticanRuntime.builder()
         .taskStateStore(myDatabaseStore)
         .build();
 ```
 
-If no store is provided, Agentican creates a `MemTaskStateStore`.
+If no store is provided, Agentican creates a `TaskStateStoreMemory`.
 
 ## Event Emission
 
-The store itself does not emit events. `NotifyingTaskStateStore` is a decorator that wraps any `TaskStateStore` and fires `TaskListener` events after each mutation. Agentican applies this decorator automatically — you don't need to wrap your store manually.
+The store itself does not emit events. `TaskStateStoreNotifying` is a decorator that wraps any `TaskStateStore` and fires `TaskListener` events after each mutation. Agentican applies this decorator automatically — you don't need to wrap your store manually.
 
 See [Observability](observability.md) for the event system.
 

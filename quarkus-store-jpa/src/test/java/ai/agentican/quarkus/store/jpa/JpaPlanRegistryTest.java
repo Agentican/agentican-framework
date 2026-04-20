@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.store.jpa;
 
-import ai.agentican.framework.orchestration.PlanRegistry;
+import ai.agentican.framework.registry.PlanRegistry;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanParam;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;

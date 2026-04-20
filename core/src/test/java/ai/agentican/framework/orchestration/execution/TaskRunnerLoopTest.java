@@ -2,14 +2,14 @@ package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.MockLlmClient;
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.InMemoryAgentRegistry;
+import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.agent.SmacAgentRunner;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
-import ai.agentican.framework.state.MemTaskStateStore;
+import ai.agentican.framework.store.TaskStateStoreMemory;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.tools.ToolkitRegistry;
+import ai.agentican.framework.registry.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
 
 import static ai.agentican.framework.MockLlmClient.*;
@@ -44,11 +44,11 @@ class TaskRunnerLoopTest {
                 .onSend("Alice", endTurn("Processed Alice"))
                 .onSend("Bob", endTurn("Processed Bob"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new MemTaskStateStore(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("loop-task")
                 .step("produce", "producer-agent", "Produce a JSON array")
@@ -74,11 +74,11 @@ class TaskRunnerLoopTest {
         var producerLlm = new MockLlmClient()
                 .onSend("", endTurn("[]"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", new MockLlmClient()));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new MemTaskStateStore(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("empty-loop-task")
                 .step("produce", "producer-agent", "Produce an empty array")
@@ -105,11 +105,11 @@ class TaskRunnerLoopTest {
         var bodyLlm = new MockLlmClient()
                 .onSend("Process item 123", endTurn("Done with 123"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new MemTaskStateStore(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("placeholder-loop-task")
                 .step("produce", "producer-agent", "Produce items")
@@ -135,11 +135,11 @@ class TaskRunnerLoopTest {
                 .onSend("item 1", endTurn("Result for item 1"))
                 .onSend("item 2", endTurn("Result for item 2"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new MemTaskStateStore(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("aggregate-loop-task")
                 .step("produce", "producer-agent", "Produce items")
@@ -164,11 +164,11 @@ class TaskRunnerLoopTest {
         var producerLlm = new MockLlmClient()
                 .onSend("", endTurn("some output"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", new MockLlmClient()));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new MemTaskStateStore(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("missing-upstream-task")
                 .step("produce", "producer-agent", "Produce something")

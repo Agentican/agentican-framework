@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.scheduler;
 
-import ai.agentican.framework.Agentican;
+import ai.agentican.framework.AgenticanRuntime;
 
 import io.quarkus.scheduler.Scheduler;
 import jakarta.annotation.PostConstruct;
@@ -15,7 +15,7 @@ public class AgenticanScheduler {
     private static final Logger LOG = LoggerFactory.getLogger(AgenticanScheduler.class);
 
     @Inject
-    Agentican agentican;
+    AgenticanRuntime agentican;
 
     @Inject
     Scheduler scheduler;

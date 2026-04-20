@@ -2,14 +2,14 @@ package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.MockLlmClient;
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.InMemoryAgentRegistry;
+import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.agent.SmacAgentRunner;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
-import ai.agentican.framework.state.MemTaskStateStore;
+import ai.agentican.framework.store.TaskStateStoreMemory;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.tools.ToolkitRegistry;
+import ai.agentican.framework.registry.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
 
 import static ai.agentican.framework.MockLlmClient.*;
@@ -46,12 +46,12 @@ class TaskRunnerBranchTest {
         var pathBLlm = new MockLlmClient()
                 .onSend("", endTurn("B result"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new MemTaskStateStore(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("branch-task")
                 .step("decide", "producer-agent", "Pick a path")
@@ -81,12 +81,12 @@ class TaskRunnerBranchTest {
         var pathBLlm = new MockLlmClient()
                 .onSend("", endTurn("B result"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new MemTaskStateStore(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("default-branch-task")
                 .step("decide", "producer-agent", "Pick a path")
@@ -117,12 +117,12 @@ class TaskRunnerBranchTest {
         var pathBLlm = new MockLlmClient()
                 .onSend("", endTurn("B result"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new MemTaskStateStore(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("no-match-branch-task")
                 .step("decide", "producer-agent", "Pick a path")
@@ -151,12 +151,12 @@ class TaskRunnerBranchTest {
         var pathBLlm = new MockLlmClient()
                 .onSend("", endTurn("B from array"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new MemTaskStateStore(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("json-array-branch-task")
                 .step("decide", "producer-agent", "Pick a path")
@@ -186,12 +186,12 @@ class TaskRunnerBranchTest {
         var pathBLlm = new MockLlmClient()
                 .onSend("", endTurn("B via contains"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new MemTaskStateStore(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = Plan.builder("contains-branch-task")
                 .step("decide", "producer-agent", "Pick a path")

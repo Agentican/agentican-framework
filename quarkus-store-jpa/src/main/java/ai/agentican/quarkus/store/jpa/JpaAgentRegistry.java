@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.store.jpa;
 
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.AgentRegistry;
+import ai.agentican.framework.registry.AgentRegistry;
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.quarkus.store.jpa.entity.AgentEntity;
 

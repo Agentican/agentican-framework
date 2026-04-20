@@ -2,11 +2,11 @@ package ai.agentican.framework.state;
 
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
+import ai.agentican.framework.store.TaskStateStoreMemory;
 import org.junit.jupiter.api.Test;
 
 import ai.agentican.framework.orchestration.execution.TaskStatus;
 
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -23,7 +23,7 @@ class MemTaskStateStoreTest {
     @Test
     void taskStartedAndLoad() {
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
 
         store.taskStarted("task-1", "Test", dummyTask(), Map.of());
 
@@ -37,7 +37,7 @@ class MemTaskStateStoreTest {
     @Test
     void loadMissingReturnsNull() {
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
 
         assertNull(store.load("nonexistent"));
     }
@@ -45,7 +45,7 @@ class MemTaskStateStoreTest {
     @Test
     void listReturnsAll() {
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
 
         store.taskStarted("t1", "Task 1", dummyTask(), Map.of());
         store.taskStarted("t2", "Task 2", dummyTask(), Map.of());
@@ -58,7 +58,7 @@ class MemTaskStateStoreTest {
     @Test
     void taskCompletedUpdatesStatus() {
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
 
         store.taskStarted("id1", "task1", dummyTask(), Map.of());
         store.taskCompleted("id1", TaskStatus.COMPLETED);

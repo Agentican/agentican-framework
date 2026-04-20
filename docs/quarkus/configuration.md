@@ -26,7 +26,7 @@ Complete list of all `agentican.*` configuration properties across all Quarkus m
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `agentican.resume-on-start` | boolean | `true` | When `true`, `AgenticanService.resumeInterrupted` runs on `StartupEvent` to pick up tasks left in-flight after a restart |
+| `agentican.resume-on-start` | boolean | `true` | When `true`, `AgenticanRecovery.resumeInterrupted` runs on `StartupEvent` to pick up tasks left in-flight after a restart |
 | `agentican.resume-max-concurrent` | int | `10` | Max concurrent task resumes during startup recovery |
 
 ### Composio Integration
@@ -67,7 +67,7 @@ Complete list of all `agentican.*` configuration properties across all Quarkus m
 
 > `external-id` is enforced at boot. Any config-declared agent or skill without
 > one causes Agentican to throw `IllegalStateException` during
-> `Agentican.builder().build()`. Planner-created entities don't carry one —
+> `AgenticanRuntime.builder().build()`. Planner-created entities don't carry one —
 > they exist only within the lifetime of the process / DB row.
 
 ### Store backend selection
@@ -133,11 +133,11 @@ The following beans are produced with `@DefaultBean` — override by producing y
 | Bean | Default | Override by producing |
 |---|---|---|
 | `HitlManager` | Logging notifier | `@Produces HitlManager` |
-| `KnowledgeStore` | `MemKnowledgeStore` | `@Produces KnowledgeStore` |
-| `TaskStateStore` | `MemTaskStateStore` | `@Produces TaskStateStore` |
-| `AgentRegistry` | `InMemoryAgentRegistry` | `@Produces AgentRegistry` |
-| `SkillRegistry` | `InMemorySkillRegistry` | `@Produces SkillRegistry` |
-| `PlanRegistry` | `InMemoryPlanRegistry` | `@Produces PlanRegistry` |
+| `KnowledgeStore` | `KnowledgeStoreMemory` | `@Produces KnowledgeStore` |
+| `TaskStateStore` | `TaskStateStoreMemory` | `@Produces TaskStateStore` |
+| `AgentRegistry` | `AgentRegistryMemory` | `@Produces AgentRegistry` |
+| `SkillRegistry` | `SkillRegistryMemory` | `@Produces SkillRegistry` |
+| `PlanRegistry` | `PlanRegistryMemory` | `@Produces PlanRegistry` |
 
 With `agentican-quarkus-store-jpa` on the classpath, JPA-backed implementations
 of all six registries/stores auto-activate and supersede these defaults.
@@ -223,12 +223,12 @@ quarkus.otel.exporter.otlp.protocol=grpc
 
 ## Reactive Support
 
-`ReactiveAgentican` wraps `Agentican` and returns Mutiny `Uni` types instead of blocking.
+`ReactiveAgenticanRuntime` wraps `Agentican` and returns Mutiny `Uni` types instead of blocking.
 Inject it in reactive REST endpoints or Vert.x handlers:
 
 ```java
 @Inject
-ReactiveAgentican agentican;
+ReactiveAgenticanRuntime agentican;
 
 @POST
 @Path("/tasks")
@@ -243,7 +243,7 @@ public Uni<TaskLog> taskLog(@PathParam("id") String taskId) {
 }
 ```
 
-`ReactiveAgentican` is produced automatically by `agentican-quarkus`. It offloads blocking
+`ReactiveAgenticanRuntime` is produced automatically by `agentican-quarkus`. It offloads blocking
 operations to the framework's virtual thread executor and returns results on the Vert.x
 event loop. Use it when your endpoints run on the event loop (non-`@Blocking` RESTEasy
 Reactive endpoints).

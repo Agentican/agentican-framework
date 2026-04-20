@@ -1,6 +1,6 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.Agentican;
+import ai.agentican.framework.AgenticanRuntime;
 import ai.agentican.framework.agent.Agent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.Dependent;
@@ -12,7 +12,7 @@ import jakarta.inject.Inject;
 public class AgentProducer {
 
     @Inject
-    Agentican agentican;
+    AgenticanRuntime agentican;
 
     @Produces
     @Dependent

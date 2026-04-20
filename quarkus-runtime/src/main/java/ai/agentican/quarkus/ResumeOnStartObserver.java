@@ -1,6 +1,6 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.AgenticanService;
+import ai.agentican.framework.AgenticanRecovery;
 
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
@@ -17,7 +17,7 @@ public class ResumeOnStartObserver {
     private static final Logger LOG = LoggerFactory.getLogger(ResumeOnStartObserver.class);
 
     @Inject
-    AgenticanService agenticanService;
+    AgenticanRecovery agenticanService;
 
     @Inject
     AgenticanConfig config;

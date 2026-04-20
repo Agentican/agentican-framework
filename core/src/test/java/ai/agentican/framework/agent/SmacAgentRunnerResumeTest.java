@@ -7,7 +7,7 @@ import ai.agentican.framework.llm.ToolCall;
 import ai.agentican.framework.orchestration.execution.resume.ResumeClassifier;
 import ai.agentican.framework.orchestration.execution.resume.ResumePlan;
 import ai.agentican.framework.orchestration.execution.resume.TurnResumeState;
-import ai.agentican.framework.state.MemTaskStateStore;
+import ai.agentican.framework.store.TaskStateStoreMemory;
 import ai.agentican.framework.tools.ToolDefinition;
 import ai.agentican.framework.tools.ToolResult;
 import ai.agentican.framework.tools.Toolkit;
@@ -37,7 +37,7 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeWithNoSavedTurnsBehavesAsFreshRun() {
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
         var mockLlm = new MockLlmClient().onSend("", endTurn("Fresh completion"));
 
         var runner = SmacAgentRunner.builder()
@@ -54,11 +54,9 @@ class SmacAgentRunnerResumeTest {
 
         var emptyRun = new ai.agentican.framework.state.RunLog(Ids.generate(), 0, "resume-agent");
 
-        var result = runner.resumeAfterCrash(agent(runner), "do it", List.of(), emptyRun,
-                new ResumePlan(List.of(), java.util.Optional.empty(),
+        var result = runner.resumeAfterCrash(agent(runner), "do it", taskId, stepId, "work", List.of(), Map.of(), null, emptyRun, new AtomicBoolean(false), new ResumePlan(List.of(), java.util.Optional.empty(),
                         java.util.Optional.of(emptyRun), java.util.Optional.empty(),
-                        TurnResumeState.NONE, List.of(), false, null),
-                Map.of(), taskId, stepId, "work", new AtomicBoolean(false));
+                        TurnResumeState.NONE, List.of(), false, null));
 
         assertEquals(AgentStatus.COMPLETED, result.status());
     }
@@ -66,7 +64,7 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeStartedNoMessageAbandonsTurnAndRunsFresh() {
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
         var mockLlm = new MockLlmClient().onSend("", endTurn("Completed after resume"));
 
         var runner = SmacAgentRunner.builder()
@@ -96,8 +94,7 @@ class SmacAgentRunnerResumeTest {
 
         assertEquals(TurnResumeState.STARTED_NO_MESSAGE, resumePlan.turnState());
 
-        var result = runner.resumeAfterCrash(agent(runner), "do it", List.of(), run, resumePlan,
-                Map.of(), taskId, stepId, "work", new AtomicBoolean(false));
+        var result = runner.resumeAfterCrash(agent(runner), "do it", taskId, stepId, "work", List.of(), Map.of(), null, run, new AtomicBoolean(false), resumePlan);
 
         assertEquals(AgentStatus.COMPLETED, result.status());
 
@@ -111,7 +108,7 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeToolsPartialReExecutesOnlyMissingTools() {
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
 
         var toolkit = new MockToolkit(List.of(
                 new ToolDefinition("FOO", "foo tool", Map.of("x", Map.of("type", "string")))
@@ -163,8 +160,7 @@ class SmacAgentRunnerResumeTest {
 
         var initialExecutions = toolkit.invocationCount("FOO");
 
-        var result = runner.resumeAfterCrash(agent(runner), "do it", List.of(), run, resumePlan,
-                toolkitMap(toolkit), taskId, stepId, "work", new AtomicBoolean(false));
+        var result = runner.resumeAfterCrash(agent(runner), "do it", taskId, stepId, "work", List.of(), toolkitMap(toolkit), null, run, new AtomicBoolean(false), resumePlan);
 
         assertEquals(AgentStatus.COMPLETED, result.status());
 
@@ -181,7 +177,7 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeResponseReceivedExecutesAllToolsWithoutReCallingLlm() {
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
 
         var toolkit = new MockToolkit(List.of(
                 new ToolDefinition("BAR", "bar tool", Map.of())
@@ -226,8 +222,7 @@ class SmacAgentRunnerResumeTest {
 
         var initialExecutions = toolkit.invocationCount("BAR");
 
-        var result = runner.resumeAfterCrash(agent(runner), "do it", List.of(), run, resumePlan,
-                toolkitMap(toolkit), taskId, stepId, "work", new AtomicBoolean(false));
+        var result = runner.resumeAfterCrash(agent(runner), "do it", taskId, stepId, "work", List.of(), toolkitMap(toolkit), null, run, new AtomicBoolean(false), resumePlan);
 
         assertEquals(AgentStatus.COMPLETED, result.status());
 
@@ -238,7 +233,7 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeMessageSentAbandonsTurnTokenPathLeavesNoWasteBeyondOneRequest() {
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
 
         var mockLlm = new MockLlmClient().onSend("", endTurn("Done after resume"));
 
@@ -271,8 +266,7 @@ class SmacAgentRunnerResumeTest {
 
         assertEquals(TurnResumeState.MESSAGE_SENT, resumePlan.turnState());
 
-        var result = runner.resumeAfterCrash(agent(runner), "do it", List.of(), run, resumePlan,
-                Map.of(), taskId, stepId, "work", new AtomicBoolean(false));
+        var result = runner.resumeAfterCrash(agent(runner), "do it", taskId, stepId, "work", List.of(), Map.of(), null, run, new AtomicBoolean(false), resumePlan);
 
         assertEquals(AgentStatus.COMPLETED, result.status());
 
@@ -284,7 +278,7 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeClosedEndTurnShortCircuitsWithoutCallingLlm() {
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
 
         // MockLlmClient with zero entries — throws on any invocation. Short-circuit must skip LLM entirely.
         var mockLlm = new MockLlmClient();
@@ -324,8 +318,7 @@ class SmacAgentRunnerResumeTest {
 
         assertEquals(TurnResumeState.CLOSED, resumePlan.turnState());
 
-        var result = runner.resumeAfterCrash(agent(runner), "do it", List.of(), run, resumePlan,
-                Map.of(), taskId, stepId, "work", new AtomicBoolean(false));
+        var result = runner.resumeAfterCrash(agent(runner), "do it", taskId, stepId, "work", List.of(), Map.of(), null, run, new AtomicBoolean(false), resumePlan);
 
         assertEquals(AgentStatus.COMPLETED, result.status(),
                 "CLOSED state with END_TURN should short-circuit to COMPLETED without calling the LLM");

@@ -7,7 +7,7 @@
  */
 package ai.agentican.framework.examples;
 
-import ai.agentican.framework.Agentican;
+import ai.agentican.framework.AgenticanRuntime;
 import ai.agentican.framework.config.ComposioConfig;
 import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.config.PlanConfig;
@@ -39,7 +39,7 @@ var plan = PlanConfig.builder()
                                 "4. Post it to {{param.channel}} on Slack"))
                 .build();
 
-        var builder = Agentican.builder()
+        var builder = AgenticanRuntime.builder()
                 .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
                 .composio(new ComposioConfig(System.getenv("COMPOSIO_API_KEY"), "user-1"))
                 .plan(plan);

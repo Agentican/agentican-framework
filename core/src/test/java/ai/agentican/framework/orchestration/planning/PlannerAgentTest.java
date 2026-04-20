@@ -3,18 +3,18 @@ package ai.agentican.framework.orchestration.planning;
 import ai.agentican.framework.MockLlmClient;
 import ai.agentican.framework.MockToolkit;
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.InMemoryAgentRegistry;
+import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.agent.AgentResult;
 import ai.agentican.framework.agent.AgentStatus;
 import ai.agentican.framework.config.AgentConfig;
-import ai.agentican.framework.orchestration.InMemoryPlanRegistry;
+import ai.agentican.framework.registry.PlanRegistryMemory;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanParam;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.skill.InMemorySkillRegistry;
+import ai.agentican.framework.registry.SkillRegistryMemory;
 import ai.agentican.framework.state.RunLog;
 import ai.agentican.framework.tools.ToolDefinition;
-import ai.agentican.framework.tools.ToolkitRegistry;
+import ai.agentican.framework.registry.ToolkitRegistry;
 import ai.agentican.framework.util.Ids;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +29,7 @@ class PlannerAgentTest {
 
     private Function<AgentConfig, Agent> dummyAgentFactory() {
 
-        return config -> new Agent(config, (agent, task, activeSkills, toolkits, taskId, stepId, stepName, timeout) ->
+        return config -> new Agent(config, (agent, task, taskId, stepId, stepName, timeout, skills, toolkits, outputSchema) ->
                         AgentResult.builder().status(AgentStatus.COMPLETED).run(new RunLog(Ids.generate(), 0, (String) null)).build());
     }
 
@@ -52,11 +52,11 @@ class PlannerAgentTest {
         var mockLlm = new MockLlmClient()
                 .onSend("planning-process", endTurn(planJson));
 
-        var agentRegistry = new InMemoryAgentRegistry();
+        var agentRegistry = new AgentRegistryMemory();
         var toolkitRegistry = new ToolkitRegistry();
 
         var planner = new PlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
-                new InMemorySkillRegistry(), new InMemoryPlanRegistry(), dummyAgentFactory());
+                new SkillRegistryMemory(), new PlanRegistryMemory(), dummyAgentFactory());
 
         var result = planner.plan("Do a task");
         var task = result.plan();
@@ -97,7 +97,7 @@ class PlannerAgentTest {
                 .onSend("planning-process", endTurn(planJson))
                 .onSend("plan refiner", endTurn(refinedJson));
 
-        var agentRegistry = new InMemoryAgentRegistry();
+        var agentRegistry = new AgentRegistryMemory();
 
         var toolkitRegistry = new ToolkitRegistry();
         var toolkit = new MockToolkit(List.of(
@@ -105,7 +105,7 @@ class PlannerAgentTest {
         toolkitRegistry.register("test-toolkit", toolkit);
 
         var planner = new PlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
-                new InMemorySkillRegistry(), new InMemoryPlanRegistry(), dummyAgentFactory());
+                new SkillRegistryMemory(), new PlanRegistryMemory(), dummyAgentFactory());
 
         var task = planner.plan("Do a task with tools").plan();
 
@@ -132,11 +132,11 @@ class PlannerAgentTest {
         var mockLlm = new MockLlmClient()
                 .onSend("planning-process", endTurn(planJson));
 
-        var agentRegistry = new InMemoryAgentRegistry();
+        var agentRegistry = new AgentRegistryMemory();
         var toolkitRegistry = new ToolkitRegistry();
 
         var planner = new PlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
-                new InMemorySkillRegistry(), new InMemoryPlanRegistry(), dummyAgentFactory());
+                new SkillRegistryMemory(), new PlanRegistryMemory(), dummyAgentFactory());
 
         var task = planner.plan("Think about something").plan();
 
@@ -179,7 +179,7 @@ class PlannerAgentTest {
                 .onSend("planning-process", endTurn(planJson))
                 .onSend("plan refiner", endTurn(refinedJson));
 
-        var agentRegistry = new InMemoryAgentRegistry();
+        var agentRegistry = new AgentRegistryMemory();
 
         var toolkitRegistry = new ToolkitRegistry();
         var toolkit = new MockToolkit(List.of(
@@ -187,7 +187,7 @@ class PlannerAgentTest {
         toolkitRegistry.register("test-toolkit", toolkit);
 
         var planner = new PlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
-                new InMemorySkillRegistry(), new InMemoryPlanRegistry(), dummyAgentFactory());
+                new SkillRegistryMemory(), new PlanRegistryMemory(), dummyAgentFactory());
 
         var task = planner.plan("Produce and process items").plan();
 
@@ -208,7 +208,7 @@ class PlannerAgentTest {
                         List.of(), false, List.of(), List.of()))
                 .build();
 
-        var planRegistry = new InMemoryPlanRegistry();
+        var planRegistry = new PlanRegistryMemory();
         planRegistry.register(existing);
 
         var reuseJson = """
@@ -222,8 +222,8 @@ class PlannerAgentTest {
         var mockLlm = new MockLlmClient()
                 .onSend("planning-process", endTurn(reuseJson));
 
-        var planner = new PlannerAgent(mockLlm.toLlmClient(), new InMemoryAgentRegistry(),
-                new ToolkitRegistry(), new InMemorySkillRegistry(), planRegistry, dummyAgentFactory());
+        var planner = new PlannerAgent(mockLlm.toLlmClient(), new AgentRegistryMemory(),
+                new ToolkitRegistry(), new SkillRegistryMemory(), planRegistry, dummyAgentFactory());
 
         var result = planner.plan("Research quantum computing");
 
@@ -234,7 +234,7 @@ class PlannerAgentTest {
     @Test
     void planFallsBackToCreateWhenReuseRefIsUnknown() {
 
-        var planRegistry = new InMemoryPlanRegistry();
+        var planRegistry = new PlanRegistryMemory();
 
         var hallucinatedReuse = """
                 { "type": "reuse", "planRef": "does-not-exist", "inputs": {} }
@@ -257,8 +257,8 @@ class PlannerAgentTest {
                 .onSend("planning-process", endTurn(hallucinatedReuse))
                 .onSend("planning-process", endTurn(fallbackCreate));
 
-        var planner = new PlannerAgent(mockLlm.toLlmClient(), new InMemoryAgentRegistry(),
-                new ToolkitRegistry(), new InMemorySkillRegistry(), planRegistry, dummyAgentFactory());
+        var planner = new PlannerAgent(mockLlm.toLlmClient(), new AgentRegistryMemory(),
+                new ToolkitRegistry(), new SkillRegistryMemory(), planRegistry, dummyAgentFactory());
 
         var result = planner.plan("novel task");
 

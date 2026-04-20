@@ -1,8 +1,9 @@
 package ai.agentican.framework.knowledge;
 
 import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.state.MemTaskStateStore;
+import ai.agentican.framework.store.TaskStateStoreMemory;
 
+import ai.agentican.framework.store.KnowledgeStoreMemory;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -12,20 +13,20 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class KnowledgeIngestorTest {
 
-    private static final KnowledgeExtraction EMPTY = KnowledgeExtraction.empty();
+    private static final List<ExtractedEntry> EMPTY = List.of();
 
     @Test
     void createsMultipleEntriesFromSingleStep() {
 
         var state = newStateWithCompletedStep("t", "s", "research-step", "research text\n\nKNOWLEDGE_ACQUIRED");
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
-        KnowledgeExtractor extractor = (input, output, existing) -> new KnowledgeExtraction(List.of(
+        KnowledgeExtractor extractor = (input, output, existing) -> List.<ExtractedEntry>of(
                 new ExtractedEntry(ExtractedEntry.Action.CREATE, null, "Claude Opus 4.6",
                         "Anthropic model.", List.of(KnowledgeFact.of("pricing", "$15/$75", List.of("anthropic")))),
                 new ExtractedEntry(ExtractedEntry.Action.CREATE, null, "Gemini 3.1 Pro",
-                        "Google model.", List.of(KnowledgeFact.of("pricing", "$2/$12", List.of("google"))))));
+                        "Google model.", List.of(KnowledgeFact.of("pricing", "$2/$12", List.of("google")))));
 
         new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
 
@@ -41,16 +42,16 @@ class KnowledgeIngestorTest {
 
         var state = newStateWithCompletedStep("t", "s", "deep-dive", "more research\n\nKNOWLEDGE_ACQUIRED");
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
         var existing = KnowledgeEntry.of("Claude Opus 4.6", "Existing entry");
         existing.addFact(KnowledgeFact.of("existing-1", "old fact 1", List.of("anthropic")));
         existing.setStatus(KnowledgeStatus.INDEXED);
         store.save(existing);
 
-        KnowledgeExtractor extractor = (input, output, existingSummaries) -> new KnowledgeExtraction(List.of(
+        KnowledgeExtractor extractor = (input, output, existingSummaries) -> List.<ExtractedEntry>of(
                 new ExtractedEntry(ExtractedEntry.Action.UPDATE, existing.id(), null, null,
-                        List.of(KnowledgeFact.of("new-1", "new fact 1", List.of("anthropic"))))));
+                        List.of(KnowledgeFact.of("new-1", "new fact 1", List.of("anthropic")))));
 
         new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
 
@@ -66,7 +67,7 @@ class KnowledgeIngestorTest {
 
         var state = newStateWithCompletedStep("t", "s", "action-step", "I created a page.");
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
         KnowledgeExtractor extractor = (input, output, existing) -> EMPTY;
 
@@ -78,17 +79,17 @@ class KnowledgeIngestorTest {
     @Test
     void skipsWhenStepFailed() {
 
-        var state = new MemTaskStateStore();
+        var state = new TaskStateStoreMemory();
         state.taskStarted("t", "demo", null, Map.of());
         state.stepStarted("t", "s", "failed-step");
         state.runStarted("t", "s", "r", "agent");
         state.stepCompleted("t", "s", TaskStatus.FAILED, "some output");
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
-        KnowledgeExtractor extractor = (input, output, existing) -> new KnowledgeExtraction(List.of(
+        KnowledgeExtractor extractor = (input, output, existing) -> List.<ExtractedEntry>of(
                 new ExtractedEntry(ExtractedEntry.Action.CREATE, null, "X", "desc",
-                        List.of(KnowledgeFact.of("f", "v", List.of())))));
+                        List.of(KnowledgeFact.of("f", "v", List.of()))));
 
         new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
 
@@ -98,17 +99,17 @@ class KnowledgeIngestorTest {
     @Test
     void skipsLoopOrBranchAggregates() {
 
-        var state = new MemTaskStateStore();
+        var state = new TaskStateStoreMemory();
         state.taskStarted("t", "demo", null, Map.of());
         state.stepStarted("t", "s", "loop-step");
 
         state.stepCompleted("t", "s", TaskStatus.COMPLETED, "## Iteration 1\n\nfoo");
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
-        KnowledgeExtractor extractor = (input, output, existing) -> new KnowledgeExtraction(List.of(
+        KnowledgeExtractor extractor = (input, output, existing) -> List.<ExtractedEntry>of(
                 new ExtractedEntry(ExtractedEntry.Action.CREATE, null, "X", "desc",
-                        List.of(KnowledgeFact.of("f", "v", List.of())))));
+                        List.of(KnowledgeFact.of("f", "v", List.of()))));
 
         new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
 
@@ -120,11 +121,11 @@ class KnowledgeIngestorTest {
 
         var state = newStateWithCompletedStep("t", "s", "step", "text\n\nKNOWLEDGE_ACQUIRED");
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
-        KnowledgeExtractor extractor = (input, output, existing) -> new KnowledgeExtraction(List.of(
+        KnowledgeExtractor extractor = (input, output, existing) -> List.<ExtractedEntry>of(
                 new ExtractedEntry(ExtractedEntry.Action.UPDATE, "does-not-exist", null, null,
-                        List.of(KnowledgeFact.of("f", "v", List.of())))));
+                        List.of(KnowledgeFact.of("f", "v", List.of()))));
 
         new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
 
@@ -136,7 +137,7 @@ class KnowledgeIngestorTest {
 
         var state = newStateWithCompletedStep("t", "s", "step", "text\n\nKNOWLEDGE_ACQUIRED");
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
         var seed = KnowledgeEntry.of("Seed Topic", "seed desc");
         seed.addFact(KnowledgeFact.of("f", "v", List.of()));
@@ -162,15 +163,15 @@ class KnowledgeIngestorTest {
         var state = newStateWithCompletedStep("t", "s", "recall-only",
                 "This output only reformats recalled knowledge — no marker here.");
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
         var extractorCalled = new java.util.concurrent.atomic.AtomicBoolean(false);
 
         KnowledgeExtractor extractor = (input, output, existing) -> {
             extractorCalled.set(true);
-            return new KnowledgeExtraction(List.of(
+            return List.<ExtractedEntry>of(
                     new ExtractedEntry(ExtractedEntry.Action.CREATE, null, "x", "y",
-                            List.of(KnowledgeFact.of("f", "v", List.of())))));
+                            List.of(KnowledgeFact.of("f", "v", List.of()))));
         };
 
         new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
@@ -185,7 +186,7 @@ class KnowledgeIngestorTest {
         var state = newStateWithCompletedStep("t", "s", "research",
                 "Paris is the capital of France.\n\nKNOWLEDGE_ACQUIRED");
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
 
         var sawOutput = new java.util.concurrent.atomic.AtomicReference<String>();
 
@@ -203,10 +204,10 @@ class KnowledgeIngestorTest {
                 "Actual content should be preserved");
     }
 
-    private static MemTaskStateStore newStateWithCompletedStep(String taskId, String stepId,
-                                                                String stepName, String output) {
+    private static TaskStateStoreMemory newStateWithCompletedStep(String taskId, String stepId,
+                                                                  String stepName, String output) {
 
-        var state = new MemTaskStateStore();
+        var state = new TaskStateStoreMemory();
         state.taskStarted(taskId, "demo", null, Map.of());
         state.stepStarted(taskId, stepId, stepName);
         state.runStarted(taskId, stepId, "run-" + stepId, "agent");

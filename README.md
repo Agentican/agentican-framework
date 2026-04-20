@@ -11,7 +11,7 @@ Describe a task in natural language and the built-in Planner breaks it into a st
 ## Quick start
 
 ```java
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
         .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
         .build()) {
 
@@ -36,7 +36,7 @@ This is a multi-module project. Each module has a focused responsibility:
 
 | Module | ArtifactId | Description |
 |---|---|---|
-| [quarkus-runtime](quarkus-runtime/) | `agentican-quarkus-runtime` | CDI bindings — `@Inject Agentican`, `application.properties` config, CDI lifecycle events, health checks. |
+| [quarkus-runtime](quarkus-runtime/) | `agentican-quarkus-runtime` | CDI bindings — `@Inject AgenticanRuntime`, `application.properties` config, CDI lifecycle events, health checks. |
 | [quarkus-deployment](quarkus-deployment/) | `agentican-quarkus-deployment` | Quarkus build-time processing for the extension. |
 | [quarkus-rest](quarkus-rest/) | `agentican-quarkus-rest` | REST API + SSE streaming — 18 endpoints for tasks, checkpoints, knowledge, agents. |
 | [quarkus-metrics](quarkus-metrics/) | `agentican-quarkus-metrics` | Micrometer metrics — tasks active/completed/duration, steps, HITL checkpoints, resume outcomes. |
@@ -106,9 +106,12 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 
 ### Core framework (`agentican-framework-core`)
 
-- **`Agentican`** — main entry point with builder API
+- **`AgenticanRuntime`** — main entry point with builder API
+- **`Agentican<P, R>`** — typed invoker bound to a plan: turns typed params (`P`) into a `TaskHandle` with a typed structured result (`R`), enforced on the plan's `outputStep` via native provider JSON-schema modes
+- **`AgenticanRecovery`** — crash-recovery helper for resuming interrupted tasks after a restart
+- **`AgenticanRegistry`** — read-only view over registered plans, agents, toolkits, and skills
 - **`Plan` / `PlanStep`** — declarative workflow model (agent steps, loops, branches, typed code steps)
-- **`PlanConfig`** — fluent builder for plans with `step()`, `loop()`, `branch()`, `codeStep()` sub-builders
+- **`PlanConfig`** — fluent builder for plans with `step()`, `loop()`, `branch()`, `codeStep()`, `outputStep()`
 - **`CodeStep<I, O>` / `CodeStepSpec<I, O>`** — register typed Java functions as plan steps (no LLM round-trip)
 - **`Agent` / `AgentRunner`** — agent abstraction with pluggable runners
 - **`SmacAgentRunner`** — production agent loop with tool calling, HITL and knowledge
@@ -122,7 +125,7 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 
 ### Quarkus integration
 
-- **CDI** — `@Inject Agentican`, config via `application.properties`, lifecycle events
+- **CDI** — `@Inject AgenticanRuntime`, config via `application.properties`, lifecycle events
 - **REST** — 18 endpoints for task management, HITL checkpoints, knowledge and agents
 - **SSE** — real-time event streaming with `Last-Event-ID` replay
 - **Persistence** — JPA/Postgres with Flyway migrations for all framework stores

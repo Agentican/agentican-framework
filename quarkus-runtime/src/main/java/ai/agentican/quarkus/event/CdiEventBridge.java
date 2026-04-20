@@ -1,14 +1,14 @@
 package ai.agentican.quarkus.event;
 
-import ai.agentican.framework.Agentican;
-import ai.agentican.framework.TaskListener;
+import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.orchestration.execution.TaskListener;
 import ai.agentican.framework.agent.AgentStatus;
-import ai.agentican.framework.hitl.HitlCheckpointType;
 import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.state.StepLog;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
 import ai.agentican.framework.util.Ids;
+import ai.agentican.framework.hitl.HitlCheckpoint;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.enterprise.inject.Instance;
@@ -19,7 +19,7 @@ public class CdiEventBridge implements TaskListener {
 
     @Inject TaskStateStore taskStateStore;
 
-    @Inject Instance<Agentican> agentican;
+    @Inject Instance<AgenticanRuntime> agentican;
 
     private final java.util.concurrent.ConcurrentHashMap<String, String> toolCallIds = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -281,7 +281,7 @@ public class CdiEventBridge implements TaskListener {
     }
 
     @Override
-    public void onHitlNotified(String taskId, String hitlId, HitlCheckpointType type) {
+    public void onHitlNotified(String taskId, String hitlId, HitlCheckpoint.Type type) {
 
         var taskLog = taskStateStore.load(taskId);
         String stepId = null;

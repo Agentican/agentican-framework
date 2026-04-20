@@ -1,8 +1,9 @@
 package ai.agentican.quarkus.metrics;
 
-import ai.agentican.framework.TaskListener;
+import ai.agentican.framework.orchestration.execution.TaskListener;
 import ai.agentican.framework.llm.LlmClientDecorator;
 
+import ai.agentican.framework.store.TaskStateStore;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
@@ -15,7 +16,7 @@ public class MetricsAutoConfiguration {
     MeterRegistry registry;
 
     @Inject
-    ai.agentican.framework.state.TaskStateStore taskStateStore;
+    TaskStateStore taskStateStore;
 
     @Produces
     @ApplicationScoped

@@ -1,15 +1,15 @@
 package ai.agentican.framework.orchestration.planning;
 
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.AgentRegistry;
+import ai.agentican.framework.registry.AgentRegistry;
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.PlanConfig;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmRequest;
-import ai.agentican.framework.orchestration.PlanRegistry;
+import ai.agentican.framework.registry.PlanRegistry;
 import ai.agentican.framework.orchestration.model.*;
-import ai.agentican.framework.skill.SkillRegistry;
-import ai.agentican.framework.tools.ToolkitRegistry;
+import ai.agentican.framework.registry.SkillRegistry;
+import ai.agentican.framework.registry.ToolkitRegistry;
 import ai.agentican.framework.util.Json;
 import ai.agentican.framework.util.Logs;
 import ai.agentican.framework.util.Templates;
@@ -179,7 +179,7 @@ public class PlannerAgent {
             var steps = refinement.stepConfigs.stream().map(PlanConfig.PlanStepConfig::toPlanStep).toList();
 
             return new Plan(initial.id(), initial.name(), initial.description(),
-                    params, steps, initial.externalId());
+                    params, steps, initial.externalId(), initial.outputStep());
         }
         catch (Exception e) {
 
@@ -209,7 +209,7 @@ public class PlannerAgent {
         var reconciledSteps = plan.steps().stream().map(this::reconcileStep).toList();
 
         return new Plan(plan.id(), plan.name(), plan.description(),
-                plan.params(), reconciledSteps, plan.externalId());
+                plan.params(), reconciledSteps, plan.externalId(), plan.outputStep());
     }
 
     private PlanStep reconcileStep(PlanStep step) {

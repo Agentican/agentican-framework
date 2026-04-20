@@ -30,10 +30,10 @@ public class LlmKnowledgeExtractor implements KnowledgeExtractor {
     }
 
     @Override
-    public KnowledgeExtraction extract(String input, String output, List<KnowledgeEntrySummary> existingEntries) {
+    public List<ExtractedEntry> extract(String input, String output, List<KnowledgeEntry> existingEntries) {
 
         if (output == null || output.isBlank())
-            return KnowledgeExtraction.empty();
+            return List.<ExtractedEntry>of();
 
         try {
 
@@ -55,7 +55,7 @@ public class LlmKnowledgeExtractor implements KnowledgeExtractor {
             var parsed = Json.findObject(llmResponse.text(), ExtractionOutput.class);
 
             if (parsed == null || parsed.entries == null || parsed.entries.isEmpty())
-                return KnowledgeExtraction.empty();
+                return List.<ExtractedEntry>of();
 
             var entries = new ArrayList<ExtractedEntry>();
 
@@ -90,12 +90,12 @@ public class LlmKnowledgeExtractor implements KnowledgeExtractor {
                         facts));
             }
 
-            return new KnowledgeExtraction(entries);
+            return entries;
         }
         catch (Exception e) {
 
             LOG.warn("Fact extraction failed: {}", e.getMessage());
-            return KnowledgeExtraction.empty();
+            return List.<ExtractedEntry>of();
         }
     }
 

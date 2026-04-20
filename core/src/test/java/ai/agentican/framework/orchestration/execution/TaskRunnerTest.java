@@ -2,16 +2,16 @@ package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.MockLlmClient;
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.InMemoryAgentRegistry;
+import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.agent.SmacAgentRunner;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
-import ai.agentican.framework.state.MemTaskStateStore;
+import ai.agentican.framework.store.TaskStateStoreMemory;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanParam;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.tools.ToolkitRegistry;
+import ai.agentican.framework.registry.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -52,10 +52,10 @@ class TaskRunnerTest {
         var mockLlm = new MockLlmClient()
                 .onSend("", endTurn("output text"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm));
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -79,11 +79,11 @@ class TaskRunnerTest {
         var mockLlmB = new MockLlmClient()
                 .onSend("step-a-output", endTurn("step-b-done"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -108,11 +108,11 @@ class TaskRunnerTest {
         var mockLlmB = new MockLlmClient()
                 .onSend("", endTurn("parallel-b-output"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -132,9 +132,9 @@ class TaskRunnerTest {
 
         var mockLlm = new MockLlmClient();
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -158,11 +158,11 @@ class TaskRunnerTest {
         var mockLlmB = new MockLlmClient()
                 .onSend("", endTurn("step-b-done"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -190,10 +190,10 @@ class TaskRunnerTest {
         var mockLlm = new MockLlmClient()
                 .onSend("", endTurn("draft output"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm));
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -230,10 +230,10 @@ class TaskRunnerTest {
                 .onSend("Write a draft", endTurn("first draft"))
                 .onSend("Reviewer Feedback", endTurn("revised draft"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm, hitlManager));
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var runner = new TaskRunner(registry, hitlManager, new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -263,10 +263,10 @@ class TaskRunnerTest {
                 .onSend("", endTurn("attempt 1"))
                 .onSend("Reviewer Feedback", endTurn("attempt 2"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm, hitlManager));
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var runner = new TaskRunner(registry, hitlManager, new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -285,10 +285,10 @@ class TaskRunnerTest {
 
         var mockLlm = new MockLlmClient();
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm));
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -309,11 +309,11 @@ class TaskRunnerTest {
         var mockLlmB = new MockLlmClient()
                 .onSend("step-a-done", endTurn("step-b-done"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -356,10 +356,10 @@ class TaskRunnerTest {
 
         var agent = Agent.builder().config(AgentConfig.builder().name("agent-a").role("Slow agent").build()).runner(runner).build();
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(agent);
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var taskRunner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, Duration.ofMillis(50), 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -379,10 +379,10 @@ class TaskRunnerTest {
         var mockLlm = new MockLlmClient()
                 .onSend("Process 5 items", endTurn("processed"));
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm));
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
@@ -402,10 +402,10 @@ class TaskRunnerTest {
 
         var mockLlm = new MockLlmClient();
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm));
 
-        var taskStateStore = new MemTaskStateStore();
+        var taskStateStore = new TaskStateStoreMemory();
 
         var taskRunner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 

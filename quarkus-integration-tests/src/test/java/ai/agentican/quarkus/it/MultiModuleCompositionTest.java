@@ -1,8 +1,8 @@
 package ai.agentican.quarkus.it;
 
-import ai.agentican.framework.Agentican;
-import ai.agentican.framework.TaskListener;
-import ai.agentican.framework.TaskDecorator;
+import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.orchestration.execution.TaskListener;
+import ai.agentican.framework.orchestration.execution.TaskDecorator;
 import ai.agentican.framework.llm.LlmClientDecorator;
 import ai.agentican.quarkus.test.MockLlmClient;
 import ai.agentican.quarkus.test.TestTaskBuilder;
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MultiModuleCompositionTest {
 
     @Inject
-    Agentican agentican;
+    AgenticanRuntime agentican;
 
     @Inject
     MockLlmClient mockLlm;

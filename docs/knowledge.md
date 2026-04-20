@@ -12,7 +12,6 @@ A topical container with extracted facts:
 KnowledgeEntry
   ├── id, name, description
   ├── status: INDEXING | INDEXED | FAILED
-  ├── files: List<KnowledgeFile>         ← optional source documents
   ├── facts: List<KnowledgeFact>         ← extracted atomic facts
   └── created, updated
 ```
@@ -50,28 +49,19 @@ record KnowledgeFact(
 KnowledgeFact.of(name, content, tags);   // generates UUID + timestamps
 ```
 
-### KnowledgeFile
-
-Optional source document attached to an entry:
-
-```
-KnowledgeFile
-  ├── id, name, type, size
-  └── contents: byte[]
-```
-
 The framework doesn't extract facts from binary files (PDFs, Office docs, images) — that's app-specific. Extract facts yourself and call `entry.addFact(...)`, or implement your own `KnowledgeExtractor` that handles your formats.
 
 ## Setting Up Knowledge
 
-Provide a `KnowledgeStore` to the Agentican builder. If you don't, a `MemKnowledgeStore` is created by default.
+Provide a `KnowledgeStore` to the Agentican builder. If you don't, a `KnowledgeStoreMemory` is created by default.
 
 ```java
 import ai.agentican.framework.knowledge.*;
+import ai.agentican.framework.store.KnowledgeStoreMemory;
 
-var knowledgeStore = new MemKnowledgeStore();
+var knowledgeStore = new KnowledgeStoreMemory();
 
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
         .knowledgeStore(knowledgeStore)
         .build()) {
 
@@ -132,10 +122,11 @@ The agent opts in by including `KNOWLEDGE_ACQUIRED` in its final step output whe
 
 ```java
 public interface KnowledgeExtractor {
-    KnowledgeExtraction extract(
+
+    List<ExtractedEntry> extract(
             String input,
             String output,
-            List<KnowledgeEntrySummary> existingEntries);
+            List<KnowledgeEntry> existingEntries);
 }
 ```
 
@@ -211,7 +202,6 @@ new KnowledgeEntry(String id, String name, String description,
 KnowledgeEntry.of(String name, String description);
 
 entry.addFact(KnowledgeFact);
-entry.addFile(KnowledgeFile);
 entry.setStatus(KnowledgeStatus);
 entry.setName(String);
 entry.setDescription(String);
@@ -232,12 +222,14 @@ KnowledgeFact.of(String name, String content, List<String> tags);
 ```java
 public interface KnowledgeExtractor {
 
-    KnowledgeExtraction extract(
+    List<ExtractedEntry> extract(
             String input,
             String output,
-            List<KnowledgeEntrySummary> existingEntries);
+            List<KnowledgeEntry> existingEntries);
 }
 ```
+
+`ExtractedEntry` carries a `CREATE` / `UPDATE` operation plus the target entry. The ingestor applies each one against the store.
 
 ### LlmKnowledgeExtractor
 

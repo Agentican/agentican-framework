@@ -2,7 +2,7 @@ package ai.agentican.quarkus.otel;
 
 import ai.agentican.framework.agent.AgentStatus;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.state.MemTaskStateStore;
+import ai.agentican.framework.store.TaskStateStoreMemory;
 
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
@@ -23,7 +23,7 @@ class TracedLifecycleListenerSubTaskTest {
                 .build();
         var tracer = provider.get("test");
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
         var listener = new TracedLifecycleListener(tracer, store);
 
         var topTask = "task-top";
@@ -96,7 +96,7 @@ class TracedLifecycleListenerSubTaskTest {
                 .build();
         var tracer = provider.get("test");
 
-        var store = new MemTaskStateStore();
+        var store = new TaskStateStoreMemory();
         var listener = new TracedLifecycleListener(tracer, store);
 
         var taskId = "task-root";

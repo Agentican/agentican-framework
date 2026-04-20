@@ -1,6 +1,7 @@
 package ai.agentican.framework.agent;
 
 import ai.agentican.framework.config.AgentConfig;
+import ai.agentican.framework.llm.StructuredOutput;
 import ai.agentican.framework.state.RunLog;
 import ai.agentican.framework.tools.ToolResult;
 import ai.agentican.framework.tools.Toolkit;
@@ -22,18 +23,32 @@ public record Agent(
             throw new IllegalArgumentException("AgentRunner is required");
     }
 
-    public AgentResult run(String task, List<String> activeSkills, Map<String, Toolkit> toolkits, String taskId,
-                           String stepId, String stepName, Duration timeoutOverride) {
+    public AgentResult run(String task, String taskId, String stepId, String stepName, Duration timeout,
+                           List<String> skills, Map<String, Toolkit> toolkits) {
 
-        return runner.run(this, task, activeSkills, toolkits, taskId, stepId, stepName, timeoutOverride);
+        return run(task, taskId, stepId, stepName, timeout, skills, toolkits, null);
     }
 
-    public AgentResult resume(String task, List<String> activeSkills, RunLog savedRun,
-                              List<ToolResult> hitlToolResults, Map<String, Toolkit> toolkits, String taskId,
-                              String stepId, String stepName, Duration timeoutOverride) {
+    public AgentResult run(String task, String taskId, String stepId, String stepName, Duration timeout,
+                           List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema) {
 
-        return runner.resume(this, task, activeSkills, savedRun, hitlToolResults, toolkits, taskId, stepId,
-                stepName, timeoutOverride);
+        return runner.run(this, task, taskId, stepId, stepName, timeout, skills, toolkits, outputSchema);
+    }
+
+    public AgentResult resume(String task, String taskId, String stepId, String stepName, Duration timeout,
+                              List<String> skills, Map<String, Toolkit> toolkits, RunLog run,
+                              List<ToolResult> hitlToolResults) {
+
+        return resume(task, taskId, stepId, stepName, timeout, skills, toolkits,
+                run, hitlToolResults, null);
+    }
+
+    public AgentResult resume(String task, String taskId, String stepId, String stepName, Duration timeout,
+                              List<String> skills, Map<String, Toolkit> toolkits, RunLog run,
+                              List<ToolResult> hitlToolResults, StructuredOutput outputSchema) {
+
+        return runner.resume(this, task, taskId, stepId, stepName, timeout, skills, toolkits, outputSchema,
+                run, hitlToolResults);
     }
 
     public String id()   { return config.id(); }

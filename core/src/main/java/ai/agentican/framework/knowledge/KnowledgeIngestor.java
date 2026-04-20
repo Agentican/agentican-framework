@@ -1,9 +1,10 @@
 package ai.agentican.framework.knowledge;
 
-import ai.agentican.framework.TaskListener;
+import ai.agentican.framework.orchestration.execution.TaskListener;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
 
+import ai.agentican.framework.store.KnowledgeStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,13 +74,11 @@ public class KnowledgeIngestor implements TaskListener {
 
         try {
 
-            var existing = knowledgeStore.indexed().stream()
-                    .map(KnowledgeEntrySummary::of)
-                    .toList();
+            var existing = knowledgeStore.indexed();
 
             var extraction = extractor.extract(input, output, existing);
 
-            if (extraction.entries().isEmpty()) {
+            if (extraction.isEmpty()) {
                 LOG.debug("No knowledge extracted from step '{}'", stepName);
                 return;
             }
@@ -87,7 +86,7 @@ public class KnowledgeIngestor implements TaskListener {
             var created = 0;
             var updated = 0;
 
-            for (var entry : extraction.entries()) {
+            for (var entry : extraction) {
 
                 switch (entry.action()) {
 

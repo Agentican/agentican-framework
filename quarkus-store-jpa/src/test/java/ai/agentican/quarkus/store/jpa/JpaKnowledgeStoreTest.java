@@ -3,7 +3,7 @@ package ai.agentican.quarkus.store.jpa;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
 import ai.agentican.framework.knowledge.KnowledgeFact;
 import ai.agentican.framework.knowledge.KnowledgeStatus;
-import ai.agentican.framework.knowledge.KnowledgeStore;
+import ai.agentican.framework.store.KnowledgeStore;
 
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;

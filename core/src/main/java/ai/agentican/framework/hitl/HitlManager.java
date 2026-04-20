@@ -42,19 +42,19 @@ public class HitlManager {
         var description = "Tool call: " + call.toolName();
         var toolArgs = call.args().toString();
 
-        return createCheckpoint(Ids.generate(), HitlCheckpointType.TOOL_CALL, stepName, description, toolArgs);
+        return createCheckpoint(Ids.generate(), HitlCheckpoint.Type.TOOL_CALL, stepName, description, toolArgs);
     }
 
     public HitlCheckpoint createStepApprovalCheckpoint(String stepName, String output) {
 
         var description = "Step output: " + stepName;
 
-        return createCheckpoint(Ids.generate(), HitlCheckpointType.STEP_OUTPUT, stepName, description, output);
+        return createCheckpoint(Ids.generate(), HitlCheckpoint.Type.STEP_OUTPUT, stepName, description, output);
     }
 
     public HitlCheckpoint createQuestionCheckpoint(String question, String context, String stepName) {
 
-        return createCheckpoint(Ids.generate(), HitlCheckpointType.QUESTION, stepName, question, context);
+        return createCheckpoint(Ids.generate(), HitlCheckpoint.Type.QUESTION, stepName, question, context);
     }
 
     public HitlResponse awaitResponse(String checkpointId) {
@@ -143,7 +143,7 @@ public class HitlManager {
         return future != null && !future.isDone();
     }
 
-    private HitlCheckpoint createCheckpoint(String id, HitlCheckpointType type, String stepName,
+    private HitlCheckpoint createCheckpoint(String id, HitlCheckpoint.Type type, String stepName,
                                              String description, String content) {
 
         var checkpoint = new HitlCheckpoint(id, type, stepName, description, content);

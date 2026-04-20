@@ -1,14 +1,14 @@
 package ai.agentican.framework.agent;
 
-import ai.agentican.framework.TaskListener;
+import ai.agentican.framework.orchestration.execution.TaskListener;
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.config.RuntimeConfig;
 import ai.agentican.framework.hitl.HitlManager;
-import ai.agentican.framework.knowledge.KnowledgeStore;
+import ai.agentican.framework.store.KnowledgeStore;
 import ai.agentican.framework.llm.LlmClient;
-import ai.agentican.framework.skill.SkillRegistry;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.registry.SkillRegistry;
+import ai.agentican.framework.store.TaskStateStore;
 import ai.agentican.framework.util.Logs;
 
 import org.slf4j.Logger;
@@ -21,24 +21,26 @@ public class AgentFactory {
     private static final Logger LOG = LoggerFactory.getLogger(AgentFactory.class);
 
     private final RuntimeConfig config;
-    private final Map<String, LlmClient> llms;
     private final HitlManager hitlManager;
     private final KnowledgeStore knowledgeStore;
-    private final TaskStateStore taskStateStore;
     private final SkillRegistry skillRegistry;
     private final TaskListener taskListener;
+    private final TaskStateStore taskStateStore;
+
+    private final Map<String, LlmClient> llms;
 
     private AgentFactory(RuntimeConfig config, Map<String, LlmClient> llms, HitlManager hitlManager,
-                         KnowledgeStore knowledgeStore, TaskStateStore taskStateStore,
-                         SkillRegistry skillRegistry, TaskListener taskListener) {
+                         SkillRegistry skillRegistry, KnowledgeStore knowledgeStore,
+                         TaskStateStore taskStateStore, TaskListener taskListener) {
 
         this.config = config;
-        this.llms = llms;
         this.hitlManager = hitlManager;
         this.knowledgeStore = knowledgeStore;
-        this.taskStateStore = taskStateStore;
         this.skillRegistry = skillRegistry;
         this.taskListener = taskListener;
+        this.taskStateStore = taskStateStore;
+
+        this.llms = llms;
     }
 
     public Agent build(AgentConfig agentConfig) {
@@ -89,27 +91,29 @@ public class AgentFactory {
     public static class Builder {
 
         private RuntimeConfig config;
-        private Map<String, LlmClient> llms;
         private HitlManager hitlManager;
+        private SkillRegistry skillRegistry;
         private KnowledgeStore knowledgeStore;
         private TaskStateStore taskStateStore;
-        private SkillRegistry skillRegistry;
         private TaskListener taskListener;
+
+        private Map<String, LlmClient> llms;
 
         Builder() {}
 
         public Builder config(RuntimeConfig config) { this.config = config; return this; }
-        public Builder llms(Map<String, LlmClient> llms) { this.llms = llms; return this; }
         public Builder hitlManager(HitlManager hitlManager) { this.hitlManager = hitlManager; return this; }
         public Builder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
-        public Builder taskStateStore(TaskStateStore taskStateStore) { this.taskStateStore = taskStateStore; return this; }
         public Builder skillRegistry(SkillRegistry skillRegistry) { this.skillRegistry = skillRegistry; return this; }
         public Builder taskListener(TaskListener taskListener) { this.taskListener = taskListener; return this; }
+        public Builder taskStateStore(TaskStateStore taskStateStore) { this.taskStateStore = taskStateStore; return this; }
+
+        public Builder llms(Map<String, LlmClient> llms) { this.llms = llms; return this; }
 
         public AgentFactory build() {
 
-            return new AgentFactory(config, llms, hitlManager, knowledgeStore, taskStateStore,
-                    skillRegistry, taskListener);
+            return new AgentFactory(config, llms, hitlManager, skillRegistry, knowledgeStore,
+                    taskStateStore, taskListener);
         }
     }
 }

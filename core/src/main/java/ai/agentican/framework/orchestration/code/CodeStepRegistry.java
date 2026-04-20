@@ -4,18 +4,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Holds the {@link CodeStep} implementations registered with an {@code Agentican}
- * instance, keyed by slug. Each entry pairs a {@link CodeStepSpec} (which
- * carries the typed input/output classes) with the executor itself.
- */
 public class CodeStepRegistry {
 
-    /**
-     * A registered code step: its {@link CodeStepSpec} and the executor that
-     * implements it. Wildcards on the type parameters allow uniform storage —
-     * the runner re-casts at dispatch time.
-     */
     public record Registered(CodeStepSpec<?, ?> spec, CodeStep<?, ?> executor) { }
 
     private final Map<String, Registered> entries = new LinkedHashMap<>();

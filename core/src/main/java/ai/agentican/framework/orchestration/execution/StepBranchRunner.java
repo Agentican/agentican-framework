@@ -1,7 +1,7 @@
 package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.orchestration.model.*;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
 
 import ai.agentican.framework.util.Json;
 

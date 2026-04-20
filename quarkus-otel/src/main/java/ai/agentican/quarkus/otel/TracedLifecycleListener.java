@@ -1,13 +1,13 @@
 package ai.agentican.quarkus.otel;
 
-import ai.agentican.framework.TaskListener;
+import ai.agentican.framework.orchestration.execution.TaskListener;
 import ai.agentican.framework.agent.AgentStatus;
-import ai.agentican.framework.hitl.HitlCheckpointType;
 import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.state.StepLog;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
 
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.hitl.HitlCheckpoint;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
@@ -57,7 +57,7 @@ public class TracedLifecycleListener implements TaskListener {
     private final ConcurrentHashMap<String, SpanAndScope> spans = new ConcurrentHashMap<>();
     private final java.util.Set<String> resumedTaskIds = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    public TracedLifecycleListener(Tracer tracer, ai.agentican.framework.state.TaskStateStore taskStateStore) {
+    public TracedLifecycleListener(Tracer tracer, TaskStateStore taskStateStore) {
 
         this.tracer = tracer;
         this.taskStateStore = taskStateStore;
@@ -356,7 +356,7 @@ public class TracedLifecycleListener implements TaskListener {
     }
 
     @Override
-    public void onHitlNotified(String taskId, String hitlId, HitlCheckpointType type) {
+    public void onHitlNotified(String taskId, String hitlId, HitlCheckpoint.Type type) {
 
         var hitlBuilder = tracer.spanBuilder(HITL_SPAN)
                 .setAttribute(HITL_CHECKPOINT_ID, hitlId)

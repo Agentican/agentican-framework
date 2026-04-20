@@ -6,7 +6,7 @@ This page explains the core abstractions in Agentican and how they fit together.
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                          Agentican                         │
+│                       AgenticanRuntime                     │
 └───┬──────────────┬──────────────┬────────────┬─────────────┘
     │              │              │            │
     ▼              ▼              ▼            ▼
@@ -42,41 +42,104 @@ This page explains the core abstractions in Agentican and how they fit together.
 
 ## Key Concepts
 
-### Agentican
+### AgenticanRuntime
 
-The main entry point. Owns the runtime configuration, registries, planner, and task runner. Build it with `Agentican.builder()` and use it via `run(String)` or `run(Plan)`.
+The main entry point. Owns the runtime configuration, registries, planner, and task runner. Build it with `AgenticanRuntime.builder()` and use it via `run(String)` or `run(Plan)`.
 
 ```java
-try (var agentican = Agentican.builder()
+try (var runtime = AgenticanRuntime.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
         .build()) {
 
-    var handle = agentican.run("Do something useful");
+    var handle = runtime.run("Do something useful");
 
     var result = handle.result();
 }
 ```
 
-`Agentican` is `AutoCloseable` — close it to release the virtual thread executor and any toolkits that hold resources.
+`AgenticanRuntime` is `AutoCloseable` — close it to release the virtual thread executor and any toolkits that hold resources.
 
 At `build()` time, the framework validates that every `AgentConfig`, `SkillConfig`, and `PlanConfig` supplied via the config file or the fluent builder declares an `externalId`. See [External IDs](#external-ids) below.
 
-### AgenticanService
+### Agentican&lt;P, R&gt;
 
-A separate, server-oriented companion to `Agentican` that owns the recovery surface — `resumeInterrupted(...)` and `reapOrphans(...)`. Construct it by composing onto an Agentican:
+A typed, reusable caller bound to a specific plan. `Agentican<P, R>` is the dev-facing injectable: you hand it a typed params record `P`, it runs the bound plan as a task, and (optionally) deserializes the plan's output into a typed `R`.
 
 ```java
-try (var agentican = Agentican.builder()...build();
-     var service = new AgenticanService(agentican)) {
+record TriageParams(String customerId, String priority) {}
+record TriageOutput(String classification, String reason) {}
 
-    service.resumeInterrupted();   // pick up tasks left in flight after restart
-    // agentican.run(...) calls happen as before
+// Plain Java — capture a Plan reference
+Agentican<TriageParams, TriageOutput> triage =
+        runtime.agentican(plan, TriageParams.class, TriageOutput.class);
+
+// Or resolve by plan name (picks up runtime-registered plans)
+Agentican<TriageParams, TriageOutput> triage =
+        runtime.agentican("triage", TriageParams.class, TriageOutput.class);
+
+// Run with typed in + typed out
+TriageOutput out = triage.runAndAwait(new TriageParams("cust-42", "HIGH"));
+
+// Or get the raw TaskHandle for taskId / cancellation
+TaskHandle handle = triage.run(new TriageParams("cust-42", "HIGH"));
+```
+
+Use `Void` for either type parameter when no inputs or no typed output is needed:
+
+- `Agentican<P, Void>` — typed inputs, untyped output. `awaitTaskResult(params)` returns the raw `TaskResult`.
+- `Agentican<Void, R>` — parameterless plan, typed output. `runAndAwait()` (no args) parses the output.
+- `Agentican<Void, Void>` — both untyped.
+
+Two factory forms on `AgenticanRuntime`, each with a Void-output overload:
+
+- **`runtime.agentican(Plan, Class<P>, Class<R>)`** — captures the Plan reference. No per-invoke lookup; plan mutations are invisible.
+- **`runtime.agentican(String planName, Class<P>, Class<R>)`** — resolves by name in the `PlanRegistry` on each invocation.
+
+The plan name is the runtime lookup key — any plan in the registry qualifies regardless of source (YAML, fluent builder, JPA catalog, planner output, programmatic registration). `externalId` is persistence-dedup metadata and is not used for invoker binding.
+
+**Params** are converted via Jackson with `SNAKE_CASE` naming, so `TriageParams.customerId` maps to plan param `customer_id`. Nested objects/collections JSON-serialize into strings.
+
+**Typed output** comes from the plan's *output step*. For single-step plans, that step is implicit. For multi-step plans, declare it on the builder:
+
+```java
+Plan.builder("triage")
+    .outputStep("classify")     // ← which step's output IS the plan's output
+    .step(...)
+    .step(PlanStepAgent.builder("classify").agent("triage")
+            .instructions("Respond with JSON: {classification, reason}")
+            .build())
+    .build();
+```
+
+The output step's text output is parsed via Jackson into `R` at the boundary. The framework generates a JSON Schema from `R` and attaches it to that step's LLM requests via the provider's native structured-output mode — Anthropic `output_config.format`, OpenAI `response_format: json_schema (strict)`, Gemini `responseJsonSchema`, and passthrough `response_format` for OpenAI-compatible endpoints — so the model is constrained to emit conformant JSON, not just steered toward it.
+
+Failure modes:
+- Task didn't complete → `TaskFailedException` (carries the `TaskResult`).
+- Output step produced text that doesn't match `R` → `OutputParseException` (carries the raw output and target class).
+
+In Quarkus, inject by plan name with both type parameters:
+
+```java
+@Inject @AgenticanPlan("triage")
+Agentican<TriageParams, TriageOutput> triage;
+```
+
+### AgenticanRecovery
+
+A separate, server-oriented companion to `AgenticanRuntime` that owns the recovery surface — `resumeInterrupted(...)` and `reapOrphans(...)`. Construct it by composing onto a runtime:
+
+```java
+try (var runtime = AgenticanRuntime.builder()...build();
+     var recovery = new AgenticanRecovery(runtime)) {
+
+    recovery.resumeInterrupted();   // pick up tasks left in flight after restart
+    // runtime.run(...) calls happen as before
 }
 ```
 
-`AgenticanService` is also `AutoCloseable` — declare it after the `Agentican` in try-with-resources so it closes first (it awaits in-flight knowledge re-ingestion using the shared executor before the executor shuts down).
+`AgenticanRecovery` is also `AutoCloseable` — declare it after the `AgenticanRuntime` in try-with-resources so it closes first (it awaits in-flight knowledge re-ingestion using the shared executor before the executor shuts down).
 
-In Quarkus, `AgenticanService` is a CDI bean produced from the injected `Agentican`; the framework's `ResumeOnStartObserver` invokes `resumeInterrupted` on `StartupEvent` (toggleable via `agentican.resume-on-start`).
+In Quarkus, `AgenticanRecovery` is a CDI bean produced from the injected `AgenticanRuntime`; the framework's `ResumeOnStartObserver` invokes `resumeInterrupted` on `StartupEvent` (toggleable via `agentican.resume-on-start`).
 
 ### Plan
 
@@ -205,7 +268,7 @@ TaskLog
                     └── toolResults
 ```
 
-A `TaskStateStore` persists execution state. `MemTaskStateStore` is provided; you can implement your own for durable storage.
+A `TaskStateStore` persists execution state. `TaskStateStoreMemory` is provided; you can implement your own for durable storage.
 
 `TaskLog`, `StepLog`, `TurnLog`, and `KnowledgeEntry` all have constructors that accept full state (timestamps, ids, status) so a persistent store can round-trip an instance without stamping fresh values on rehydrate.
 
@@ -221,7 +284,7 @@ All four registries are bundled on `agentican.registry()` (an `AgenticanRegistry
 All three of `AgentRegistry`, `SkillRegistry`, and `PlanRegistry` are **interfaces** with an `InMemory*` implementation as the default. A persistent backend (e.g., the JPA-backed registries in `agentican-quarkus`) plugs in via the builder:
 
 ```java
-Agentican.builder()
+AgenticanRuntime.builder()
         .agentRegistry(myJpaAgentRegistry)
         .skillRegistry(myJpaSkillRegistry)
         .planRegistry(myJpaPlanRegistry)
@@ -234,7 +297,7 @@ Each interface has a `default seed(...)` hook the framework calls once at boot. 
 
 Every `AgentConfig`, `SkillConfig`, `PlanConfig`, and `Plan` has an optional `externalId` — a stable business key separate from the internal UUID `id`. A persistent catalog upserts on `externalId` so redeploys don't create duplicates.
 
-Anything declared via the config file or the fluent builder **must** set an `externalId`. The framework throws `IllegalStateException` at `Agentican.build()` if it's missing, because without it every boot would auto-generate a fresh UUID and pile up duplicate catalog rows.
+Anything declared via the config file or the fluent builder **must** set an `externalId`. The framework throws `IllegalStateException` at `AgenticanRuntime.build()` if it's missing, because without it every boot would auto-generate a fresh UUID and pile up duplicate catalog rows.
 
 Set `externalId(...)` on the builder:
 
@@ -278,7 +341,7 @@ When you call `agentican.run("description")`:
 
 ### Recovery flow
 
-When the server starts and a task was left in-flight (e.g., a previous JVM was killed mid-run), `AgenticanService` is responsible for picking it up:
+When the server starts and a task was left in-flight (e.g., a previous JVM was killed mid-run), `AgenticanRecovery` is responsible for picking it up:
 
 1. **Classify** — `ResumeClassifier.classify(taskLog, plan)` walks the persisted `TaskLog` to decide what to do: drive the in-flight step forward, or reap it if it can't be resumed (corrupt state, missing plan, etc.).
 2. **Rehydrate** — pending HITL checkpoints are restored to the `HitlManager`; persisted HITL responses are replayed; completed-step outputs are re-ingested into the knowledge store.
@@ -291,7 +354,7 @@ Server applications wire this in by calling `service.resumeInterrupted()` on sta
 
 Agentican uses **virtual threads exclusively** from the moment you call `run()`:
 
-- `Agentican` owns an `Executors.newVirtualThreadPerTaskExecutor()` for task execution
+- `AgenticanRuntime` owns an `Executors.newVirtualThreadPerTaskExecutor()` for task execution
 - Each task step runs on its own virtual thread
 - Parallel tool execution and loop iterations use `StructuredTaskScope`
 - HITL waits **park** the virtual thread — no OS threads are blocked, even for hours-long human approvals

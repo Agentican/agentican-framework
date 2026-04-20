@@ -1,7 +1,6 @@
 package ai.agentican.quarkus.metrics;
 
 import ai.agentican.framework.hitl.HitlCheckpoint;
-import ai.agentican.framework.hitl.HitlCheckpointType;
 import ai.agentican.framework.state.TaskLog;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
@@ -85,7 +84,7 @@ class AgenticanMetricsObserverTest {
     @Test
     void hitlCheckpointRecordsCounterAndPendingGauge() {
 
-        var checkpoint = new HitlCheckpoint("ck-1", HitlCheckpointType.TOOL_CALL, "s1", "d", "c");
+        var checkpoint = new HitlCheckpoint("ck-1", HitlCheckpoint.Type.TOOL_CALL, "s1", "d", "c");
         observer.onHitlCheckpoint(new HitlCheckpointEvent("t1", "step-1", "s1", checkpoint));
 
         assertEquals(1.0, registry.counter("agentican.hitl.checkpoints.created", "type", "TOOL_CALL").count());
@@ -95,7 +94,7 @@ class AgenticanMetricsObserverTest {
     @Test
     void taskCompletedClearsPendingCheckpointGauge() {
 
-        var checkpoint = new HitlCheckpoint("ck-1", HitlCheckpointType.STEP_OUTPUT, "s1", "d", "c");
+        var checkpoint = new HitlCheckpoint("ck-1", HitlCheckpoint.Type.STEP_OUTPUT, "s1", "d", "c");
         observer.onHitlCheckpoint(new HitlCheckpointEvent("t1", "step-1", "s1", checkpoint));
 
         assertEquals(1.0, registry.get("agentican.hitl.checkpoints.pending").gauge().value());

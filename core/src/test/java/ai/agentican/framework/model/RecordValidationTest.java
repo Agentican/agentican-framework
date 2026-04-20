@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import ai.agentican.framework.config.AgentConfig;
 class RecordValidationTest {
 
-    private final AgentRunner dummyRunner = (agent, task, activeSkills, toolkits, taskId, stepId, stepName, timeout) -> null;
+    private final AgentRunner dummyRunner = (agent, task, taskId, stepId, stepName, timeout, skills, toolkits, outputSchema) -> null;
 
     @Test
     void agentRequiresName() {

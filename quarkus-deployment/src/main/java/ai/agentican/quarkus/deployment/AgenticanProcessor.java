@@ -9,11 +9,9 @@ import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.config.PlanConfig;
 import ai.agentican.framework.config.WorkerConfig;
 import ai.agentican.framework.hitl.HitlCheckpoint;
-import ai.agentican.framework.hitl.HitlCheckpointType;
 import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.knowledge.KnowledgeFact;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
-import ai.agentican.framework.knowledge.KnowledgeFile;
 import ai.agentican.framework.knowledge.KnowledgeStatus;
 import ai.agentican.framework.llm.LlmRequest;
 import ai.agentican.framework.llm.LlmResponse;
@@ -106,11 +104,10 @@ class AgenticanProcessor {
                 ToolCall.class,
                 StopReason.class,
                 HitlCheckpoint.class,
-                HitlCheckpointType.class,
+                HitlCheckpoint.Type.class,
                 HitlResponse.class,
                 KnowledgeEntry.class,
                 KnowledgeFact.class,
-                KnowledgeFile.class,
                 KnowledgeStatus.class)
                 .methods()
                 .fields()

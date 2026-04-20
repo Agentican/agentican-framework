@@ -3,7 +3,7 @@ package ai.agentican.quarkus.rest.resource;
 import ai.agentican.framework.knowledge.KnowledgeFact;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
 import ai.agentican.framework.knowledge.KnowledgeStatus;
-import ai.agentican.framework.knowledge.KnowledgeStore;
+import ai.agentican.framework.store.KnowledgeStore;
 import ai.agentican.quarkus.rest.dto.AddFactRequest;
 import ai.agentican.quarkus.rest.dto.CreateKnowledgeRequest;
 import ai.agentican.quarkus.rest.dto.KnowledgeEntrySummary;

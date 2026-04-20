@@ -4,7 +4,6 @@ import ai.agentican.framework.agent.Agent;
 import ai.agentican.framework.agent.AgentToolUse;
 import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
-import ai.agentican.framework.knowledge.KnowledgeEntrySummary;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.planning.ToolView;
 import ai.agentican.framework.tools.scratchpad.ScratchpadEntry;
@@ -41,15 +40,22 @@ public class Templates {
 
     public String renderSystemPrompt(String agentName, String agentDescription) {
 
-        return renderSystemPrompt(agentName, agentDescription, List.of());
+        return renderSystemPrompt(agentName, agentDescription, List.of(), false);
     }
 
     public String renderSystemPrompt(String agentName, String agentDescription, List<SkillConfig> skills) {
+
+        return renderSystemPrompt(agentName, agentDescription, skills, false);
+    }
+
+    public String renderSystemPrompt(String agentName, String agentDescription, List<SkillConfig> skills,
+                                     boolean structuredOutput) {
 
         return systemPromptTemplate
                 .data("agentName", agentName != null ? agentName : "")
                 .data("agentDescription", agentDescription != null ? agentDescription : "")
                 .data("skills", skills != null ? skills : List.of())
+                .data("structuredOutput", structuredOutput)
                 .render();
     }
 
@@ -91,7 +97,7 @@ public class Templates {
         return refinePlanPrompt;
     }
 
-    public String renderFactExtractionPrompt(List<KnowledgeEntrySummary> existingEntries) {
+    public String renderFactExtractionPrompt(List<KnowledgeEntry> existingEntries) {
 
         return factExtractionPromptTemplate
                 .data("existingEntries", existingEntries != null ? existingEntries : List.of())

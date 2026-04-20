@@ -5,7 +5,7 @@ import ai.agentican.framework.llm.LlmResponse;
 import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
 import ai.agentican.framework.tools.ToolResult;
 import ai.agentican.framework.util.Ids;
 

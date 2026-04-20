@@ -17,7 +17,6 @@ public class Placeholders {
     public static final Pattern STEP_OUTPUT_PATTERN = Pattern.compile("\\{\\{step\\.([a-zA-Z0-9_-]+)\\.output}}");
     public static final Pattern STEP_OUTPUT_FIELD_PATTERN =
             Pattern.compile("\\{\\{step\\.([a-zA-Z0-9_-]+)\\.output\\.([a-zA-Z0-9_.-]+)}}");
-    private static final Pattern STEP_PLACEHOLDER = STEP_OUTPUT_PATTERN;
     private static final Pattern PARAM_PLACEHOLDER = Pattern.compile("\\{\\{param\\.([a-zA-Z0-9_-]+)}}");
 
     public static String resolveParams(String text, Map<String, String> params) {
@@ -40,17 +39,11 @@ public class Placeholders {
         });
     }
 
-    /**
-     * Resolves both {@code {{step.X.output}}} (whole-output, wrapped with a
-     * prompt-injection guard suitable for agent instructions) and
-     * {@code {{step.X.output.field}}} (raw field extracted from a JSON
-     * upstream output). Use this for agent instruction strings.
-     */
     public static String resolveStepOutputs(String text, Map<String, String> stepOutputs) {
 
         var afterFields = resolveStepOutputFields(text, stepOutputs);
 
-        return STEP_PLACEHOLDER.matcher(afterFields).replaceAll(match -> {
+        return STEP_OUTPUT_PATTERN.matcher(afterFields).replaceAll(match -> {
 
             var stepName = match.group(1);
             var output = stepOutputs.get(stepName);
@@ -80,7 +73,7 @@ public class Placeholders {
 
         var afterFields = resolveStepOutputFields(text, stepOutputs);
 
-        return STEP_PLACEHOLDER.matcher(afterFields).replaceAll(match -> {
+        return STEP_OUTPUT_PATTERN.matcher(afterFields).replaceAll(match -> {
 
             var stepName = match.group(1);
             var output = stepOutputs.get(stepName);

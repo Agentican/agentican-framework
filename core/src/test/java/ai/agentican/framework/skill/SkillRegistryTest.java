@@ -1,6 +1,7 @@
 package ai.agentican.framework.skill;
 
 import ai.agentican.framework.config.SkillConfig;
+import ai.agentican.framework.registry.SkillRegistryMemory;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -10,7 +11,7 @@ class SkillRegistryTest {
     @Test
     void registerAndGet() {
 
-        var registry = new InMemorySkillRegistry();
+        var registry = new SkillRegistryMemory();
         var skill = new SkillConfig("summarize", "Summarize", "Summarize long text", null);
 
         registry.register(skill);
@@ -24,7 +25,7 @@ class SkillRegistryTest {
     @Test
     void registerIfAbsentIsFirstWins() {
 
-        var registry = new InMemorySkillRegistry();
+        var registry = new SkillRegistryMemory();
         var first = new SkillConfig("cite", "Cite Claims", "First version", null);
         var second = new SkillConfig("cite", "Cite Claims", "Second version", null);
 
@@ -39,7 +40,7 @@ class SkillRegistryTest {
     @Test
     void getAllReturnsAllRegistered() {
 
-        var registry = new InMemorySkillRegistry();
+        var registry = new SkillRegistryMemory();
 
         registry.register(new SkillConfig("a", "A Skill", "A", null));
         registry.register(new SkillConfig("b", "B Skill", "B", null));
@@ -51,7 +52,7 @@ class SkillRegistryTest {
     @Test
     void getUnknownReturnsNull() {
 
-        var registry = new InMemorySkillRegistry();
+        var registry = new SkillRegistryMemory();
 
         assertNull(registry.get("nope"));
         assertNull(registry.getByName("nope"));

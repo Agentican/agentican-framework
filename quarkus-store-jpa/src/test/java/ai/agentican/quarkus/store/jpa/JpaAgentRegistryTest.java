@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.store.jpa;
 
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.AgentRegistry;
+import ai.agentican.framework.registry.AgentRegistry;
 import ai.agentican.framework.agent.AgentRunner;
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.util.Ids;
@@ -22,7 +22,7 @@ class JpaAgentRegistryTest {
     AgentRegistry registryInterface;
 
     private static final AgentRunner NOOP_RUNNER =
-            (agent, task, activeSkills, toolkits, taskId, stepId, stepName, timeout) -> null;
+            (agent, task, taskId, stepId, stepName, timeout, skills, toolkits, outputSchema) -> null;
 
     @Test
     void interfaceResolvesToJpaBean() {

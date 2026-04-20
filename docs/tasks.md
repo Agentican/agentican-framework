@@ -17,7 +17,7 @@ record Plan(
 
 A plan has an auto-generated internal UUID, a name, description, optional parameters, and a list of steps. Steps can depend on each other; the runner builds a dependency graph and executes independent steps in parallel.
 
-Plans registered at boot (via `RuntimeConfig.plans` or `Agentican.builder().plan(...)`) must carry an `externalId` so a catalog can upsert on redeploys. Use the builder for all construction — pass `.externalId(...)` for cataloged plans, omit it for ephemeral ones (planner output, tests):
+Plans registered at boot (via `RuntimeConfig.plans` or `AgenticanRuntime.builder().plan(...)`) must carry an `externalId` so a catalog can upsert on redeploys. Use the builder for all construction — pass `.externalId(...)` for cataloged plans, omit it for ephemeral ones (planner output, tests):
 
 ```java
 Plan.builder(name)
@@ -147,7 +147,7 @@ record HttpOutput(String body, int status) { }
 #### 2. Register the executor at build
 
 ```java
-Agentican.builder()
+AgenticanRuntime.builder()
     .codeStep(
         new CodeStepSpec<>("http-get", null, HttpInput.class, HttpOutput.class),
         (HttpInput input, StepContext ctx) -> {
@@ -266,6 +266,51 @@ var task = Plan.builder("multi-page")
                         .toolkit("notion")
                         .build()))
         .build();
+```
+
+## Typed Invocation with `Agentican<P, R>`
+
+A `Plan` by itself runs as an untyped task — params are a `Map<String, String>` and output is a blob of text. For callers that want typed parameters in and a typed structured result out, bind the plan to an `Agentican<P, R>`:
+
+```java
+record TriageParams(String customerId, String priority) {}
+record TriageOutput(String classification, String reason) {}
+
+var triage = runtime.agentican(plan, TriageParams.class, TriageOutput.class);
+
+TriageOutput out = triage.runAndAwait(new TriageParams("cust-42", "HIGH"));
+```
+
+- Params convert via Jackson with `SNAKE_CASE` — `customerId` → plan param `customer_id`.
+- `Void.class` on either slot skips that side (no typed params, no typed output).
+- `runtime.agentican("planName", P.class, R.class)` resolves by name from the registry on each call — picks up late-registered or persisted plans.
+
+### Designating the output step
+
+For multi-step plans, declare which step's output the typed result comes from:
+
+```java
+Plan.builder("triage")
+    .param("customer_id", "The customer to triage", null, true)
+    .step("gather", ...)
+    .step(PlanStepAgent.builder("classify")
+            .agent("triage")
+            .instructions("Respond with JSON: {classification, reason}")
+            .dependency("gather")
+            .build())
+    .outputStep("classify")
+    .build();
+```
+
+The framework attaches a JSON Schema generated from `TriageOutput.class` to `classify`'s LLM request via the provider's native structured-output mode (Anthropic `output_config.format`, OpenAI `response_format: json_schema (strict)`, Gemini `responseJsonSchema`, OpenAI-compatible passthrough). The model is forced to emit conformant JSON, which Jackson then deserializes into `TriageOutput`.
+
+If the task fails, `runAndAwait` throws `TaskFailedException` (carries the `TaskResult`). If the output step emits text that doesn't match `R`, it throws `OutputParseException` (carries the raw output and target class).
+
+Under Quarkus, inject the typed invoker directly:
+
+```java
+@Inject @AgenticanPlan("triage")
+Agentican<TriageParams, TriageOutput> triage;
 ```
 
 ## Placeholder Resolution

@@ -41,11 +41,6 @@ public record PlanStepCode<I>(
         if (dependencies == null) dependencies = List.of();
     }
 
-    /**
-     * Code steps never carry a HITL flag — HITL requires an agent / LLM
-     * context; raising an approval from deterministic code is a separate
-     * primitive. Required by the sealed {@link PlanStep} interface.
-     */
     @Override
     public boolean hitl() {
 

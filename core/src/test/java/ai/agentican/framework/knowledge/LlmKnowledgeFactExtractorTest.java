@@ -42,11 +42,11 @@ class LlmKnowledgeFactExtractorTest {
 
         var result = extractor.extract(null, "research text", List.of());
 
-        assertEquals(2, result.entries().size());
-        assertEquals(ExtractedEntry.Action.CREATE, result.entries().get(0).action());
-        assertEquals("Claude Opus 4.6", result.entries().get(0).name());
-        assertEquals(2, result.entries().get(0).facts().size());
-        assertEquals("Gemini 3.1 Pro", result.entries().get(1).name());
+        assertEquals(2, result.size());
+        assertEquals(ExtractedEntry.Action.CREATE, result.get(0).action());
+        assertEquals("Claude Opus 4.6", result.get(0).name());
+        assertEquals(2, result.get(0).facts().size());
+        assertEquals("Gemini 3.1 Pro", result.get(1).name());
     }
 
     @Test
@@ -68,14 +68,14 @@ class LlmKnowledgeFactExtractorTest {
 
         var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
 
-        var existing = List.of(new KnowledgeEntrySummary("existing-123", "Topic X", "desc", 5));
+        var existing = List.of(new KnowledgeEntry("existing-123", "Topic X", "desc"));
 
         var result = extractor.extract(null, "more findings", existing);
 
-        assertEquals(1, result.entries().size());
-        assertEquals(ExtractedEntry.Action.UPDATE, result.entries().getFirst().action());
-        assertEquals("existing-123", result.entries().getFirst().existingEntryId());
-        assertEquals(1, result.entries().getFirst().facts().size());
+        assertEquals(1, result.size());
+        assertEquals(ExtractedEntry.Action.UPDATE, result.getFirst().action());
+        assertEquals("existing-123", result.getFirst().existingEntryId());
+        assertEquals(1, result.getFirst().facts().size());
     }
 
     @Test
@@ -93,7 +93,7 @@ class LlmKnowledgeFactExtractorTest {
 
         var result = extractor.extract(null, "text", List.of());
 
-        assertTrue(result.entries().isEmpty());
+        assertTrue(result.isEmpty());
     }
 
     @Test
@@ -103,7 +103,7 @@ class LlmKnowledgeFactExtractorTest {
 
         var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
 
-        assertTrue(extractor.extract(null, "anything", List.of()).entries().isEmpty());
+        assertTrue(extractor.extract(null, "anything", List.of()).isEmpty());
     }
 
     @Test
@@ -111,8 +111,8 @@ class LlmKnowledgeFactExtractorTest {
 
         var extractor = new LlmKnowledgeExtractor(new MockLlmClient().toLlmClient());
 
-        assertTrue(extractor.extract(null, "", List.of()).entries().isEmpty());
-        assertTrue(extractor.extract(null, null, List.of()).entries().isEmpty());
+        assertTrue(extractor.extract(null, "", List.of()).isEmpty());
+        assertTrue(extractor.extract(null, null, List.of()).isEmpty());
     }
 
     @Test
@@ -122,7 +122,7 @@ class LlmKnowledgeFactExtractorTest {
 
         var extractor = new LlmKnowledgeExtractor(throwing);
 
-        assertTrue(extractor.extract(null, "some text", List.of()).entries().isEmpty());
+        assertTrue(extractor.extract(null, "some text", List.of()).isEmpty());
     }
 
     @Test
@@ -132,7 +132,7 @@ class LlmKnowledgeFactExtractorTest {
 
         var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
 
-        assertTrue(extractor.extract(null, "some text", List.of()).entries().isEmpty());
+        assertTrue(extractor.extract(null, "some text", List.of()).isEmpty());
     }
 
     @Test
@@ -143,7 +143,7 @@ class LlmKnowledgeFactExtractorTest {
 
         var extractor = new LlmKnowledgeExtractor(mockLlm.toLlmClient());
 
-        var existing = List.of(new KnowledgeEntrySummary("existing-abc", "Topic", "Covers X", 3));
+        var existing = List.of(new KnowledgeEntry("existing-abc", "Topic", "Covers X"));
 
         var result = extractor.extract(null, "source text", existing);
 

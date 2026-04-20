@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.otel;
 
-import ai.agentican.framework.TaskDecorator;
+import ai.agentican.framework.orchestration.execution.TaskDecorator;
 import io.opentelemetry.context.Context;
 
 import java.util.function.Supplier;

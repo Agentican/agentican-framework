@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.rest.resource;
 
 import ai.agentican.framework.state.TaskLog;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
 import ai.agentican.quarkus.rest.TaskEventBus;
 import ai.agentican.quarkus.rest.TaskService;

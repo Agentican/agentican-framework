@@ -1,7 +1,6 @@
 package ai.agentican.quarkus.rest.sse;
 
 import ai.agentican.framework.hitl.HitlCheckpoint;
-import ai.agentican.framework.hitl.HitlCheckpointType;
 import ai.agentican.framework.state.TaskLog;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
@@ -31,7 +30,7 @@ class SseEventTypesTest {
 
         assertEquals(SseEventTypes.HITL_CHECKPOINT,
                 SseEventTypes.nameFor(new HitlCheckpointEvent("t1", "sid", "s",
-                        new HitlCheckpoint("ck", HitlCheckpointType.STEP_OUTPUT, "s", "d", "c"))));
+                        new HitlCheckpoint("ck", HitlCheckpoint.Type.STEP_OUTPUT, "s", "d", "c"))));
 
         assertEquals(SseEventTypes.TASK_COMPLETED,
                 SseEventTypes.nameFor(new TaskCompletedEvent("t1", "demo", TaskStatus.COMPLETED, log)));

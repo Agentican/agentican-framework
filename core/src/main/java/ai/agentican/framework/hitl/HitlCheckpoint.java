@@ -2,7 +2,7 @@ package ai.agentican.framework.hitl;
 
 public record HitlCheckpoint(
         String id,
-        HitlCheckpointType type,
+        Type type,
         String stepName,
         String description,
         String content) {
@@ -14,5 +14,12 @@ public record HitlCheckpoint(
 
         if (type == null)
             throw new IllegalArgumentException("Checkpoint type is required");
+    }
+
+    public enum Type {
+
+        TOOL_CALL,
+        STEP_OUTPUT,
+        QUESTION
     }
 }

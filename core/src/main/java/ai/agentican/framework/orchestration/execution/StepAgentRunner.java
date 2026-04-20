@@ -1,8 +1,9 @@
 package ai.agentican.framework.orchestration.execution;
 
-import ai.agentican.framework.agent.AgentRegistry;
+import ai.agentican.framework.registry.AgentRegistry;
+import ai.agentican.framework.llm.StructuredOutput;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.tools.ToolkitRegistry;
+import ai.agentican.framework.registry.ToolkitRegistry;
 import ai.agentican.framework.util.Logs;
 import ai.agentican.framework.util.Placeholders;
 
@@ -29,6 +30,12 @@ class StepAgentRunner {
     TaskStepResult run(PlanStepAgent taskStep, Map<String, String> parentStepOutputs, Map<String, String> taskParams,
                        String taskId, String stepId) {
 
+        return run(taskStep, parentStepOutputs, taskParams, taskId, stepId, null);
+    }
+
+    TaskStepResult run(PlanStepAgent taskStep, Map<String, String> parentStepOutputs, Map<String, String> taskParams,
+                       String taskId, String stepId, StructuredOutput structuredOutput) {
+
         var agentRef = taskStep.agentId();
 
         var agent = agentRegistry.get(agentRef);
@@ -51,8 +58,11 @@ class StepAgentRunner {
 
         LOG.info(Logs.RUNNER_RUN_AGENT_STEP, taskStep.name());
 
-        var taskStepResult = agent.run(instructions, taskStep.skills(), taskStepToolkits,
-                taskId, stepId, taskStep.name(), taskStep.timeout());
+        var taskStepResult = agent.run(instructions,
+                taskId, stepId, taskStep.name(),
+                taskStep.timeout(),
+                taskStep.skills(), taskStepToolkits,
+                structuredOutput);
 
         var stepResultStatus = taskStepResult.isCompleted() ? TaskStatus.COMPLETED
                 : taskStepResult.isSuspended() ? TaskStatus.SUSPENDED

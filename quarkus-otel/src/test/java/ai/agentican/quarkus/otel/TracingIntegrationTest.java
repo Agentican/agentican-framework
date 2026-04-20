@@ -1,8 +1,8 @@
 package ai.agentican.quarkus.otel;
 
-import ai.agentican.framework.Agentican;
-import ai.agentican.framework.TaskListener;
-import ai.agentican.framework.TaskDecorator;
+import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.orchestration.execution.TaskListener;
+import ai.agentican.framework.orchestration.execution.TaskDecorator;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
 import ai.agentican.quarkus.test.MockLlmClient;
@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class TracingIntegrationTest {
 
     @Inject
-    Agentican agentican;
+    AgenticanRuntime agentican;
 
     @Inject
     MockLlmClient mockLlm;

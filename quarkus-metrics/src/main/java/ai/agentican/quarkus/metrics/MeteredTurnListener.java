@@ -1,9 +1,9 @@
 package ai.agentican.quarkus.metrics;
 
-import ai.agentican.framework.TaskListener;
+import ai.agentican.framework.orchestration.execution.TaskListener;
 import ai.agentican.framework.agent.AgentStatus;
 import ai.agentican.framework.llm.StopReason;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
 import ai.agentican.framework.tools.ToolResult;
 
 import io.micrometer.core.instrument.MeterRegistry;

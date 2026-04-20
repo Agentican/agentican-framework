@@ -1,9 +1,9 @@
 package ai.agentican.quarkus.devui;
 
-import ai.agentican.framework.Agentican;
+import ai.agentican.framework.AgenticanRuntime;
 import ai.agentican.framework.hitl.HitlManager;
-import ai.agentican.framework.knowledge.KnowledgeStore;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.KnowledgeStore;
+import ai.agentican.framework.store.TaskStateStore;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -14,7 +14,7 @@ import java.util.Map;
 public class AgenticanDevUIService {
 
     @Inject
-    Agentican agentican;
+    AgenticanRuntime agentican;
 
     @Inject
     TaskStateStore taskStateStore;

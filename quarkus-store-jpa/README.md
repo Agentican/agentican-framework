@@ -48,11 +48,11 @@ reference wiring.
 
 | Bean | Implementation | Replaces |
 |---|---|---|
-| `TaskStateStore` | `JpaTaskStateStore` | `MemTaskStateStore` |
-| `KnowledgeStore` | `JpaKnowledgeStore` | `MemKnowledgeStore` |
-| `AgentRegistry` | `JpaAgentRegistry` | `InMemoryAgentRegistry` |
-| `SkillRegistry` | `JpaSkillRegistry` | `InMemorySkillRegistry` |
-| `PlanRegistry` | `JpaPlanRegistry` | `InMemoryPlanRegistry` |
+| `TaskStateStore` | `JpaTaskStateStore` | `TaskStateStoreMemory` |
+| `KnowledgeStore` | `JpaKnowledgeStore` | `KnowledgeStoreMemory` |
+| `AgentRegistry` | `JpaAgentRegistry` | `AgentRegistryMemory` |
+| `SkillRegistry` | `JpaSkillRegistry` | `SkillRegistryMemory` |
+| `PlanRegistry` | `JpaPlanRegistry` | `PlanRegistryMemory` |
 
 All beans are gated with:
 

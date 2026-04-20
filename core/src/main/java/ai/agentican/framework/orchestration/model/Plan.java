@@ -12,7 +12,8 @@ public record Plan(
         String description,
         List<PlanParam> params,
         List<PlanStep> steps,
-        String externalId) {
+        String externalId,
+        String outputStep) {
 
     public Plan {
 
@@ -33,6 +34,9 @@ public record Plan(
 
         if (externalId != null && externalId.isBlank())
             externalId = null;
+
+        if (outputStep != null && outputStep.isBlank())
+            outputStep = null;
     }
 
     public static PlanBuilder builder(String name) {
@@ -50,6 +54,7 @@ public record Plan(
         private String id;
         private String description;
         private String externalId;
+        private String outputStep;
 
         PlanBuilder(String name) {
 
@@ -59,6 +64,7 @@ public record Plan(
         public PlanBuilder id(String id) { this.id = id; return this; }
         public PlanBuilder description(String description) { this.description = description; return this; }
         public PlanBuilder externalId(String externalId) { this.externalId = externalId; return this; }
+        public PlanBuilder outputStep(String stepName) { this.outputStep = stepName; return this; }
 
         public PlanBuilder param(String paramName) { params.add(new PlanParam(paramName, null, null, true)); return this; }
         public PlanBuilder param(String paramName, String description) { params.add(new PlanParam(paramName, description, null, true)); return this; }
@@ -110,7 +116,7 @@ public record Plan(
 
         public Plan build() {
 
-            return new Plan(id, name, description, params, steps, externalId);
+            return new Plan(id, name, description, params, steps, externalId, outputStep);
         }
     }
 

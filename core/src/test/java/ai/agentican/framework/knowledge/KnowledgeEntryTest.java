@@ -18,13 +18,12 @@ class KnowledgeEntryTest {
         assertEquals("A description", entry.description());
         assertEquals(KnowledgeStatus.INDEXING, entry.status());
         assertTrue(entry.facts().isEmpty());
-        assertTrue(entry.files().isEmpty());
         assertNotNull(entry.created());
         assertNotNull(entry.updated());
     }
 
     @Test
-    void addFactAndFile() throws InterruptedException {
+    void addFact() throws InterruptedException {
 
         var entry = new KnowledgeEntry("id", "name", "desc");
         var initialUpdated = entry.updated();
@@ -37,16 +36,6 @@ class KnowledgeEntryTest {
         assertEquals(1, entry.facts().size());
         assertEquals("Pricing", entry.facts().getFirst().name());
         assertTrue(entry.updated().isAfter(initialUpdated));
-
-        var afterFactUpdated = entry.updated();
-        Thread.sleep(5);
-
-        var file = KnowledgeFile.of("doc.pdf", "application/pdf", new byte[]{1, 2, 3});
-        entry.addFile(file);
-
-        assertEquals(1, entry.files().size());
-        assertEquals("doc.pdf", entry.files().getFirst().name());
-        assertTrue(entry.updated().isAfter(afterFactUpdated));
     }
 
     @Test

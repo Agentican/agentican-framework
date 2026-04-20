@@ -3,7 +3,9 @@ package ai.agentican.framework;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.knowledge.KnowledgeIngestor;
 import ai.agentican.framework.orchestration.execution.TaskRunner;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.orchestration.execution.TaskDecorator;
+import ai.agentican.framework.orchestration.execution.TaskListener;
 
 import java.util.concurrent.ExecutorService;
 

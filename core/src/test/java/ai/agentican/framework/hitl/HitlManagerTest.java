@@ -108,7 +108,7 @@ class HitlManagerTest {
         // fires with the persisted approval.
         var manager = new HitlManager((mgr, cp) -> {});
 
-        var checkpoint = new HitlCheckpoint("cp-rehydrated", HitlCheckpointType.TOOL_CALL,
+        var checkpoint = new HitlCheckpoint("cp-rehydrated", HitlCheckpoint.Type.TOOL_CALL,
                 "approve-step", "Tool call: deploy", "{}");
 
         manager.rehydrate(checkpoint);
@@ -133,7 +133,7 @@ class HitlManagerTest {
         // Covers the rejected-STEP_OUTPUT HITL resume path.
         var manager = new HitlManager((mgr, cp) -> {});
 
-        var checkpoint = new HitlCheckpoint("cp-reject", HitlCheckpointType.STEP_OUTPUT,
+        var checkpoint = new HitlCheckpoint("cp-reject", HitlCheckpoint.Type.STEP_OUTPUT,
                 "review-step", "Step output: review-step", "draft output");
 
         manager.rehydrate(checkpoint);
@@ -155,7 +155,7 @@ class HitlManagerTest {
 
         var manager = new HitlManager((mgr, cp) -> {});
 
-        var checkpoint = new HitlCheckpoint("cp-double", HitlCheckpointType.TOOL_CALL,
+        var checkpoint = new HitlCheckpoint("cp-double", HitlCheckpoint.Type.TOOL_CALL,
                 "step", "Tool call: deploy", "{}");
 
         manager.rehydrate(checkpoint);

@@ -38,7 +38,7 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
     mgr.respond(checkpoint.id(), response);
 });
 
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
         .hitlManager(hitlManager)
         .build()) {
 
@@ -144,7 +144,7 @@ After the configured max retries (default 3, configurable via `WorkerConfig.maxS
 ```java
 record HitlCheckpoint(
     String id,
-    HitlCheckpointType type,    // TOOL_CALL, STEP_OUTPUT, or QUESTION
+    HitlCheckpoint.Type type,   // TOOL_CALL, STEP_OUTPUT, or QUESTION
     String stepName,
     String description,         // human-readable summary
     String content              // type-specific payload (tool args, step output, question)

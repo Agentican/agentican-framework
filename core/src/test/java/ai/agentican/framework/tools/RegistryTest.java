@@ -2,9 +2,11 @@ package ai.agentican.framework.tools;
 
 import ai.agentican.framework.MockToolkit;
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.InMemoryAgentRegistry;
+import ai.agentican.framework.hitl.HitlType;
+import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.agent.AgentRunner;
-import ai.agentican.framework.hitl.AskQuestionToolkit;
+import ai.agentican.framework.tools.hitl.AskQuestionToolkit;
+import ai.agentican.framework.registry.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -18,7 +20,7 @@ class RegistryTest {
 
     private Agent dummyAgent(String name) {
 
-        AgentRunner runner = (agent, task, activeSkills, toolkits, taskId, stepId, stepName, timeout) -> null;
+        AgentRunner runner = (agent, task, taskId, stepId, stepName, timeout, skills, toolkits, outputSchema) -> null;
 
         return Agent.builder().config(AgentConfig.builder().name(name).role("Role for " + name).build()).runner(runner).build();
     }
@@ -26,7 +28,7 @@ class RegistryTest {
     @Test
     void agentRegistryRegisterAndGet() {
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
 
         var agent = dummyAgent("agent-1");
 
@@ -38,7 +40,7 @@ class RegistryTest {
     @Test
     void agentRegistryHasAndAll() {
 
-        var registry = new InMemoryAgentRegistry();
+        var registry = new AgentRegistryMemory();
 
         registry.register(dummyAgent("agent-1"));
         registry.register(dummyAgent("agent-2"));

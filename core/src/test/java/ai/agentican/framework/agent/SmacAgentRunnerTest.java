@@ -2,16 +2,15 @@ package ai.agentican.framework.agent;
 
 import ai.agentican.framework.MockLlmClient;
 import ai.agentican.framework.MockToolkit;
-import ai.agentican.framework.hitl.AskQuestionToolkit;
-import ai.agentican.framework.hitl.HitlCheckpointType;
+import ai.agentican.framework.tools.hitl.AskQuestionToolkit;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlNotifier;
 import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.knowledge.KnowledgeFact;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
 import ai.agentican.framework.knowledge.KnowledgeStatus;
-import ai.agentican.framework.knowledge.KnowledgeToolkit;
-import ai.agentican.framework.knowledge.MemKnowledgeStore;
+import ai.agentican.framework.tools.knowledge.KnowledgeToolkit;
+import ai.agentican.framework.store.KnowledgeStoreMemory;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmResponse;
 import ai.agentican.framework.llm.StopReason;
@@ -31,6 +30,7 @@ import static ai.agentican.framework.MockLlmClient.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 import ai.agentican.framework.config.AgentConfig;
+import ai.agentican.framework.hitl.HitlCheckpoint;
 class SmacAgentRunnerTest {
 
     private HitlManager autoApproveHitl() {
@@ -70,7 +70,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), Map.of(), "test-task", "step-id", "test-step", null);
+        var result = agent(runner).run("Do something", "test-task", "step-id", "test-step", null, List.of(), Map.of());
 
         assertEquals(AgentStatus.COMPLETED, result.status());
         assertEquals("Hello world", result.text());
@@ -94,7 +94,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
+        var result = agent(runner).run("Do something", "test-task", "step-id", "test-step", null, List.of(), toolkitMap(toolkit));
 
         assertEquals(AgentStatus.COMPLETED, result.status());
         assertEquals("Done", result.text());
@@ -118,11 +118,11 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
+        var result = agent(runner).run("Do something", "test-task", "step-id", "test-step", null, List.of(), toolkitMap(toolkit));
 
         assertEquals(AgentStatus.SUSPENDED, result.status());
         assertNotNull(result.checkpoint());
-        assertEquals(HitlCheckpointType.TOOL_CALL, result.checkpoint().type());
+        assertEquals(HitlCheckpoint.Type.TOOL_CALL, result.checkpoint().type());
     }
 
     @Test
@@ -143,11 +143,11 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), toolkits, "test-task", "step-id", "test-step", null);
+        var result = agent(runner).run("Do something", "test-task", "step-id", "test-step", null, List.of(), toolkits);
 
         assertEquals(AgentStatus.SUSPENDED, result.status());
         assertNotNull(result.checkpoint());
-        assertEquals(HitlCheckpointType.QUESTION, result.checkpoint().type());
+        assertEquals(HitlCheckpoint.Type.QUESTION, result.checkpoint().type());
         assertEquals("What color?", result.checkpoint().description());
     }
 
@@ -175,7 +175,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
+        var result = agent(runner).run("Do something", "test-task", "step-id", "test-step", null, List.of(), toolkitMap(toolkit));
 
         assertEquals(AgentStatus.SUSPENDED, result.status());
         assertEquals(1, result.run().turns().getFirst().toolResults().size());
@@ -204,12 +204,11 @@ class SmacAgentRunnerTest {
 
         var agentInstance = agent(runner);
 
-        var suspended = agentInstance.run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
+        var suspended = agentInstance.run("Do something", "test-task", "step-id", "test-step", null, List.of(), toolkitMap(toolkit));
 
         assertEquals(AgentStatus.SUSPENDED, suspended.status());
 
-        var resumed = runner.resume(agentInstance, "Do something", List.of(), suspended.run(), List.of(),
-                toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
+        var resumed = runner.resume(agentInstance, "Do something", "test-task", "step-id", "test-step", null, List.of(), toolkitMap(toolkit), null, suspended.run(), List.of());
 
         assertEquals(AgentStatus.COMPLETED, resumed.status());
         assertEquals("Resumed successfully", resumed.text());
@@ -237,16 +236,14 @@ class SmacAgentRunnerTest {
 
         var agentInstance = agent(runner);
 
-        var suspended = agentInstance.run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
+        var suspended = agentInstance.run("Do something", "test-task", "step-id", "test-step", null, List.of(), toolkitMap(toolkit));
 
         assertEquals(AgentStatus.SUSPENDED, suspended.status());
 
         var rejectionResult = new ToolResult("hitl", "HITL_TOOL",
                 "{\"error\": \"Tool call rejected\", \"feedback\": \"Not allowed\"}");
 
-        var resumed = runner.resume(agentInstance, "Do something", List.of(),
-                suspended.run(), List.of(rejectionResult), toolkitMap(toolkit), "test-task",
-                "step-id", "test-step", null);
+        var resumed = runner.resume(agentInstance, "Do something", "test-task", "step-id", "test-step", null, List.of(), toolkitMap(toolkit), null, suspended.run(), List.of(rejectionResult));
 
         assertEquals(AgentStatus.COMPLETED, resumed.status());
         assertEquals("OK, I won't do that", resumed.text());
@@ -270,7 +267,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(3)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), toolkitMap(toolkit), "test-task", "step-id", "test-step", null);
+        var result = agent(runner).run("Do something", "test-task", "step-id", "test-step", null, List.of(), toolkitMap(toolkit));
 
         assertEquals(AgentStatus.MAX_TURNS, result.status());
         assertEquals(3, result.run().turns().size());
@@ -308,7 +305,7 @@ class SmacAgentRunnerTest {
         var toolkits = new LinkedHashMap<String, Toolkit>();
         toolkits.put("FAILING_TOOL", toolkit);
 
-        var result = agent(runner).run("Do something", List.of(), toolkits, "test-task", "step-id", "test-step", null);
+        var result = agent(runner).run("Do something", "test-task", "step-id", "test-step", null, List.of(), toolkits);
 
         assertEquals(AgentStatus.COMPLETED, result.status());
         assertEquals("Handled error", result.text());
@@ -317,7 +314,7 @@ class SmacAgentRunnerTest {
     @Test
     void knowledgeIndexInjectedInUserMessage() {
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
         var entry = new KnowledgeEntry("k1", "Customer Pricing Data", "Pricing info");
 
         entry.setStatus(KnowledgeStatus.INDEXED);
@@ -333,7 +330,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), Map.of(), "test-task", "step-id", "test-step", null);
+        var result = agent(runner).run("Do something", "test-task", "step-id", "test-step", null, List.of(), Map.of());
 
         assertEquals(AgentStatus.COMPLETED, result.status());
         assertEquals("done", result.text());
@@ -342,7 +339,7 @@ class SmacAgentRunnerTest {
     @Test
     void recallKnowledgeReturnsFacts() {
 
-        var store = new MemKnowledgeStore();
+        var store = new KnowledgeStoreMemory();
         var entry = new KnowledgeEntry("k1", "Customer Pricing Data", "Pricing info");
 
         entry.addFact(KnowledgeFact.of("Monthly Cost", "$10/month", List.of("pricing")));
@@ -362,7 +359,7 @@ class SmacAgentRunnerTest {
                 .maxIterations(5)
                 .build();
 
-        var result = agent(runner).run("Do something", List.of(), Map.of(), "test-task", "step-id", "test-step", null);
+        var result = agent(runner).run("Do something", "test-task", "step-id", "test-step", null, List.of(), Map.of());
 
         assertEquals(AgentStatus.COMPLETED, result.status());
         assertEquals("got the facts", result.text());
@@ -389,7 +386,7 @@ class SmacAgentRunnerTest {
                 .timeout(Duration.ofMillis(10))
                 .build();
 
-        var result = agent(runner).run("task", List.of(), toolkitMap(toolkit), "test-task", "step-id", "step", null);
+        var result = agent(runner).run("task", "test-task", "step-id", "step", null, List.of(), toolkitMap(toolkit));
 
         assertEquals(AgentStatus.TIMED_OUT, result.status());
     }

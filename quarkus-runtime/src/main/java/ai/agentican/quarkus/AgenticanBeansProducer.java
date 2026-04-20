@@ -1,17 +1,17 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.agent.AgentRegistry;
-import ai.agentican.framework.agent.InMemoryAgentRegistry;
+import ai.agentican.framework.registry.AgentRegistry;
+import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlNotifier;
-import ai.agentican.framework.knowledge.KnowledgeStore;
-import ai.agentican.framework.knowledge.MemKnowledgeStore;
-import ai.agentican.framework.orchestration.InMemoryPlanRegistry;
-import ai.agentican.framework.orchestration.PlanRegistry;
-import ai.agentican.framework.skill.InMemorySkillRegistry;
-import ai.agentican.framework.skill.SkillRegistry;
-import ai.agentican.framework.state.MemTaskStateStore;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.KnowledgeStore;
+import ai.agentican.framework.store.KnowledgeStoreMemory;
+import ai.agentican.framework.registry.PlanRegistryMemory;
+import ai.agentican.framework.registry.PlanRegistry;
+import ai.agentican.framework.registry.SkillRegistryMemory;
+import ai.agentican.framework.registry.SkillRegistry;
+import ai.agentican.framework.store.TaskStateStoreMemory;
+import ai.agentican.framework.store.TaskStateStore;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
@@ -32,7 +32,7 @@ public class AgenticanBeansProducer {
     @DefaultBean
     public KnowledgeStore defaultKnowledgeStore() {
 
-        return new MemKnowledgeStore();
+        return new KnowledgeStoreMemory();
     }
 
     @Produces
@@ -40,7 +40,7 @@ public class AgenticanBeansProducer {
     @DefaultBean
     public TaskStateStore defaultTaskStateStore() {
 
-        return new MemTaskStateStore();
+        return new TaskStateStoreMemory();
     }
 
     @Produces
@@ -48,7 +48,7 @@ public class AgenticanBeansProducer {
     @DefaultBean
     public AgentRegistry defaultAgentRegistry() {
 
-        return new InMemoryAgentRegistry();
+        return new AgentRegistryMemory();
     }
 
     @Produces
@@ -56,7 +56,7 @@ public class AgenticanBeansProducer {
     @DefaultBean
     public SkillRegistry defaultSkillRegistry() {
 
-        return new InMemorySkillRegistry();
+        return new SkillRegistryMemory();
     }
 
     @Produces
@@ -64,6 +64,6 @@ public class AgenticanBeansProducer {
     @DefaultBean
     public PlanRegistry defaultPlanRegistry() {
 
-        return new InMemoryPlanRegistry();
+        return new PlanRegistryMemory();
     }
 }

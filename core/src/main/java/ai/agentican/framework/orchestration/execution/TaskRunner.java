@@ -1,22 +1,20 @@
 package ai.agentican.framework.orchestration.execution;
 
-import ai.agentican.framework.TaskDecorator;
-import ai.agentican.framework.agent.AgentRegistry;
+import ai.agentican.framework.registry.AgentRegistry;
 import ai.agentican.framework.agent.AgentResult;
 import ai.agentican.framework.agent.AgentStatus;
 import ai.agentican.framework.orchestration.execution.resume.ResumeClassifier;
 import ai.agentican.framework.orchestration.execution.resume.ResumePlan;
 import ai.agentican.framework.config.WorkerConfig;
-import ai.agentican.framework.hitl.AskQuestionToolkit;
+import ai.agentican.framework.tools.hitl.AskQuestionToolkit;
 import ai.agentican.framework.hitl.HitlCheckpoint;
-import ai.agentican.framework.hitl.HitlCheckpointType;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.state.RunLog;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
 import ai.agentican.framework.orchestration.model.*;
 import ai.agentican.framework.tools.ToolResult;
-import ai.agentican.framework.tools.ToolkitRegistry;
+import ai.agentican.framework.registry.ToolkitRegistry;
 import ai.agentican.framework.tools.scratchpad.ScratchpadToolkit;
 import ai.agentican.framework.util.Ids;
 import ai.agentican.framework.util.Json;
@@ -40,6 +38,7 @@ public class TaskRunner {
 
     private static final InheritableThreadLocal<ScratchpadToolkit> SHARED_SCRATCHPAD = new InheritableThreadLocal<>();
     private static final InheritableThreadLocal<TaskDecorator> STEP_DECORATOR = new InheritableThreadLocal<>();
+    private static final InheritableThreadLocal<OutputBinding> OUTPUT_BINDING = new InheritableThreadLocal<>();
 
     public static ScratchpadToolkit sharedScratchpad() {
         return SHARED_SCRATCHPAD.get();
@@ -114,9 +113,21 @@ public class TaskRunner {
 
     public TaskResult run(Plan plan, String taskId, Map<String, String> taskInputs, AtomicBoolean taskCancelled) {
 
+        return run(plan, taskId, taskInputs, taskCancelled, null);
+    }
+
+    public TaskResult run(Plan plan, String taskId, Map<String, String> taskInputs, AtomicBoolean taskCancelled,
+                          OutputBinding outputBinding) {
+
         var taskParams = setTaskParameters(plan, taskInputs);
 
-        return run(plan, taskId, null, null, 0, taskParams, taskCancelled, Map.of());
+        if (outputBinding != null) OUTPUT_BINDING.set(outputBinding);
+        try {
+            return run(plan, taskId, null, null, 0, taskParams, taskCancelled, Map.of());
+        }
+        finally {
+            if (outputBinding != null) OUTPUT_BINDING.remove();
+        }
     }
 
     public TaskResult resume(Plan plan, String taskId, Map<String, String> taskInputs, AtomicBoolean cancelled) {
@@ -237,8 +248,11 @@ public class TaskRunner {
         LOG.info("Resuming agent step '{}' via AgentRunner.resumeAfterCrash ({})",
                 agentStep.name(), agent.runner().getClass().getSimpleName());
 
-        var agentResult = agent.runner().resumeAfterCrash(agent, instructions, agentStep.skills(),
-                lastRun, classified, taskStepToolkits, taskId, stepLog.id(), agentStep.name(), cancelled);
+        var agentResult = agent.runner().resumeAfterCrash(agent, instructions,
+                taskId, stepLog.id(), agentStep.name(),
+                agentStep.skills(), taskStepToolkits,
+                null,
+                lastRun, cancelled, classified);
 
         if (agentResult.status() == AgentStatus.COMPLETED) {
 
@@ -290,7 +304,7 @@ public class TaskRunner {
                     "SUSPENDED step has no run log to resume from", List.of());
 
         if (!persistedResponse.approved()
-                && checkpoint.type() == HitlCheckpointType.STEP_OUTPUT) {
+                && checkpoint.type() == HitlCheckpoint.Type.STEP_OUTPUT) {
             LOG.info("Step '{}' rejected via HITL; marking step FAILED with feedback",
                     agentStep.name());
             var msg = persistedResponse.feedback() != null ? persistedResponse.feedback() : "rejected";
@@ -308,9 +322,11 @@ public class TaskRunner {
         LOG.info("Resuming SUSPENDED step '{}' via HITL path (approved={})",
                 agentStep.name(), persistedResponse.approved());
 
-        var agentResult = agent.resume(instructions, agentStep.skills(),
-                savedRun, hitlToolResults, scopedToolkits, taskId, stepLog.id(), agentStep.name(),
-                agentStep.timeout());
+        var agentResult = agent.resume(instructions,
+                taskId, stepLog.id(), agentStep.name(),
+                agentStep.timeout(),
+                agentStep.skills(), scopedToolkits,
+                savedRun, hitlToolResults);
 
         var status = agentResult.status() == AgentStatus.COMPLETED ? TaskStatus.COMPLETED
                 : agentResult.status() == AgentStatus.SUSPENDED ? TaskStatus.SUSPENDED
@@ -815,13 +831,20 @@ public class TaskRunner {
         pool.submit(stepDec != null ? stepDec.decorate(taskStepRunner) : taskStepRunner);
     }
 
+    private static ai.agentican.framework.llm.StructuredOutput structuredOutputFor(PlanStepAgent step) {
+
+        var binding = OUTPUT_BINDING.get();
+        return binding != null && binding.stepName().equals(step.name()) ? binding.structuredOutput() : null;
+    }
+
     private TaskStepResult runTaskStep(PlanStep taskStep, Map<String, String> parentStepOutputs,
                                        Map<String, String> taskParams, AtomicBoolean taskCancelled,
                                        String taskId, String stepId) {
 
         return switch (taskStep) {
 
-            case PlanStepAgent agentTaskStep -> stepAgentRunner.run(agentTaskStep, parentStepOutputs, taskParams, taskId, stepId);
+            case PlanStepAgent agentTaskStep -> stepAgentRunner.run(agentTaskStep, parentStepOutputs, taskParams,
+                    taskId, stepId, structuredOutputFor(agentTaskStep));
             case PlanStepLoop loopTaskStep -> stepLoopRunner.run(loopTaskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
             case PlanStepBranch branchTaskStep -> stepBranchRunner.run(branchTaskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
             case PlanStepCode<?> codeTaskStep -> stepCodeRunner.run(codeTaskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
@@ -875,7 +898,7 @@ public class TaskRunner {
 
         var checkpointType = checkpoint.type();
 
-        if (checkpointType == HitlCheckpointType.STEP_OUTPUT) {
+        if (checkpointType == HitlCheckpoint.Type.STEP_OUTPUT) {
 
             if (response.approved()) {
 
@@ -930,9 +953,11 @@ public class TaskRunner {
                             Placeholders.resolveParams(agentStep.instructions(), taskParams), parentStepOutputs);
 
                     var stepId = stepNameToStepId.get(agentStep.name());
-                    var agentResult = agent.resume(
-                            resolvedTask, agentStep.skills(), savedRun, hitlToolResults, scopedToolkits,
-                            taskId, stepId, agentStep.name(), agentStep.timeout());
+                    var agentResult = agent.resume(resolvedTask,
+                            taskId, stepId, agentStep.name(),
+                            agentStep.timeout(),
+                            agentStep.skills(), scopedToolkits,
+                            savedRun, hitlToolResults);
 
                     var status = agentResult.isCompleted() ? TaskStatus.COMPLETED
                             : agentResult.isSuspended() ? TaskStatus.SUSPENDED
@@ -974,7 +999,7 @@ public class TaskRunner {
 
         try {
 
-            if (checkpoint.type() == HitlCheckpointType.TOOL_CALL) {
+            if (checkpoint.type() == HitlCheckpoint.Type.TOOL_CALL) {
 
                 if (response.approved())
                     return List.of();
@@ -986,7 +1011,7 @@ public class TaskRunner {
                 return List.of(new ToolResult("hitl", checkpoint.description(), content));
             }
 
-            if (checkpoint.type() == HitlCheckpointType.QUESTION) {
+            if (checkpoint.type() == HitlCheckpoint.Type.QUESTION) {
 
                 var content = Json.writeValueAsString(Map.of(
                         "question", checkpoint.description(),

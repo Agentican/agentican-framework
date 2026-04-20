@@ -1,6 +1,6 @@
 package ai.agentican.framework;
 
-import ai.agentican.framework.tools.HitlType;
+import ai.agentican.framework.hitl.HitlType;
 import ai.agentican.framework.tools.Tool;
 import ai.agentican.framework.tools.ToolDefinition;
 import ai.agentican.framework.tools.ToolRecord;

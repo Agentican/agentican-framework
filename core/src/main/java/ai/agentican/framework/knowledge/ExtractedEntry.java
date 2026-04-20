@@ -14,6 +14,7 @@ public record ExtractedEntry(
         if (action == null) throw new IllegalArgumentException("action is required");
         if (action == Action.UPDATE && (existingEntryId == null || existingEntryId.isBlank()))
             throw new IllegalArgumentException("existingEntryId is required for UPDATE");
+
         if (facts == null) facts = List.of();
     }
 

@@ -2,25 +2,25 @@
 
 Configure Agentican via the fluent builder, a `RuntimeConfig` record (for programmatic composition), or a YAML file.
 
-## Agentican.builder()
+## AgenticanRuntime.builder()
 
 Three entry points:
 
 ```java
 // Fluent-only
-Agentican.builder()...build();
+AgenticanRuntime.builder()...build();
 
 // Pre-seeded from an existing RuntimeConfig
-Agentican.builder(runtimeConfig)....build();
+AgenticanRuntime.builder(runtimeConfig)....build();
 
 // Load YAML, then optionally add more
-Agentican.builder(Path.of("agentican.yml"))....build();
+AgenticanRuntime.builder(Path.of("agentican.yml"))....build();
 ```
 
 Fluent methods mirror the `RuntimeConfig` shape — declare LLMs, MCP servers, agents, skills, plans, Composio, and worker settings directly:
 
 ```java
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
         .worker(WorkerConfig.builder().maxTurns(20).build())
         .agent(AgentConfig.builder()
@@ -128,7 +128,7 @@ The framework validates that `baseUrl` is non-blank when `provider == "openai-co
 You can register multiple LLMs — mixing providers freely — and assign them to specific agents:
 
 ```java
-Agentican.builder()
+AgenticanRuntime.builder()
         .llm(LlmConfig.builder().name("default").apiKey(anthropicKey).model("claude-sonnet-4-5").build())
         .llm(LlmConfig.builder().name("fast").provider("openai").apiKey(openaiKey).model("gpt-4o-mini").build())
         .llm(LlmConfig.builder().name("grounded").provider("gemini").apiKey(geminiKey).model("gemini-2.5-flash").build())
@@ -172,7 +172,7 @@ Retryable errors: `IOException`, `TimeoutException`, HTTP 429/500/503/529, rate 
 
 Non-retryable errors fail immediately: bad request (400), authentication (401), validation errors.
 
-On exhaustion, throws `LlmCallException` with agent name, step name, turn index, and attempt count.
+On exhaustion, the last exception is rethrown (wrapped in a `RuntimeException` if it was checked).
 
 ### LLM Streaming
 
@@ -316,18 +316,18 @@ Environment variables in `${VAR}` form are resolved at load time.
 
 ## Agentican Builder
 
-The `Agentican.builder()` is the one-stop entry for both declarative config and framework wiring. It can start fresh, pre-seed from a `RuntimeConfig`, or load a YAML file:
+The `AgenticanRuntime.builder()` is the one-stop entry for both declarative config and framework wiring. It can start fresh, pre-seed from a `RuntimeConfig`, or load a YAML file:
 
 ```java
-Agentican.builder()                               // fresh
-Agentican.builder(runtimeConfig)                  // pre-seeded
-Agentican.builder(Path.of("agentican.yml"))      // YAML → RuntimeConfig → pre-seeded
+AgenticanRuntime.builder()                               // fresh
+AgenticanRuntime.builder(runtimeConfig)                  // pre-seeded
+AgenticanRuntime.builder(Path.of("agentican.yml"))      // YAML → RuntimeConfig → pre-seeded
 ```
 
 All fluent methods:
 
 ```java
-Agentican.builder()
+AgenticanRuntime.builder()
         // Declarative config (parity with RuntimeConfig's lists):
         .llm(LlmConfig.builder()...build())
         .agent(AgentConfig.builder().externalId(...).name(...).role(...).build())
@@ -377,7 +377,7 @@ If you want to inject your own `LlmClient` (for testing, custom providers, or to
 ```java
 LlmClient cachedClient = LlmClient.withLogging(myCustomClient);
 
-Agentican.builder()
+AgenticanRuntime.builder()
         .llm("default", cachedClient)
         .build();
 ```
@@ -387,17 +387,17 @@ Agentican.builder()
 If not provided, Agentican creates one with a logging notifier (auto-approves, logs each checkpoint).
 
 ```java
-Agentican.builder()
+AgenticanRuntime.builder()
         .hitlManager(new HitlManager(myNotifier, Duration.ofHours(2)))
         .build();
 ```
 
 ### Custom TaskStateStore
 
-If not provided, Agentican creates a `MemTaskStateStore`. Implement your own for durable storage — the `TaskStateStore` interface uses granular mutation methods (`taskStarted()`, `stepStarted()`, `runStarted()`, `turnStarted()`, `messageSent()`, etc.) plus query methods `load(taskId)` and `list()`.
+If not provided, Agentican creates a `TaskStateStoreMemory`. Implement your own for durable storage — the `TaskStateStore` interface uses granular mutation methods (`taskStarted()`, `stepStarted()`, `runStarted()`, `turnStarted()`, `messageSent()`, etc.) plus query methods `load(taskId)` and `list()`.
 
 ```java
-Agentican.builder()
+AgenticanRuntime.builder()
         .taskStateStore(new DatabaseTaskStateStore(dataSource))
         .build();
 ```
@@ -406,7 +406,7 @@ Agentican.builder()
 
 `AgentConfig`, `SkillConfig`, `PlanConfig`, and `Plan` all carry an optional `externalId` separate from their internal UUID `id`. The `externalId` is a stable business key that a persistent catalog upserts on, so redeploys don't duplicate rows.
 
-Anything registered through `RuntimeConfig` or the Agentican fluent builder **must** set an `externalId`. `Agentican.build()` throws `IllegalStateException` on any missing one:
+Anything registered through `RuntimeConfig` or the Agentican fluent builder **must** set an `externalId`. `AgenticanRuntime.build()` throws `IllegalStateException` on any missing one:
 
 ```
 skill 'citations' is missing an externalId. Config-file and fluent-builder
@@ -458,7 +458,7 @@ llm:
 `Agentican` implements `AutoCloseable`. Use try-with-resources:
 
 ```java
-try (var agentican = Agentican.builder(runtimeConfig).build()) {
+try (var agentican = AgenticanRuntime.builder(runtimeConfig).build()) {
     // ...
 } // automatically closes the virtual thread executor and toolkits
 ```

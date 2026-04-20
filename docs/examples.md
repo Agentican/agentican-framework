@@ -7,7 +7,7 @@ Common patterns and recipes for using Agentican.
 Plan and execute a task from natural language:
 
 ```java
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
         .build()) {
 
@@ -87,7 +87,7 @@ public class DbToolkit implements Toolkit {
 }
 
 // Register and use:
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
         .toolkit("db", new DbToolkit(myDataSource))
         .build()) {
 
@@ -102,7 +102,7 @@ Block execution of sensitive tools until the user approves:
 ```java
 var hitlManager = new HitlManager((mgr, checkpoint) -> {
 
-    if (checkpoint.type() == HitlCheckpointType.TOOL_CALL) {
+    if (checkpoint.type() == HitlCheckpoint.Type.TOOL_CALL) {
 
         System.out.println("\n[APPROVAL NEEDED]");
         System.out.println("Tool: " + checkpoint.description());
@@ -119,7 +119,7 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
     }
 });
 
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
         .toolkit("email", new EmailToolkit())  // send_email is HitlType.APPROVAL
         .hitlManager(hitlManager)
         .build()) {
@@ -179,7 +179,7 @@ The agent can ask the user mid-workflow via the built-in `ASK_QUESTION` tool. Th
 ```java
 var hitlManager = new HitlManager((mgr, checkpoint) -> {
 
-    if (checkpoint.type() == HitlCheckpointType.QUESTION) {
+    if (checkpoint.type() == HitlCheckpoint.Type.QUESTION) {
 
         System.out.println("\nAgent asks: " + checkpoint.description());
         System.out.print("Your answer: ");
@@ -190,7 +190,7 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
     }
 });
 
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
         .hitlManager(hitlManager)
         .build()) {
 
@@ -255,7 +255,7 @@ record HttpInput(String url, String method) {
 }
 record HttpOutput(String body, int status) { }
 
-var agentican = Agentican.builder()
+var agentican = AgenticanRuntime.builder()
         .codeStep(
                 new CodeStepSpec<>("http-get", null, HttpInput.class, HttpOutput.class),
                 (HttpInput input, StepContext ctx) -> {
@@ -290,7 +290,7 @@ The agent reads individual fields from the typed JSON output via `{{step.X.outpu
 Use a fast/cheap model for classification and a stronger one for content generation:
 
 ```java
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
         .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
         .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
         .agent(AgentConfig.builder()
@@ -311,9 +311,9 @@ try (var agentican = Agentican.builder()
 After a task runs, the `TaskLog` contains the full execution history:
 
 ```java
-var taskStateStore = new MemTaskStateStore();
+var taskStateStore = new TaskStateStoreMemory();
 
-try (var agentican = Agentican.builder()
+try (var agentican = AgenticanRuntime.builder()
         .taskStateStore(taskStateStore)
         .build()) {
 
@@ -343,7 +343,7 @@ LlmClient myClient = request -> {
     // your custom LLM provider
 };
 
-Agentican.builder()
+AgenticanRuntime.builder()
         .llm("default", myClient)  // still gets automatic retry wrapping
         .build();
 ```

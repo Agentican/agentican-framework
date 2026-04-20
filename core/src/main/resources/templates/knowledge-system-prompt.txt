@@ -35,7 +35,7 @@
     <id>{e.id}</id>
     <name>{e.name}</name>
     <description>{e.description}</description>
-    <fact-count>{e.factCount}</fact-count>
+    <fact-count>{e.facts.size}</fact-count>
   </entry>{/for}
 </existing-entries>{/if}
 

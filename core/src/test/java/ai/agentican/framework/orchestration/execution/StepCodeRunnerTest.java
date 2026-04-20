@@ -2,19 +2,18 @@ package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.MockLlmClient;
 import ai.agentican.framework.agent.Agent;
-import ai.agentican.framework.agent.InMemoryAgentRegistry;
+import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.agent.SmacAgentRunner;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.orchestration.code.CodeStep;
 import ai.agentican.framework.orchestration.code.CodeStepRegistry;
 import ai.agentican.framework.orchestration.code.CodeStepSpec;
-import ai.agentican.framework.orchestration.code.StepContext;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
 import ai.agentican.framework.orchestration.model.PlanStepCode;
-import ai.agentican.framework.state.MemTaskStateStore;
-import ai.agentican.framework.tools.ToolkitRegistry;
+import ai.agentican.framework.store.TaskStateStoreMemory;
+import ai.agentican.framework.registry.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -46,10 +45,10 @@ class StepCodeRunnerTest {
         return Agent.builder().config(AgentConfig.builder().name(name).role("Test agent for " + name).build()).runner(runner).build();
     }
 
-    private TaskRunner taskRunner(InMemoryAgentRegistry agents, CodeStepRegistry codeSteps) {
+    private TaskRunner taskRunner(AgentRegistryMemory agents, CodeStepRegistry codeSteps) {
 
         return new TaskRunner(agents, autoApproveHitl(), new ToolkitRegistry(),
-                new MemTaskStateStore(), null, 0, null, codeSteps);
+                new TaskStateStoreMemory(), null, 0, null, codeSteps);
     }
 
     @Test
@@ -58,7 +57,7 @@ class StepCodeRunnerTest {
         var mockLlm = new MockLlmClient()
                 .onSend("final output", endTurn("AGENT DONE"));
 
-        var agents = new InMemoryAgentRegistry();
+        var agents = new AgentRegistryMemory();
         agents.register(createAgent("collector", mockLlm));
 
         var codeSteps = new CodeStepRegistry();
@@ -94,7 +93,7 @@ class StepCodeRunnerTest {
     @Test
     void typedRecordOutputSerializesToJson() {
 
-        var agents = new InMemoryAgentRegistry();
+        var agents = new AgentRegistryMemory();
 
         var codeSteps = new CodeStepRegistry();
         CodeStep<Void, HttpOut> step = (input, ctx) -> new HttpOut("response body", 200);
@@ -124,7 +123,7 @@ class StepCodeRunnerTest {
         var mockLlm = new MockLlmClient()
                 .onSend("body=hello world status=201", endTurn("DONE"));
 
-        var agents = new InMemoryAgentRegistry();
+        var agents = new AgentRegistryMemory();
         agents.register(createAgent("reader", mockLlm));
 
         var codeSteps = new CodeStepRegistry();
@@ -150,7 +149,7 @@ class StepCodeRunnerTest {
 
         var captured = new java.util.concurrent.atomic.AtomicReference<Object>();
 
-        var agents = new InMemoryAgentRegistry();
+        var agents = new AgentRegistryMemory();
 
         var codeSteps = new CodeStepRegistry();
         @SuppressWarnings({"unchecked", "rawtypes"})
@@ -182,7 +181,7 @@ class StepCodeRunnerTest {
 
         var ran = new java.util.concurrent.atomic.AtomicBoolean(false);
 
-        var agents = new InMemoryAgentRegistry();
+        var agents = new AgentRegistryMemory();
 
         var codeSteps = new CodeStepRegistry();
         codeSteps.register(new CodeStepSpec<>("noop", null, Void.class, Void.class),
@@ -204,7 +203,7 @@ class StepCodeRunnerTest {
     @Test
     void missingSlugFailsTheStep() {
 
-        var agents = new InMemoryAgentRegistry();
+        var agents = new AgentRegistryMemory();
         var codeSteps = new CodeStepRegistry();
 
         var runner = taskRunner(agents, codeSteps);
@@ -226,7 +225,7 @@ class StepCodeRunnerTest {
     @Test
     void exceptionInCodeStepSurfacesAsFailure() {
 
-        var agents = new InMemoryAgentRegistry();
+        var agents = new AgentRegistryMemory();
         var codeSteps = new CodeStepRegistry();
         codeSteps.register(new CodeStepSpec<>("boom", null, Void.class, String.class),
                 (CodeStep<Void, String>) (input, ctx) -> { throw new IllegalStateException("kaboom"); });
@@ -246,7 +245,7 @@ class StepCodeRunnerTest {
     @Test
     void stringOutputStoredVerbatim() {
 
-        var agents = new InMemoryAgentRegistry();
+        var agents = new AgentRegistryMemory();
         var codeSteps = new CodeStepRegistry();
         codeSteps.register(new CodeStepSpec<>("speak", null, Void.class, String.class),
                 (CodeStep<Void, String>) (input, ctx) -> "hello world");

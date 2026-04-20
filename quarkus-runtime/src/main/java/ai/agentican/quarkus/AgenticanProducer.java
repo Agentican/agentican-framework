@@ -1,19 +1,20 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.Agentican;
-import ai.agentican.framework.AgenticanService;
-import ai.agentican.framework.agent.AgentRegistry;
+import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.AgenticanRecovery;
+import ai.agentican.framework.registry.AgentRegistry;
 import ai.agentican.framework.hitl.HitlManager;
-import ai.agentican.framework.knowledge.KnowledgeStore;
-import ai.agentican.framework.orchestration.PlanRegistry;
-import ai.agentican.framework.skill.SkillRegistry;
-import ai.agentican.framework.TaskListener;
-import ai.agentican.framework.TaskDecorator;
+import ai.agentican.framework.store.KnowledgeStore;
+import ai.agentican.framework.registry.PlanRegistry;
+import ai.agentican.framework.registry.SkillRegistry;
+import ai.agentican.framework.orchestration.execution.TaskListener;
+import ai.agentican.framework.orchestration.execution.TaskDecorator;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmClientDecorator;
-import ai.agentican.framework.state.TaskStateStore;
+import ai.agentican.framework.store.TaskStateStore;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
 import ai.agentican.framework.tools.Toolkit;
+import ai.agentican.framework.hitl.HitlCheckpoint;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Disposes;
 import jakarta.enterprise.inject.Instance;
@@ -66,11 +67,11 @@ public class AgenticanProducer {
     @Produces
     @ApplicationScoped
     @io.quarkus.runtime.Startup
-    public Agentican agentican() {
+    public AgenticanRuntime agentican() {
 
         var runtimeConfig = RuntimeConfigConverter.toRuntimeConfig(config);
 
-        var builder = Agentican.builder(runtimeConfig)
+        var builder = AgenticanRuntime.builder(runtimeConfig)
                 .hitlManager(hitlManager)
                 .knowledgeStore(knowledgeStore)
                 .taskStateStore(taskStateStore)
@@ -157,7 +158,7 @@ public class AgenticanProducer {
                     listenerList.forEach(l -> l.onToolCallCompleted(taskId, toolCallId));
                 }
                 @Override public void onHitlNotified(String taskId, String hitlId,
-                                                      ai.agentican.framework.hitl.HitlCheckpointType type) {
+                                                      ai.agentican.framework.hitl.HitlCheckpoint.Type type) {
                     listenerList.forEach(l -> l.onHitlNotified(taskId, hitlId, type));
                 }
                 @Override public void onHitlResponded(String taskId, String hitlId, boolean approved) {
@@ -200,21 +201,21 @@ public class AgenticanProducer {
         return builder.build();
     }
 
-    public void disposeAgentican(@Disposes Agentican agentican) {
+    public void disposeAgentican(@Disposes AgenticanRuntime agentican) {
 
         agentican.close();
     }
 
     @Produces
     @ApplicationScoped
-    public AgenticanService agenticanService(Agentican agentican) {
+    public AgenticanRecovery agenticanRecovery(AgenticanRuntime runtime) {
 
-        return new AgenticanService(agentican);
+        return new AgenticanRecovery(runtime);
     }
 
-    public void disposeAgenticanService(@Disposes AgenticanService service) {
+    public void disposeAgenticanRecovery(@Disposes AgenticanRecovery recovery) {
 
-        service.close();
+        recovery.close();
     }
 
     private static String beanName(Bean<?> bean) {

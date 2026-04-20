@@ -32,7 +32,7 @@ canned responses from a FIFO queue. If no response is queued, returns a generic 
 class MyAgentTest {
 
     @Inject MockLlmClient mockLlm;
-    @Inject Agentican agentican;
+    @Inject AgenticanRuntime agentican;
 
     @BeforeEach
     void reset() { mockLlm.reset(); }
