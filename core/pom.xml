@@ -6,7 +6,7 @@
     <parent>
         <groupId>ai.agentican</groupId>
         <artifactId>agentican-framework-parent</artifactId>
-        <version>0.1.0-alpha.2-SNAPSHOT</version>
+        <version>0.1.0-alpha.2</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
