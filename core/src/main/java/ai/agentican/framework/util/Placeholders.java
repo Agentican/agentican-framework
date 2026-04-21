@@ -14,9 +14,9 @@ public class Placeholders {
 
     private static final Logger LOG = LoggerFactory.getLogger(Placeholders.class);
 
-    public static final Pattern STEP_OUTPUT_PATTERN = Pattern.compile("\\{\\{step\\.([a-zA-Z0-9_-]+)\\.output}}");
+    public static final Pattern STEP_OUTPUT_PATTERN = Pattern.compile("\\{\\{step\\.([a-zA-Z0-9 _-]+)\\.output}}");
     public static final Pattern STEP_OUTPUT_FIELD_PATTERN =
-            Pattern.compile("\\{\\{step\\.([a-zA-Z0-9_-]+)\\.output\\.([a-zA-Z0-9_.-]+)}}");
+            Pattern.compile("\\{\\{step\\.([a-zA-Z0-9 _-]+)\\.output\\.([a-zA-Z0-9_.-]+)}}");
     private static final Pattern PARAM_PLACEHOLDER = Pattern.compile("\\{\\{param\\.([a-zA-Z0-9_-]+)}}");
 
     public static String resolveParams(String text, Map<String, String> params) {

@@ -39,18 +39,18 @@ class PlanStepCodeTest {
     @Test
     void builderProducesEquivalentRecord() {
 
-        var inputs = new Inputs("http://example");
+        var input = new Inputs("http://example");
 
         var built = PlanStepCode.<Inputs>builder("validate")
                 .code("validate-payment")
-                .inputs(inputs)
+                .input(input)
                 .dependency("extract")
                 .dependency("lookup")
                 .build();
 
         assertEquals("validate", built.name());
         assertEquals("validate-payment", built.codeSlug());
-        assertSame(inputs, built.inputs());
+        assertSame(input, built.input());
         assertEquals(List.of("extract", "lookup"), built.dependencies());
         assertFalse(built.hitl());
     }
@@ -64,10 +64,10 @@ class PlanStepCodeTest {
     }
 
     @Test
-    void inputsMayBeNull() {
+    void inputMayBeNull() {
 
         var step = new PlanStepCode<>("name", "slug", null, List.of());
 
-        assertNull(step.inputs());
+        assertNull(step.input());
     }
 }

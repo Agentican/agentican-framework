@@ -166,17 +166,17 @@ public class PlannerAgent {
 
             var refinement = Json.findObject(llmResponse.text(), RefinedPlan.class);
 
-            if (refinement == null || refinement.stepConfigs == null || refinement.stepConfigs.isEmpty()) {
+            if (refinement == null || refinement.steps == null || refinement.steps.isEmpty()) {
                 LOG.warn("Refinement returned empty plan; using initial plan");
                 return initial;
             }
 
-            var params = refinement.paramConfigs != null
-                    ? refinement.paramConfigs.stream().map(pc ->
+            var params = refinement.params != null
+                    ? refinement.params.stream().map(pc ->
                             new PlanParam(pc.name(), pc.description(), pc.defaultValue(), pc.required())).toList()
                     : initial.params();
 
-            var steps = refinement.stepConfigs.stream().map(PlanConfig.PlanStepConfig::toPlanStep).toList();
+            var steps = refinement.steps.stream().map(PlanConfig.PlanStepConfig::toPlanStep).toList();
 
             return new Plan(initial.id(), initial.name(), initial.description(),
                     params, steps, initial.externalId(), initial.outputStep());
@@ -269,6 +269,6 @@ public class PlannerAgent {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record RefinedPlan(
-            List<PlanConfig.PlanParamConfig> paramConfigs,
-            List<PlanConfig.PlanStepConfig> stepConfigs) {}
+            List<PlanConfig.PlanParamConfig> params,
+            List<PlanConfig.PlanStepConfig> steps) {}
 }

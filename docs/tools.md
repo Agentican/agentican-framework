@@ -190,19 +190,27 @@ MCP toolkits are registered by `slug`. The framework supports both Streamable HT
 
 ## Tool Scoping
 
-A task step's `toolkits` field controls which toolkits the agent has access to:
+A step's `tools` field lists the tool **names** the agent is allowed to call for that step. The registry resolves each name to its owning toolkit at dispatch time:
 
 ```java
 PlanStepAgent.builder("create-page")
     .agent("documentation-specialist")
     .instructions("Create a Notion page")
-    .toolkit("notion")  // ← only notion tools available to this step
+    .tools(List.of("create_page", "append_block"))  // ← explicit tool names
     .build();
 ```
 
-The agent only sees tools from the listed toolkits (plus the always-available scratchpad and ASK_QUESTION). This keeps the LLM's tool list focused and reduces hallucinated tool calls.
+Equivalent fluent forms on the `PlanConfig` step builder:
 
-> **Tool name collisions:** If two toolkits scoped to the same step define a tool with the same name, the framework throws an `IllegalStateException` with a message naming both toolkit slugs and the conflicting tool name. Fix by scoping the toolkits to different steps or renaming the conflicting tool.
+```java
+.step("create-page", s -> s.agent("documentation-specialist")
+    .instructions("Create a Notion page")
+    .tools("create_page", "append_block"))
+```
+
+The agent only sees the listed tools (plus the always-available scratchpad and ASK_QUESTION). Keeping the list tight focuses the LLM's tool-selection and reduces hallucinated calls.
+
+> **Tool name collisions:** If two toolkits define a tool with the same name and both are in scope, `ToolkitRegistry.scopeForStep` keeps the first match (insertion order). Avoid collisions by renaming or picking tool names that won't overlap across your registered toolkits.
 
 ## Tool Execution
 

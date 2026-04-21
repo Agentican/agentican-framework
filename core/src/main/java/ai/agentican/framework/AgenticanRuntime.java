@@ -296,8 +296,9 @@ public class AgenticanRuntime implements AutoCloseable {
         public AgenticanBuilder llm(String name, LlmClient llm) { llms.put(name, llm); return this; }
         public AgenticanBuilder toolkit(String slug, Toolkit toolkit) { toolkits.put(slug, toolkit); return this; }
 
-        public <I, O> AgenticanBuilder codeStep(CodeStepSpec<I, O> spec, CodeStep<I, O> executor) {
-            codeStepRegistry.register(spec, executor);
+        public <I, O> AgenticanBuilder codeStep(String slug, Class<I> inputType, Class<O> outputType,
+                                                CodeStep<I, O> executor) {
+            codeStepRegistry.register(new CodeStepSpec<>(slug, null, inputType, outputType), executor);
             return this;
         }
 

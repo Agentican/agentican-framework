@@ -53,7 +53,7 @@ public class PlanStepCodeDeserializer extends StdDeserializer<PlanStepCode<?>> {
             for (var dep : depsNode)
                 dependencies.add(dep.asText());
 
-        var inputsNode = node.get("inputs");
+        var inputNode = node.get("input");
 
         CodeStepRegistry registry;
         try {
@@ -64,7 +64,7 @@ public class PlanStepCodeDeserializer extends StdDeserializer<PlanStepCode<?>> {
             registry = null;
         }
 
-        Object inputs;
+        Object input;
 
         if (registry != null) {
 
@@ -75,15 +75,15 @@ public class PlanStepCodeDeserializer extends StdDeserializer<PlanStepCode<?>> {
 
             var inputType = registered.spec().inputType();
 
-            if (inputsNode == null || inputsNode.isNull() || inputType == Void.class)
-                inputs = null;
+            if (inputNode == null || inputNode.isNull() || inputType == Void.class)
+                input = null;
             else
-                inputs = ctxt.readTreeAsValue(inputsNode, inputType);
+                input = ctxt.readTreeAsValue(inputNode, inputType);
         }
         else {
-            inputs = inputsNode != null && !inputsNode.isNull() ? inputsNode : null;
+            input = inputNode != null && !inputNode.isNull() ? inputNode : null;
         }
 
-        return new PlanStepCode<>(name, slug, inputs, dependencies);
+        return new PlanStepCode<>(name, slug, input, dependencies);
     }
 }

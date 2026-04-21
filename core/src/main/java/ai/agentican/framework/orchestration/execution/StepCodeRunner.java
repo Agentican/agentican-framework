@@ -60,7 +60,7 @@ class StepCodeRunner {
 
         try {
 
-            Object typedInput = resolveInput(taskStep.inputs(), inputType, parentStepOutputs, taskParams);
+            Object typedInput = resolveInput(taskStep.input(), inputType, parentStepOutputs, taskParams);
 
             var context = new StepContext(taskId, stepId, cancelled, taskStateStore, hitlManager);
 

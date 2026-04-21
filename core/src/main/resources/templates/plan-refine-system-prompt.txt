@@ -58,10 +58,10 @@
   The JSON shape mirrors the input plan (without `name`/`description` — those stay from the original):
 
   {
-    "paramConfigs": [
+    "params": [
       {"name": "<snake_case>", "description": "<help>", "defaultValue": "<default>", "required": true}
     ],
-    "stepConfigs": [
+    "steps": [
       {
         "name": "<step-name — MUST match an input step, or a new setup step>",
         "type": "agent" | "loop" | "branch",
@@ -73,11 +73,11 @@
 
         // For loop:
         "over": "<producer step name>",
-        "stepConfigs": [ /* refined body */ ],
+        "steps": [ /* refined body */ ],
 
         // For branch:
         "from": "<classifier step name>",
-        "pathConfigs": [ {"pathName": "...", "stepConfigs": [...]} ],
+        "pathConfigs": [ {"pathName": "...", "steps": [...]} ],
         "defaultPath": "<path name>"
       }
     ]

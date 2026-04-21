@@ -16,7 +16,7 @@ import com.fasterxml.jackson.databind.ObjectReader;
  * <p>Serialization is plain Jackson — no codec needed — but a {@code toJson}
  * helper is provided for symmetry. Use this codec from any caller that
  * deserializes a {@link Plan} (or any structure containing
- * {@link PlanStepCode}) so the typed {@code I inputs} field is reconstructed
+ * {@link PlanStepCode}) so the typed {@code I input} field is reconstructed
  * correctly.
  */
 public class PlanCodec {

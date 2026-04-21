@@ -20,29 +20,27 @@ import java.util.function.Consumer;
 public record  PlanConfig(
         String name,
         String description,
-        List<PlanParamConfig> paramConfigs,
-        List<PlanStepConfig> stepConfigs,
-        String externalId) {
+        List<PlanParamConfig> params,
+        List<PlanStepConfig> steps,
+        String externalId,
+        String outputStep) {
 
     public PlanConfig {
 
         if (name == null || name.isBlank())
             throw new IllegalArgumentException("Task name is required");
 
-        if (stepConfigs == null)
-            stepConfigs = List.of();
+        if (steps == null)
+            steps = List.of();
 
-        if (paramConfigs == null)
-            paramConfigs = List.of();
+        if (params == null)
+            params = List.of();
 
         if (externalId != null && externalId.isBlank())
             externalId = null;
-    }
 
-    public PlanConfig(String name, String description, List<PlanParamConfig> paramConfigs,
-                      List<PlanStepConfig> stepConfigs) {
-
-        this(name, description, paramConfigs, stepConfigs, null);
+        if (outputStep != null && outputStep.isBlank())
+            outputStep = null;
     }
 
     public static PlanConfigBuilder builder() {
@@ -59,12 +57,13 @@ public record  PlanConfig(
 
         var builder = Plan.builder(name)
                 .description(description)
-                .externalId(externalId);
+                .externalId(externalId)
+                .outputStep(outputStep);
 
-        paramConfigs.forEach(tpc ->
+        params.forEach(tpc ->
                 builder.param(new PlanParam(tpc.name(), tpc.description(), tpc.defaultValue(), tpc.required())));
 
-        stepConfigs.forEach(s -> builder.step(s.toPlanStep(codeStepRegistry)));
+        steps.forEach(s -> builder.step(s.toPlanStep(codeStepRegistry)));
 
         return builder.build();
     }
@@ -75,105 +74,132 @@ public record  PlanConfig(
         private String description;
         private String externalId;
 
-        private final List<PlanParamConfig> paramConfigs = new ArrayList<>();
-        private final List<PlanStepConfig> stepConfigs = new ArrayList<>();
+        private final List<PlanParamConfig> params = new ArrayList<>();
+        private final List<PlanStepConfig> steps = new ArrayList<>();
+
+        private String outputStep;
 
         public PlanConfigBuilder name(String name) { this.name = name; return this; }
         public PlanConfigBuilder description(String description) { this.description = description; return this; }
         public PlanConfigBuilder externalId(String externalId) { this.externalId = externalId; return this; }
+        public PlanConfigBuilder outputStep(String stepName) { this.outputStep = stepName; return this; }
 
-        public PlanConfigBuilder param(PlanParamConfig param) { this.paramConfigs.add(param); return this; }
+        public PlanConfigBuilder param(PlanParamConfig param) { this.params.add(param); return this; }
         public PlanConfigBuilder param(String name, String description, String defaultValue, boolean required) {
-            this.paramConfigs.add(new PlanParamConfig(name, description, defaultValue, required));
+            this.params.add(new PlanParamConfig(name, description, defaultValue, required));
             return this;
         }
 
-        public PlanConfigBuilder step(PlanStepConfig step) { this.stepConfigs.add(step); return this; }
-        public PlanConfigBuilder steps(List<PlanStepConfig> steps) { this.stepConfigs.addAll(steps); return this; }
+        public PlanConfigBuilder step(PlanStepConfig step) { this.steps.add(step); return this; }
+        public PlanConfigBuilder steps(List<PlanStepConfig> steps) { this.steps.addAll(steps); return this; }
 
         public PlanConfigBuilder step(String name, Consumer<StepBuilder> config) {
             var b = new StepBuilder(name);
             config.accept(b);
-            this.stepConfigs.add(b.build());
+            this.steps.add(b.build());
             return this;
         }
 
         public PlanConfigBuilder loop(String name, Consumer<LoopBuilder> config) {
             var b = new LoopBuilder(name);
             config.accept(b);
-            this.stepConfigs.add(b.build());
+            this.steps.add(b.build());
             return this;
         }
 
         public PlanConfigBuilder branch(String name, Consumer<BranchBuilder> config) {
             var b = new BranchBuilder(name);
             config.accept(b);
-            this.stepConfigs.add(b.build());
-            return this;
-        }
-
-        public PlanConfigBuilder codeStep(String name, Consumer<CodeStepBuilder> config) {
-            var b = new CodeStepBuilder(name);
-            config.accept(b);
-            this.stepConfigs.add(b.build());
+            this.steps.add(b.build());
             return this;
         }
 
         public PlanConfig build() {
 
-            return new PlanConfig(name, description, paramConfigs, stepConfigs, externalId);
+            return new PlanConfig(name, description, params, steps, externalId, outputStep);
         }
     }
 
     public static class StepBuilder {
 
         private final String name;
+
         private String agent;
         private String instructions;
-        private List<String> dependencies = List.of();
-        private boolean hitl;
         private List<String> skills = List.of();
         private List<String> tools = List.of();
 
+        private String codeSlug;
+        private Object input;
+
+        private List<String> dependencies = List.of();
+        private boolean hitl;
+
         StepBuilder(String name) { this.name = name; }
 
-        public StepBuilder agent(String agent) { this.agent = agent; return this; }
-        public StepBuilder instructions(String instructions) { this.instructions = instructions; return this; }
-        public StepBuilder dependencies(String... deps) { this.dependencies = List.of(deps); return this; }
-        public StepBuilder dependencies(List<String> deps) { this.dependencies = deps; return this; }
-        public StepBuilder hitl(boolean hitl) { this.hitl = hitl; return this; }
-        public StepBuilder hitl() { this.hitl = true; return this; }
-        public StepBuilder skills(String... skills) { this.skills = List.of(skills); return this; }
-        public StepBuilder skills(List<String> skills) { this.skills = skills; return this; }
-        public StepBuilder tools(String... tools) { this.tools = List.of(tools); return this; }
-        public StepBuilder tools(List<String> tools) { this.tools = tools; return this; }
+        public AgentStepBuilder agent(String agent) {
+
+            if (codeSlug != null)
+                throw new IllegalStateException(
+                        "Step '" + name + "' already declared code('" + codeSlug + "'); cannot also call agent()");
+
+            this.agent = agent;
+
+            return new AgentStepBuilder(this);
+        }
+
+        public CodeStepBuilder code(String slug) {
+
+            if (agent != null)
+                throw new IllegalStateException(
+                        "Step '" + name + "' already declared agent('" + agent + "'); cannot also call code()");
+
+            this.codeSlug = slug;
+
+            return new CodeStepBuilder(this);
+        }
 
         PlanStepConfig build() {
 
-            return new PlanStepConfig(name, "agent", agent, instructions, dependencies, hitl, skills, tools,
-                    null, null, null, null, null, null, null);
+            if (agent != null)
+                return new PlanStepConfig(name, "agent", agent, instructions, dependencies, hitl, skills, tools,
+                        null, null, null, null, null, null, null);
+
+            if (codeSlug != null)
+                return new PlanStepConfig(name, "code", null, null, dependencies, false, null, null,
+                        null, null, null, null, null, codeSlug, input);
+
+            throw new IllegalStateException(
+                    "Step '" + name + "' must declare either .agent(\"...\") or .code(\"slug\")");
         }
+    }
+
+    public static class AgentStepBuilder {
+
+        private final StepBuilder parent;
+
+        AgentStepBuilder(StepBuilder parent) { this.parent = parent; }
+
+        public AgentStepBuilder instructions(String instructions) { parent.instructions = instructions; return this; }
+        public AgentStepBuilder dependencies(String... deps) { parent.dependencies = List.of(deps); return this; }
+        public AgentStepBuilder dependencies(List<String> deps) { parent.dependencies = deps; return this; }
+        public AgentStepBuilder hitl(boolean hitl) { parent.hitl = hitl; return this; }
+        public AgentStepBuilder hitl() { parent.hitl = true; return this; }
+        public AgentStepBuilder skills(String... skills) { parent.skills = List.of(skills); return this; }
+        public AgentStepBuilder skills(List<String> skills) { parent.skills = skills; return this; }
+        public AgentStepBuilder tools(String... tools) { parent.tools = List.of(tools); return this; }
+        public AgentStepBuilder tools(List<String> tools) { parent.tools = tools; return this; }
     }
 
     public static class CodeStepBuilder {
 
-        private final String name;
-        private String codeSlug;
-        private Object inputs;
-        private List<String> dependencies = List.of();
+        private final StepBuilder parent;
 
-        CodeStepBuilder(String name) { this.name = name; }
+        CodeStepBuilder(StepBuilder parent) { this.parent = parent; }
 
-        public CodeStepBuilder code(String slug) { this.codeSlug = slug; return this; }
-        public <I> CodeStepBuilder input(I input) { this.inputs = input; return this; }
-        public CodeStepBuilder dependencies(String... deps) { this.dependencies = List.of(deps); return this; }
-        public CodeStepBuilder dependencies(List<String> deps) { this.dependencies = deps; return this; }
-
-        PlanStepConfig build() {
-
-            return new PlanStepConfig(name, "code", null, null, dependencies, false, null, null,
-                    null, null, null, null, null, codeSlug, inputs);
-        }
+        public <I> CodeStepBuilder input(I input) { parent.input = input; return this; }
+        public CodeStepBuilder dependencies(String... deps) { parent.dependencies = List.of(deps); return this; }
+        public CodeStepBuilder dependencies(List<String> deps) { parent.dependencies = deps; return this; }
     }
 
     public static class LoopBuilder {
@@ -182,7 +208,7 @@ public record  PlanConfig(
         private String over;
         private List<String> dependencies = List.of();
         private boolean hitl;
-        private final List<PlanStepConfig> stepConfigs = new ArrayList<>();
+        private final List<PlanStepConfig> steps = new ArrayList<>();
 
         LoopBuilder(String name) { this.name = name; }
 
@@ -192,18 +218,18 @@ public record  PlanConfig(
         public LoopBuilder hitl(boolean hitl) { this.hitl = hitl; return this; }
         public LoopBuilder hitl() { this.hitl = true; return this; }
 
-        public LoopBuilder step(PlanStepConfig step) { stepConfigs.add(step); return this; }
+        public LoopBuilder step(PlanStepConfig step) { steps.add(step); return this; }
         public LoopBuilder step(String name, Consumer<StepBuilder> config) {
             var b = new StepBuilder(name);
             config.accept(b);
-            stepConfigs.add(b.build());
+            steps.add(b.build());
             return this;
         }
 
         PlanStepConfig build() {
 
             return new PlanStepConfig(name, "loop", null, null, dependencies, hitl, null, null,
-                    over, null, null, null, stepConfigs, null, null);
+                    over, null, null, null, steps, null, null);
         }
     }
 
@@ -246,7 +272,7 @@ public record  PlanConfig(
         private String agent;
         private String instructions;
         private List<String> tools = List.of();
-        private final List<PlanStepConfig> stepConfigs = new ArrayList<>();
+        private final List<PlanStepConfig> steps = new ArrayList<>();
 
         PathBuilder(String pathName) { this.pathName = pathName; }
 
@@ -255,18 +281,18 @@ public record  PlanConfig(
         public PathBuilder tools(String... tools) { this.tools = List.of(tools); return this; }
         public PathBuilder tools(List<String> tools) { this.tools = tools; return this; }
 
-        public PathBuilder step(PlanStepConfig step) { stepConfigs.add(step); return this; }
+        public PathBuilder step(PlanStepConfig step) { steps.add(step); return this; }
         public PathBuilder step(String name, Consumer<StepBuilder> config) {
             var b = new StepBuilder(name);
             config.accept(b);
-            stepConfigs.add(b.build());
+            steps.add(b.build());
             return this;
         }
 
         BranchPathConfig build() {
 
             return new BranchPathConfig(pathName, agent, instructions, tools,
-                    stepConfigs.isEmpty() ? null : stepConfigs);
+                    steps.isEmpty() ? null : steps);
         }
     }
 
@@ -298,9 +324,9 @@ public record  PlanConfig(
             String from,
             List<BranchPathConfig> pathConfigs,
             String defaultPath,
-            List<PlanStepConfig> stepConfigs,
+            List<PlanStepConfig> steps,
             String codeSlug,
-            Object codeInputs) {
+            Object codeInput) {
 
         public PlanStepConfig {
 
@@ -331,11 +357,11 @@ public record  PlanConfig(
 
                 case "loop" -> {
 
-                    List<PlanStep> steps;
+                    List<PlanStep> resolvedSteps;
 
-                    if (stepConfigs != null && !stepConfigs.isEmpty()) {
+                    if (steps != null && !steps.isEmpty()) {
 
-                        steps = stepConfigs.stream().map(s -> s.toPlanStep(codeStepRegistry)).toList();
+                        resolvedSteps = steps.stream().map(s -> s.toPlanStep(codeStepRegistry)).toList();
                     }
                     else {
 
@@ -343,10 +369,10 @@ public record  PlanConfig(
 
                         var step = new PlanStepAgent(stepName, agent, instructions, List.of(), false, skills, tools);
 
-                        steps = List.of(step);
+                        resolvedSteps = List.of(step);
                     }
 
-                    yield new PlanStepLoop(name, over, steps, dependencies, hitl);
+                    yield new PlanStepLoop(name, over, resolvedSteps, dependencies, hitl);
                 }
 
                 case "branch" -> {
@@ -366,9 +392,9 @@ public record  PlanConfig(
 
         private PlanStepCode<?> buildCodeStep(CodeStepRegistry codeStepRegistry) {
 
-            Object typedInputs = codeInputs;
+            Object typedInput = codeInput;
 
-            if (codeInputs != null && codeStepRegistry != null) {
+            if (codeInput != null && codeStepRegistry != null) {
 
                 var registered = codeStepRegistry.get(codeSlug);
 
@@ -376,12 +402,12 @@ public record  PlanConfig(
 
                     var inputType = registered.spec().inputType();
 
-                    if (inputType != Void.class && !inputType.isInstance(codeInputs))
-                        typedInputs = Json.mapper().convertValue(codeInputs, inputType);
+                    if (inputType != Void.class && !inputType.isInstance(codeInput))
+                        typedInput = Json.mapper().convertValue(codeInput, inputType);
                 }
             }
 
-            return new PlanStepCode<>(name, codeSlug, typedInputs, dependencies);
+            return new PlanStepCode<>(name, codeSlug, typedInput, dependencies);
         }
     }
 
@@ -391,7 +417,7 @@ public record  PlanConfig(
             String agent,
             String instructions,
             List<String> tools,
-            List<PlanStepConfig> stepConfigs) {
+            List<PlanStepConfig> steps) {
 
         public BranchPathConfig {
 
@@ -409,8 +435,8 @@ public record  PlanConfig(
 
         List<PlanStep> toPlanStep(CodeStepRegistry codeStepRegistry) {
 
-            if (stepConfigs != null && !stepConfigs.isEmpty())
-                return stepConfigs.stream().map(s -> s.toPlanStep(codeStepRegistry)).toList();
+            if (steps != null && !steps.isEmpty())
+                return steps.stream().map(s -> s.toPlanStep(codeStepRegistry)).toList();
 
             var stepName = pathName + "-body";
 

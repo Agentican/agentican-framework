@@ -70,7 +70,7 @@ class StepCodeRunnerTest {
                 .param("amount")
                 .step(PlanStepCode.<AmountIn>builder("produce")
                         .code("make-output")
-                        .inputs(new AmountIn("{{param.amount}}"))
+                        .input(new AmountIn("{{param.amount}}"))
                         .build())
                 .step(new PlanStepAgent("finalize", "collector",
                         "Process {{step.produce.output}}", List.of("produce"),
@@ -166,7 +166,7 @@ class StepCodeRunnerTest {
         var plan = Plan.builder("raw-map")
                 .step(PlanStepCode.<Map<String, Object>>builder("step")
                         .code("raw")
-                        .inputs(Map.of("key", "value"))
+                        .input(Map.of("key", "value"))
                         .build())
                 .build();
 

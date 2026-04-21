@@ -42,7 +42,7 @@ Use the builder — it handles optional fields cleanly and reads naturally:
 PlanStepAgent.builder("research-llms")
     .agent("AI Research Specialist")
     .instructions("Identify the top 3 LLMs for ...")
-    .toolkit("web")
+    .tool("web_search")
     .build();
 ```
 
@@ -76,7 +76,7 @@ Iterates over an upstream step's output, running a sub-plan per item.
 new PlanStepLoop(
     "create-pages",                  // step name
     "research-llms",                 // 'over' — name of step whose output is iterated
-    List.of(...bodySteps),           // body — sub-stepConfigs run per iteration
+    List.of(...bodySteps),           // body — sub-steps run per iteration
     List.of(),                       // dependencies
     false                            // hitl
 )
@@ -148,9 +148,8 @@ record HttpOutput(String body, int status) { }
 
 ```java
 AgenticanRuntime.builder()
-    .codeStep(
-        new CodeStepSpec<>("http-get", null, HttpInput.class, HttpOutput.class),
-        (HttpInput input, StepContext ctx) -> {
+    .codeStep("http-get", HttpInput.class, HttpOutput.class,
+        (input, ctx) -> {
             var response = httpClient.send(
                     HttpRequest.newBuilder(URI.create(input.url()))
                             .method(input.method(), HttpRequest.BodyPublishers.noBody())
@@ -168,7 +167,7 @@ AgenticanRuntime.builder()
 
 ```java
 PlanConfig.builder()
-    .codeStep("fetch-customer", s -> s
+    .step("fetch-customer", s -> s
         .code("http-get")
         .input(new HttpInput(
             "https://api.internal/customers/{{param.customer_id}}",
@@ -180,6 +179,8 @@ PlanConfig.builder()
         .dependencies("fetch-customer"))
     .build();
 ```
+
+A single `.step(name, ...)` entry covers both modes. Calling `.agent(...)` or `.code(...)` inside the lambda narrows to an `AgentStepBuilder` or `CodeStepBuilder` respectively — IDE completion shows only methods relevant to that mode, and calling both fails fast at build time.
 
 The framework at dispatch time:
 
@@ -197,10 +198,10 @@ recovery they re-run from scratch; make executors idempotent or fast.
 For ad-hoc scripts the typed record can be skipped — pass a `Map` or even a `String`:
 
 ```java
-.codeStep(new CodeStepSpec<>("delay", null, Long.class, Void.class),
+.codeStep("delay", Long.class, Void.class,
           (millis, ctx) -> { Thread.sleep(millis); return null; })
-.codeStep(new CodeStepSpec<>("raw", null, Map.class, String.class),
-          (Map<String, Object> in, ctx) -> in.get("key").toString())
+.codeStep("raw", Map.class, String.class,
+          (in, ctx) -> in.get("key").toString())
 ```
 
 ## Conditional Steps
@@ -263,7 +264,7 @@ var task = Plan.builder("multi-page")
                 .step(PlanStepAgent.builder("create-page")
                         .agent("writer")
                         .instructions("Create page about {{item}}")
-                        .toolkit("notion")
+                        .tools(List.of("create_page", "append_block"))
                         .build()))
         .build();
 ```

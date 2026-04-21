@@ -3,7 +3,7 @@ package ai.agentican.framework.orchestration.code;
 /**
  * Registration metadata for a {@link CodeStep}. The {@code inputType} and
  * {@code outputType} drive Jackson's deserialization of plan-level
- * {@code PlanStepCode<I>.inputs()} and serialization of the executor's
+ * {@code PlanStepCode<I>.input()} and serialization of the executor's
  * return value into the stored step output.
  *
  * <p>Use {@link #of(String, Class, Class)} for the common case. Pass

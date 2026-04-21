@@ -14,12 +14,12 @@ public record PlannerOutput(
         String description,
         List<AgentConfig> agents,
         List<SkillConfig> skills,
-        List<PlanConfig.PlanParamConfig> paramConfigs,
-        List<PlanConfig.PlanStepConfig> stepConfigs) implements PlannerDecision {
+        List<PlanConfig.PlanParamConfig> params,
+        List<PlanConfig.PlanStepConfig> steps) implements PlannerDecision {
 
     public PlannerResult toPlannerResult() {
 
-        var planConfig = new PlanConfig(name, description, paramConfigs, stepConfigs);
+        var planConfig = new PlanConfig(name, description, params, steps, null, null);
 
         return new PlannerResult(planConfig.toPlan(), agents, skills);
     }

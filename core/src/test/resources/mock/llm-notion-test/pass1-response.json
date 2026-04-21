@@ -2,7 +2,7 @@
   "type": "create",
   "name": "LLM Research and Documentation",
   "description": "Research the top {{param.count}} LLMs based on {{param.criteria}}, gather pricing information, and create individual Notion pages for each model.",
-  "paramConfigs": [
+  "params": [
     {"name": "count", "description": "Number of top LLMs to research", "defaultValue": "3", "required": true},
     {"name": "criteria", "description": "Evaluation criteria for selecting LLMs", "defaultValue": "reasoning and tool use", "required": true}
   ],
@@ -10,7 +10,7 @@
     {"name": "AI Research Specialist", "role": "Expert in AI/ML models, benchmarks, and LLM capabilities with focus on performance metrics and pricing", "skills": []},
     {"name": "Documentation Specialist", "role": "Expert in creating structured, detailed documentation with clear formatting", "skills": []}
   ],
-  "stepConfigs": [
+  "steps": [
     {
       "name": "research-llms",
       "type": "agent",
@@ -31,7 +31,7 @@
       "name": "create-pages",
       "type": "loop",
       "over": "setup-notion",
-      "stepConfigs": [
+      "steps": [
         {
           "name": "create-page",
           "type": "agent",

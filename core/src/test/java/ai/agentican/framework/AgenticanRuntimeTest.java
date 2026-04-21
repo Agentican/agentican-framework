@@ -90,8 +90,8 @@ class AgenticanRuntimeTest {
                         "name": "Simple Task",
                         "description": "A simple task",
                         "agents": [{"name": "worker", "role": "Does work", "skills": []}],
-                        "paramConfigs": [],
-                        "stepConfigs": [{"name": "work", "type": "agent", "agent": "worker", "instructions": "Do the work", "toolkits": []}]
+                        "params": [],
+                        "steps": [{"name": "work", "type": "agent", "agent": "worker", "instructions": "Do the work", "toolkits": []}]
                     }
                     """)
                 .onSend("Do the work", "Work completed successfully.");
@@ -119,8 +119,8 @@ class AgenticanRuntimeTest {
                         "name": "Param Task",
                         "description": "Uses params",
                         "agents": [{"name": "worker", "role": "Worker", "skills": []}],
-                        "paramConfigs": [{"name": "target", "description": "What to process", "defaultValue": "widgets", "required": true}],
-                        "stepConfigs": [{"name": "process", "type": "agent", "agent": "worker", "instructions": "Process {{param.target}}", "toolkits": []}]
+                        "params": [{"name": "target", "description": "What to process", "defaultValue": "widgets", "required": true}],
+                        "steps": [{"name": "process", "type": "agent", "agent": "worker", "instructions": "Process {{param.target}}", "toolkits": []}]
                     }
                     """)
                 .onSend("Process widgets", "Processed widgets successfully.");
@@ -148,8 +148,8 @@ class AgenticanRuntimeTest {
                         "name": "Cancel Task",
                         "description": "Test",
                         "agents": [{"name": "agent-a", "role": "Worker", "skills": []}],
-                        "paramConfigs": [],
-                        "stepConfigs": [
+                        "params": [],
+                        "steps": [
                             {"name": "step-a", "type": "agent", "agent": "agent-a", "instructions": "Step A", "toolkits": []},
                             {"name": "step-b", "type": "agent", "agent": "agent-a", "instructions": "Step B", "dependencies": ["step-a"], "toolkits": []}
                         ]
@@ -182,14 +182,14 @@ class AgenticanRuntimeTest {
                         "name": "Tool Task",
                         "description": "Uses tools",
                         "agents": [{"name": "tool-user", "role": "Uses tools", "skills": []}],
-                        "paramConfigs": [],
-                        "stepConfigs": [{"name": "use-tool", "type": "agent", "agent": "tool-user", "instructions": "Use MY_TOOL", "tools": ["MY_TOOL"]}]
+                        "params": [],
+                        "steps": [{"name": "use-tool", "type": "agent", "agent": "tool-user", "instructions": "Use MY_TOOL", "tools": ["MY_TOOL"]}]
                     }
                     """)
                 .onSend("plan refiner", """
                     {
-                      "paramConfigs": [],
-                      "stepConfigs": [
+                      "params": [],
+                      "steps": [
                         {"name": "use-tool", "type": "agent", "agent": "tool-user", "instructions": "Use MY_TOOL to get data", "tools": ["MY_TOOL"]}
                       ]
                     }
@@ -224,8 +224,8 @@ class AgenticanRuntimeTest {
                         "name": "HITL Task",
                         "description": "Needs approval",
                         "agents": [{"name": "writer", "role": "Writer", "skills": []}],
-                        "paramConfigs": [],
-                        "stepConfigs": [{"name": "write", "type": "agent", "agent": "writer", "instructions": "Write something", "hitl": true, "toolkits": []}]
+                        "params": [],
+                        "steps": [{"name": "write", "type": "agent", "agent": "writer", "instructions": "Write something", "hitl": true, "toolkits": []}]
                     }
                     """)
                 .onSend("Write something", "Here is my draft.");
@@ -256,14 +256,14 @@ class AgenticanRuntimeTest {
                         "name": "Tool HITL Task",
                         "description": "Tool needs approval",
                         "agents": [{"name": "builder", "role": "Builder", "skills": []}],
-                        "paramConfigs": [],
-                        "stepConfigs": [{"name": "build", "type": "agent", "agent": "builder", "instructions": "Build with SAFE_TOOL", "tools": ["SAFE_TOOL"]}]
+                        "params": [],
+                        "steps": [{"name": "build", "type": "agent", "agent": "builder", "instructions": "Build with SAFE_TOOL", "tools": ["SAFE_TOOL"]}]
                     }
                     """)
                 .onSend("plan refiner", """
                     {
-                      "paramConfigs": [],
-                      "stepConfigs": [
+                      "params": [],
+                      "steps": [
                         {"name": "build", "type": "agent", "agent": "builder", "instructions": "Use SAFE_TOOL to build", "tools": ["SAFE_TOOL"]}
                       ]
                     }
@@ -408,7 +408,7 @@ class AgenticanRuntimeTest {
         var step = new PlanConfig.PlanStepConfig("s1", "agent", "noop", "do nothing",
                 List.of(), false, List.of(), List.of(), null, null, List.of(), null, List.of(), null, null);
 
-        var planConfig = new PlanConfig("fluent-plan", "desc", List.of(), List.of(step), "fluent-plan-ext");
+        var planConfig = new PlanConfig("fluent-plan", "desc", List.of(), List.of(step), "fluent-plan-ext", null);
 
         try (var agentican = AgenticanRuntime.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
@@ -495,8 +495,8 @@ class AgenticanRuntimeTest {
                         "name": "Resume Task",
                         "description": "Resumable task",
                         "agents": [{"name": "worker", "role": "Worker", "skills": []}],
-                        "paramConfigs": [],
-                        "stepConfigs": [{"name": "do-work", "type": "agent", "agent": "worker", "instructions": "Run to completion after resume"}]
+                        "params": [],
+                        "steps": [{"name": "do-work", "type": "agent", "agent": "worker", "instructions": "Run to completion after resume"}]
                     }
                     """)
                 .onSend("after resume", "All done after resume");

@@ -38,15 +38,15 @@ class PlanStepCodeDeserializerTest {
         assertEquals("http", deserStep.codeSlug());
         assertEquals(List.of("upstream"), deserStep.dependencies());
 
-        // Inputs typed as HttpInput because the codec injected the registry
-        assertInstanceOf(HttpInput.class, deserStep.inputs());
-        var typed = (HttpInput) deserStep.inputs();
+        // Input typed as HttpInput because the codec injected the registry
+        assertInstanceOf(HttpInput.class, deserStep.input());
+        var typed = (HttpInput) deserStep.input();
         assertEquals("https://example.com", typed.url());
         assertEquals("GET", typed.method());
     }
 
     @Test
-    void deserWithoutCodecLeavesInputsAsJsonNode() throws Exception {
+    void deserWithoutCodecLeavesInputAsJsonNode() throws Exception {
 
         var step = new PlanStepCode<>("fetch", "http",
                 new HttpInput("https://example.com", "GET"), List.of());
@@ -59,8 +59,8 @@ class PlanStepCodeDeserializerTest {
         var deserStep = (PlanStepCode<?>) roundTripped.steps().getFirst();
         // Without the codec injecting the registry, the deserializer falls
         // back to a JsonNode so plan structure can still be inspected.
-        assertInstanceOf(JsonNode.class, deserStep.inputs());
-        var node = (JsonNode) deserStep.inputs();
+        assertInstanceOf(JsonNode.class, deserStep.input());
+        var node = (JsonNode) deserStep.input();
         assertEquals("https://example.com", node.get("url").asText());
         assertEquals("GET", node.get("method").asText());
     }
@@ -73,7 +73,7 @@ class PlanStepCodeDeserializerTest {
 
         var json = """
                 {"id":"plan-1","name":"p","description":"d","params":[],"steps":[
-                  {"type":"code","name":"x","codeSlug":"missing","inputs":null,"dependencies":[]}
+                  {"type":"code","name":"x","codeSlug":"missing","input":null,"dependencies":[]}
                 ]}
                 """;
 
@@ -81,7 +81,7 @@ class PlanStepCodeDeserializerTest {
     }
 
     @Test
-    void nullInputsRoundTrip() throws Exception {
+    void nullInputRoundTrip() throws Exception {
 
         var registry = new CodeStepRegistry();
         registry.register(new CodeStepSpec<>("noop", null, Void.class, Void.class),
@@ -96,6 +96,6 @@ class PlanStepCodeDeserializerTest {
         var back = codec.fromJson(json, Plan.class);
 
         var deserStep = (PlanStepCode<?>) back.steps().getFirst();
-        assertNull(deserStep.inputs());
+        assertNull(deserStep.input());
     }
 }

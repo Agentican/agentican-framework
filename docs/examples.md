@@ -213,7 +213,7 @@ var task = Plan.builder("create-report-cards")
                 .step(PlanStepAgent.builder("create-card")
                         .agent("report-writer")
                         .instructions("Create a report card for {{item.name}} with grades {{item.grades}}")
-                        .toolkit("notion")
+                        .tools(List.of("create_page", "append_block"))
                         .build()))
         .build();
 
@@ -256,9 +256,8 @@ record HttpInput(String url, String method) {
 record HttpOutput(String body, int status) { }
 
 var agentican = AgenticanRuntime.builder()
-        .codeStep(
-                new CodeStepSpec<>("http-get", null, HttpInput.class, HttpOutput.class),
-                (HttpInput input, StepContext ctx) -> {
+        .codeStep("http-get", HttpInput.class, HttpOutput.class,
+                (input, ctx) -> {
                     var response = HttpClient.newHttpClient().send(
                             HttpRequest.newBuilder(URI.create(input.url()))
                                     .method(input.method(), HttpRequest.BodyPublishers.noBody())
@@ -269,7 +268,7 @@ var agentican = AgenticanRuntime.builder()
         .plan(PlanConfig.builder()
                 .name("payment-enrichment").externalId("payment-enrichment")
                 .param("customer_id", "Customer to enrich", null, true)
-                .codeStep("fetch-customer", s -> s
+                .step("fetch-customer", s -> s
                         .code("http-get")
                         .input(new HttpInput(
                                 "https://api.internal/customers/{{param.customer_id}}",

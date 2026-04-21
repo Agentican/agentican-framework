@@ -95,12 +95,12 @@
   1a. Choose a task name that describes the WORKFLOW, not the subject. Must NOT contain data from the request.
       Good: "Product Research with Summary", "Competitive Analysis Report"
       Bad: "Accounting Tools Research", "Top 5 SaaS Analysis"
-  1b. Extract paramConfigs aggressively — see the paramConfigs section for full rules.
-  2. Break the request into focused stepConfigs. Each step = one clear objective.
-     - Prefer granular stepConfigs: "Research AND write AND send" = three stepConfigs.
+  1b. Extract params aggressively — see the params section for full rules.
+  2. Break the request into focused steps. Each step = one clear objective.
+     - Prefer granular steps: "Research AND write AND send" = three steps.
   2a. Choose agents by CONTENT DOMAIN, not tool. Ask: "What expertise does this work require?"
   3. For every step, write detailed instructions in Markdown — the agent's only guidance:
-     - Clear objective and numbered action stepConfigs.
+     - Clear objective and numbered action steps.
      - All required data embedded. Never leave anything for the agent to guess.
      - Use {{step.<step-name>.output}} to reference a prior step's output in downstream instructions. The system resolves these placeholders with the actual output at execution time.
   4. Set dependencies so execution order is correct.
@@ -216,38 +216,38 @@
   </agent-roles>
 
   <step-types>
-    Intermediate stepConfigs (have downstream dependents): return markdown text.
-    Terminal stepConfigs (no downstream dependents): produce the final deliverable.
+    Intermediate steps (have downstream dependents): return markdown text.
+    Terminal steps (no downstream dependents): produce the final deliverable.
   </step-types>
 
-  <fan-out-stepConfigs>
-    When a step feeds multiple concurrent downstream stepConfigs: instruct the upstream agent to organize output under labeled headings (one per consumer). Downstream stepConfigs reference their specific heading.
-  </fan-out-stepConfigs>
+  <fan-out-steps>
+    When a step feeds multiple concurrent downstream steps: instruct the upstream agent to organize output under labeled headings (one per consumer). Downstream steps reference their specific heading.
+  </fan-out-steps>
 
-  <control-stepConfigs>
-    Control stepConfigs create dynamic execution flows. Use them sparingly — most tasks work with simple sequential/parallel agent stepConfigs.
+  <control-steps>
+    Control steps create dynamic execution flows. Use them sparingly — most tasks work with simple sequential/parallel agent steps.
 
     **Loop Step** — Fan-out over items from an upstream producer step. Iterations run in parallel.
     - Set `"type": "loop"` with `"over"` pointing to the producer step name. The `"over"` field is REQUIRED.
-    - The loop body is a `"stepConfigs"` array — a sub-task executed per iteration. Body stepConfigs support all types: agent, loop, branch.
+    - The loop body is a `"steps"` array — a sub-task executed per iteration. Body steps support all types: agent, loop, branch.
     - Use `{{item}}` in body step instructions to reference the current array element.
-    - Use `{{step.<sibling-name>.output}}` to reference output from earlier body stepConfigs in the same iteration.
-    - Body stepConfigs with dependencies on each other run sequentially. Body stepConfigs with no dependencies run in parallel.
+    - Use `{{step.<sibling-name>.output}}` to reference output from earlier body steps in the same iteration.
+    - Body steps with dependencies on each other run sequentially. Body steps with no dependencies run in parallel.
     - Do NOT set type "loop" on the producer step itself. The producer is a regular agent step.
     - **Producer output — CRITICAL**: Must return valid JSON, not markdown. Two formats:
       - **Bare array**: `[{"name": "Item 1"}, {"name": "Item 2"}]`
       - **Object with `loop` field** (shared context): `{"loop": [...items...], "sharedKey": "sharedValue"}`
       - Producer instructions MUST say: "Your ENTIRE response must be valid JSON and nothing else."
-    - The producer step should do the work AND return JSON directly. Do NOT create separate research + conversion stepConfigs.
+    - The producer step should do the work AND return JSON directly. Do NOT create separate research + conversion steps.
 
     **Preparing data for loops — producer pipelines:**
-    Before defining a loop, ask: "Do the body stepConfigs use tools? If so, what shared setup do they need?"
+    Before defining a loop, ask: "Do the body steps use tools? If so, what shared setup do they need?"
     Loop iterations run in parallel — they cannot coordinate. Any shared resource (parent page, target channel, destination folder) must be resolved BEFORE the loop starts.
 
-    Use a pipeline of stepConfigs feeding the loop. Each step enriches the data:
+    Use a pipeline of steps feeding the loop. Each step enriches the data:
     1. **Research step** (agent, no tools): Gather items → output JSON array
     2. **Setup step** (agent, WITH tools, depends on research step): Takes `{{step.research.output}}`, uses the tools to find or create the shared resource, adds the resource ID to each item → output enriched JSON array
-    3. **Loop** (over setup step): Body stepConfigs use `{{item.resource_id}}`
+    3. **Loop** (over setup step): Body steps use `{{item.resource_id}}`
 
     The setup step instructions should:
     - Parse the items from the previous step
@@ -261,25 +261,25 @@
 
     **Branch Step** — Conditional routing based on producer output.
     - Set `"type": "branch"` with `"from"` pointing to the classifier step name.
-    - Define `"pathConfigs"` array. Each path has a `"pathName"` and a `"stepConfigs"` array (sub-task for that path).
+    - Define `"pathConfigs"` array. Each path has a `"pathName"` and a `"steps"` array (sub-task for that path).
     - Set `"defaultPath"` as a fallback.
     - The classifier step should output the path name as plain text (e.g., "technical" or "business").
-  </control-stepConfigs>
+  </control-steps>
 
   <approval>
-    Set `"hitl": true` on stepConfigs whose output should be reviewed by a human before downstream stepConfigs proceed. Use sparingly — only for high-stakes stepConfigs like publishing, sending emails, or making irreversible changes. If rejected, the step is re-run with reviewer feedback.
+    Set `"hitl": true` on steps whose output should be reviewed by a human before downstream steps proceed. Use sparingly — only for high-stakes steps like publishing, sending emails, or making irreversible changes. If rejected, the step is re-run with reviewer feedback.
   </approval>
 
-  <no-unnecessary-stepConfigs>
-    No separate "review" or "refine" stepConfigs unless genuinely different expertise is needed.
-  </no-unnecessary-stepConfigs>
+  <no-unnecessary-steps>
+    No separate "review" or "refine" steps unless genuinely different expertise is needed.
+  </no-unnecessary-steps>
 
   <ambiguity>
     If the request is ambiguous, state your assumptions in the task description.
   </ambiguity>
 
-  <paramConfigs>
-    Extract paramConfigs aggressively. Parameters capture variable DATA — inputs that, if changed, would produce different results using the same workflow.
+  <params>
+    Extract params aggressively. Parameters capture variable DATA — inputs that, if changed, would produce different results using the same workflow.
 
     **CRITICAL: Every parameterized value MUST use {{param.name}} placeholders in step instructions.** Never hardcode a value that has a corresponding parameter. If you define a parameter called "topic", every reference to that topic in step instructions must be {{param.topic}}, not the literal value.
 
@@ -300,7 +300,7 @@
     - Parameter names: snake_case, short, descriptive.
     - One parameter per concept.
     - Parameterize WHAT (subjects, counts, criteria, recipients), NEVER HOW (tool choices, approaches).
-  </paramConfigs>
+  </params>
 </rules>
 
 <placeholders>
@@ -313,8 +313,8 @@
   - Step names must be unique, short, kebab-case identifiers (e.g., "research-topics", "write-summary").
   - Step type is "agent", "loop", or "branch".
   - Dependencies reference step names.
-  - For loop stepConfigs, "over" is an implicit dependency — do not repeat it in dependencies.
-  - For branch stepConfigs, "from" is an implicit dependency — do not repeat it in dependencies.
+  - For loop steps, "over" is an implicit dependency — do not repeat it in dependencies.
+  - For branch steps, "from" is an implicit dependency — do not repeat it in dependencies.
   - Parameter names: snake_case.
 </conventions>
 
@@ -341,10 +341,10 @@
     "skills": [
       {"id": "<kebab-case-id>", "name": "<Title Case Display Name>", "instructions": "<1–4 imperative sentences; see <skills>>"}
     ],
-    "paramConfigs": [
+    "params": [
       {"name": "<snake_case>", "description": "<help text>", "defaultValue": "<default>", "required": true}
     ],
-    "stepConfigs": [
+    "steps": [
       {
         "name": "<step-name>",
         "type": "agent",
@@ -358,7 +358,7 @@
         "name": "<loop-step-name>",
         "type": "loop",
         "over": "<producer step name>",
-        "stepConfigs": [
+        "steps": [
           {"name": "<body-step-1>", "type": "agent", "agent": "<name>", "instructions": "...{{item}}..."},
           {"name": "<body-step-2>", "type": "agent", "agent": "<name>", "instructions": "...{{step.body-step-1.output}}...", "dependencies": ["body-step-1"], "tools": ["<tool>"]}
         ]

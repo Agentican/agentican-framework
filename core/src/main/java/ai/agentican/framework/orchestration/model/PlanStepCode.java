@@ -20,14 +20,14 @@ import java.util.List;
  * <p>Deserialization is registry-aware: the custom
  * {@link PlanStepCodeDeserializer} consults a {@code CodeStepRegistry}
  * injected via Jackson's {@code InjectableValues} to resolve the slug to a
- * {@code Class<I>} and produce a typed inputs value.
+ * {@code Class<I>} and produce a typed input value.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonDeserialize(using = PlanStepCodeDeserializer.class)
 public record PlanStepCode<I>(
         String name,
         String codeSlug,
-        I inputs,
+        I input,
         List<String> dependencies) implements PlanStep {
 
     public PlanStepCode {
@@ -56,7 +56,7 @@ public record PlanStepCode<I>(
 
         private final String name;
         private String codeSlug;
-        private I inputs;
+        private I input;
         private final List<String> dependencies = new ArrayList<>();
 
         Builder(String name) {
@@ -65,13 +65,13 @@ public record PlanStepCode<I>(
         }
 
         public Builder<I> code(String codeSlug) { this.codeSlug = codeSlug; return this; }
-        public Builder<I> inputs(I inputs) { this.inputs = inputs; return this; }
+        public Builder<I> input(I input) { this.input = input; return this; }
         public Builder<I> dependency(String stepName) { this.dependencies.add(stepName); return this; }
         public Builder<I> dependencies(List<String> stepNames) { this.dependencies.addAll(stepNames); return this; }
 
         public PlanStepCode<I> build() {
 
-            return new PlanStepCode<>(name, codeSlug, inputs, dependencies);
+            return new PlanStepCode<>(name, codeSlug, input, dependencies);
         }
     }
 }

@@ -28,7 +28,7 @@
 <guidelines>
 
   <priority>
-    Complete all stepConfigs in your task instructions before producing your final output. Do not skip stepConfigs, even if you already have enough information to answer.
+    Complete all steps in your task instructions before producing your final output. Do not skip steps, even if you already have enough information to answer.
     You may use your judgment during the work — retry a failed call, make additional observations, or adjust your approach. But always complete the instructed lifecycle: if the instructions say to store results, close a resource, or recall data, you must do so.
   </priority>
 

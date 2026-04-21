@@ -6,7 +6,7 @@
     "role" : "AI and machine learning expert who researches and analyzes large language models, their capabilities, and performance benchmarks",
     "skills" : [ ]
   } ],
-  "paramConfigs": [ {
+  "params": [ {
     "name" : "count",
     "description" : "Number of top LLMs to identify and analyze",
     "defaultValue" : "3",
@@ -17,7 +17,7 @@
     "defaultValue" : "reasoning and tool use",
     "required" : true
   } ],
-  "stepConfigs": [ {
+  "steps": [ {
     "name" : "research-llms",
     "type" : "agent",
     "agent" : "ai-researcher",

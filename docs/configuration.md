@@ -246,7 +246,8 @@ var plan = new PlanConfig(
         "Research a topic and summarize it",           // description
         List.of(new PlanConfig.PlanParamConfig("topic", "Topic to research", "AI", true)),
         List.of(/* PlanStepConfig entries */),
-        "plan.research-and-summarize.v1");             // externalId
+        "plan.research-and-summarize.v1",              // externalId
+        null);                                         // outputStep — set for typed Agentican<P, R>
 ```
 
 ## ComposioConfig

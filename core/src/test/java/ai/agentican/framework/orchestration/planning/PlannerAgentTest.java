@@ -42,8 +42,8 @@ class PlannerAgentTest {
                   "name": "Test Task",
                   "description": "A test",
                   "agents": [{"name": "test-agent", "role": "Tester"}],
-                  "paramConfigs": [],
-                  "stepConfigs": [
+                  "params": [],
+                  "steps": [
                     {"name": "step-a", "type": "agent", "agent": "test-agent", "instructions": "Do something", "toolkits": []}
                   ]
                 }
@@ -77,8 +77,8 @@ class PlannerAgentTest {
                   "name": "Refined Task",
                   "description": "A test with tools",
                   "agents": [{"name": "tool-agent", "role": "Tool user"}],
-                  "paramConfigs": [],
-                  "stepConfigs": [
+                  "params": [],
+                  "steps": [
                     {"name": "tool-step", "type": "agent", "agent": "tool-agent", "instructions": "Use the tool", "tools": ["MY_TOOL"]}
                   ]
                 }
@@ -86,8 +86,8 @@ class PlannerAgentTest {
 
         var refinedJson = """
                 {
-                  "paramConfigs": [],
-                  "stepConfigs": [
+                  "params": [],
+                  "steps": [
                     {"name": "tool-step", "type": "agent", "agent": "tool-agent", "instructions": "Refined: use MY_TOOL with param q", "tools": ["MY_TOOL"]}
                   ]
                 }
@@ -122,8 +122,8 @@ class PlannerAgentTest {
                   "name": "No-Tool Task",
                   "description": "A test without tools",
                   "agents": [{"name": "plain-agent", "role": "Worker"}],
-                  "paramConfigs": [],
-                  "stepConfigs": [
+                  "params": [],
+                  "steps": [
                     {"name": "plain-step", "type": "agent", "agent": "plain-agent", "instructions": "Just think", "tools": []}
                   ]
                 }
@@ -153,10 +153,10 @@ class PlannerAgentTest {
                   "name": "Loop Task",
                   "description": "A test with loop",
                   "agents": [{"name": "producer-agent", "role": "Producer"}, {"name": "body-agent", "role": "Processor"}],
-                  "paramConfigs": [],
-                  "stepConfigs": [
+                  "params": [],
+                  "steps": [
                     {"name": "produce", "type": "agent", "agent": "producer-agent", "instructions": "Produce items", "tools": ["MY_TOOL"]},
-                    {"name": "process-loop", "type": "loop", "over": "produce", "stepConfigs": [
+                    {"name": "process-loop", "type": "loop", "over": "produce", "steps": [
                       {"name": "process-item", "type": "agent", "agent": "body-agent", "instructions": "Process {{item}}", "tools": ["MY_TOOL"]}
                     ]}
                   ]
@@ -165,10 +165,10 @@ class PlannerAgentTest {
 
         var refinedJson = """
                 {
-                  "paramConfigs": [],
-                  "stepConfigs": [
+                  "params": [],
+                  "steps": [
                     {"name": "produce", "type": "agent", "agent": "producer-agent", "instructions": "Refined: produce items with MY_TOOL", "tools": ["MY_TOOL"]},
-                    {"name": "process-loop", "type": "loop", "over": "produce", "stepConfigs": [
+                    {"name": "process-loop", "type": "loop", "over": "produce", "steps": [
                       {"name": "process-item", "type": "agent", "agent": "body-agent", "instructions": "Refined: process {{item}} with MY_TOOL", "tools": ["MY_TOOL"]}
                     ]}
                   ]
@@ -246,8 +246,8 @@ class PlannerAgentTest {
                   "name": "Fallback Task",
                   "description": "created after reuse miss",
                   "agents": [{"name": "fallback-agent", "role": "Worker"}],
-                  "paramConfigs": [],
-                  "stepConfigs": [
+                  "params": [],
+                  "steps": [
                     {"name": "fallback-step", "type": "agent", "agent": "fallback-agent", "instructions": "do it"}
                   ]
                 }
