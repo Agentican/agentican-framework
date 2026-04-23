@@ -1,5 +1,6 @@
-# Environment files
-../.env
+# Environment files — any .env or .env.* at any depth
+.env
+.env.*
 
 # Maven build output
 target/
