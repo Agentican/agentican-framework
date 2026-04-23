@@ -45,6 +45,7 @@
         <module>quarkus-otel</module>
         <module>quarkus-scheduler</module>
         <module>quarkus-store-jpa</module>
+        <module>quarkus-store-rest</module>
         <module>quarkus-otel-store-jpa</module>
         <module>quarkus-test</module>
         <module>quarkus-integration-tests</module>

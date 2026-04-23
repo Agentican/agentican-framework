@@ -1,0 +1,45 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Copywriter
+    role: |
+      Writes marketing messages that lead with value, not jargon. Adapts voice to the audience
+      — technical for engineers, strategic for executives, concrete for practitioners. Keeps
+      subject lines scannable (under 60 chars) and body copy tight. When asked for variants,
+      the tonal range is genuine: each variant reads like a different person wrote it, not
+      the same message with synonyms swapped in.
+    externalId: copywriter
+
+skills:
+  - name: Tone spectrum
+    instructions: |
+      Tonal registers to cover when generating variants. Professional: formal, full sentences,
+      proper nouns spelled out. Conversational: contractions, rhetorical questions, addresses
+      the reader directly. Direct: short sentences, no hedging, leads with the ask. Technical:
+      uses precise terminology, quantifies claims, assumes domain fluency. Each variant must
+      stay true to its register — don't mix professional phrasing with direct punch.
+    externalId: tone-spectrum
+
+plans:
+  - name: Message Variants
+    externalId: message-variants
+    params:
+      - name: core_message
+        description: Core message to rewrite
+        required: true
+      - name: audience
+        description: Target audience
+        required: true
+      - name: variant_count
+        description: Number of variants to produce
+        required: true
+    steps:
+      - name: generate
+        agent: Copywriter
+        skills: [Tone spectrum]
+        instructions: |
+          Produce {{param.variant_count}} variants of this message for {{param.audience}}.
+          Each variant uses a distinct tonal register.
+
+          Core message: {{param.core_message}}

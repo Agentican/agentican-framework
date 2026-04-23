@@ -1,0 +1,62 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Executive Assistant
+    role: |
+      Supports a specific executive's operating cadence end-to-end: calendar, inbox,
+      travel, meeting prep. When triaging inbound, reads sender, subject and preview,
+      decides what the executive should actually do — action-required (specific ask with
+      deadline), reply-needed (expects a response, no firm deadline), fyi-only, archive
+      (promotional, automated). When ambiguous, leans toward action-required rather than
+      quietly dropping a request.
+    externalId: executive-assistant
+
+  - name: Operations Manager
+    role: |
+      Runs cross-functional operations for a team or function. Summarizes triage output
+      for quick scanning: groups by category, highlights urgent items at the top, and
+      flags patterns worth surfacing (three vendor emails about the same contract, a
+      recurring sender the user always archives). Does not revisit individual triage
+      decisions — trusts the assistant's call.
+    externalId: operations-manager
+
+skills:
+  - name: Triage rules
+    instructions: |
+      Category definitions. Action-required: contains a specific request to the user with
+      a deadline, or a question that blocks someone else's work. Reply-needed: expects a
+      response but no firm deadline; social, informational acknowledgement. Fyi-only:
+      team announcements, project updates the user is CC'd on, newsletters the user opted
+      into. Archive: promotional, automated notifications, alerts the user has muted.
+      Priority rules: senders in the user's org default one step higher priority; external
+      senders require explicit signal to escalate beyond reply-needed.
+    externalId: triage-rules
+
+plans:
+  - name: Email Triage
+    externalId: email-triage
+    outputStep: summarize
+    params:
+      - name: emails
+        description: List of emails to triage
+        required: true
+    steps:
+      - name: triage
+        type: loop
+        over: emails
+        steps:
+          - name: decide
+            agent: Executive Assistant
+            skills: [Triage rules]
+            instructions: |
+              Triage this email:
+              from={{item.sender}} subject={{item.subject}}
+              preview={{item.preview}}
+      - name: summarize
+        agent: Operations Manager
+        skills: [Triage rules]
+        instructions: |
+          Summarize these triage decisions with urgent items first:
+          {{step.triage.output}}
+        dependencies: [triage]

@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.health;
 
-import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.Agentican;
 import ai.agentican.quarkus.AgenticanConfig;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -13,7 +13,7 @@ import org.eclipse.microprofile.health.Readiness;
 public class AgenticanReadinessCheck implements HealthCheck {
 
     @Inject
-    AgenticanRuntime agentican;
+    Agentican agentican;
 
     @Inject
     AgenticanConfig config;
@@ -24,7 +24,7 @@ public class AgenticanReadinessCheck implements HealthCheck {
         var builder = HealthCheckResponse.named("agentican-readiness");
 
         if (agentican == null)
-            return builder.down().withData("reason", "AgenticanRuntime bean not initialized").build();
+            return builder.down().withData("reason", "Agentican bean not initialized").build();
 
         if (config.llm().isEmpty())
             return builder.down().withData("reason", "No agentican.llm[*] entries configured").build();

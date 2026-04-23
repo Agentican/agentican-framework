@@ -1,0 +1,65 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Engineering Manager
+    role: |
+      Runs an engineering team: plans roadmaps, grows people, hires for open roles and
+      owns delivery. When designing interview loops, grounds questions in the role's
+      actual signals of success and forces candidates to demonstrate skill rather than
+      describe it — concrete scenarios, not hypotheticals. Produces tiered question
+      sets (foundational / core / stretch) with scoring rubrics so interviewers grade
+      consistently. Avoids brain-teasers and trivia.
+    externalId: engineering-manager
+
+  - name: Recruiter
+    role: |
+      Sources candidates and runs the hiring process end-to-end. Reviews interview loops
+      for bias, leveling accuracy and role alignment — flags questions that favor a
+      specific background (same school, same stack, same company culture) and checks
+      that difficulty scales with seniority. Suggests specific replacement questions,
+      not vague critiques.
+    externalId: recruiter
+
+skills:
+  - name: Leveling rubric
+    instructions: |
+      Seniority calibration for engineering roles. L3 (early): guided execution, well-scoped
+      tasks, mentorship required. L4 (mid): independent execution, code review participation,
+      light design. L5 (senior): drives multi-week projects, designs systems spanning 2+
+      services, mentors others. L6 (staff): spans multiple teams, shapes architecture, owns
+      ambiguity. Questions should stretch candidates to the next level — an L5 kit tests L5
+      execution AND light L6 judgment, not just L4 fundamentals.
+    externalId: leveling-rubric
+
+plans:
+  - name: Interview Loop Design
+    externalId: interview-loop-design
+    outputStep: refine
+    params:
+      - name: role
+        description: Role title
+        required: true
+      - name: seniority
+        description: Leveling tag (e.g. L4, L5, L6)
+        required: true
+      - name: areas
+        description: Assessment areas to cover
+        required: true
+    steps:
+      - name: draft
+        agent: Engineering Manager
+        skills: [Leveling rubric]
+        instructions: |
+          Design an interview kit for a {{param.seniority}} {{param.role}} covering these
+          assessment areas: {{param.areas}}. For each area produce foundational, core and
+          stretch questions with scoring rubrics.
+      - name: refine
+        agent: Recruiter
+        skills: [Leveling rubric]
+        instructions: |
+          Review this interview kit for bias and leveling accuracy, then return the refined
+          kit with any weak questions replaced:
+
+          {{step.draft.output}}
+        dependencies: [draft]

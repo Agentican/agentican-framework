@@ -1,0 +1,86 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Compliance Analyst
+    role: |
+      Parses vendor data-processing agreements and flags provisions that
+      deviate from internal policy. Grounds every flag in specific language
+      from the DPA — clause and reason — not generic "unusual terms."
+    externalId: compliance-analyst
+
+  - name: Legal Counsel
+    role: |
+      Drafts redline negotiating positions for flagged DPA provisions.
+      Anchors each position on concrete customer data practice, names the
+      fallback position the business will accept, and refuses to escalate
+      items the business has already accepted as standard.
+    externalId: legal-counsel
+
+skills:
+  - name: DPA provisions
+    instructions: |
+      Watchlist. Sub-processor consent (silent consent vs prior written):
+      flag anything weaker than 30-day prior written. Breach notification
+      windows: flag anything longer than 72h. Audit rights: flag absence of
+      onsite or third-party auditor rights. Cross-border transfer
+      mechanism: flag reliance on SCCs without DPF fallback. Liability cap:
+      flag if capped below 12 months of fees. Always cite the clause number
+      or the verbatim phrase.
+    externalId: dpa-provisions
+
+  - name: Redline writing
+    instructions: |
+      Each position names: the flagged provision (verbatim), the proposed
+      edit (verbatim replacement text), the business rationale (one
+      sentence), and the fallback the business will accept if pushed. No
+      vague "strengthen this clause" — write the exact replacement text.
+    externalId: redline-writing
+
+plans:
+  - name: DPA Review
+    externalId: dpa-review
+    outputStep: positions
+    params:
+      - name: vendor_name
+        description: Vendor name
+        required: true
+      - name: data_categories
+        description: What data the vendor will process
+        required: true
+      - name: dpa_text
+        description: Verbatim DPA text
+        required: true
+    steps:
+      - name: parse
+        agent: Compliance Analyst
+        skills: [DPA provisions]
+        instructions: |
+          Extract the key DPA provisions from this vendor's agreement.
+          Group as: sub-processors, breach notification, audit rights,
+          transfer mechanism, liability.
+
+          Vendor: {{param.vendor_name}}
+          Data categories: {{param.data_categories}}
+          DPA text:
+          {{param.dpa_text}}
+      - name: assess
+        agent: Compliance Analyst
+        skills: [DPA provisions]
+        dependencies: [parse]
+        hitl: true
+        instructions: |
+          Assess these provisions against the DPA-provisions watchlist.
+          Flag each deviation with the clause reference and the reason.
+
+          Parsed provisions:
+          {{step.parse.output}}
+      - name: positions
+        agent: Legal Counsel
+        skills: [Redline writing]
+        dependencies: [assess]
+        instructions: |
+          Draft redline negotiating positions for each approved flag.
+
+          Approved flags:
+          {{step.assess.output}}

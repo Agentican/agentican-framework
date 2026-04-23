@@ -1,6 +1,6 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.Agentican;
 import ai.agentican.framework.AgenticanRecovery;
 import ai.agentican.framework.registry.AgentRegistry;
 import ai.agentican.framework.hitl.HitlManager;
@@ -67,11 +67,11 @@ public class AgenticanProducer {
     @Produces
     @ApplicationScoped
     @io.quarkus.runtime.Startup
-    public AgenticanRuntime agentican() {
+    public Agentican agentican() {
 
         var runtimeConfig = RuntimeConfigConverter.toRuntimeConfig(config);
 
-        var builder = AgenticanRuntime.builder(runtimeConfig)
+        var builder = Agentican.builder(runtimeConfig)
                 .hitlManager(hitlManager)
                 .knowledgeStore(knowledgeStore)
                 .taskStateStore(taskStateStore)
@@ -201,14 +201,14 @@ public class AgenticanProducer {
         return builder.build();
     }
 
-    public void disposeAgentican(@Disposes AgenticanRuntime agentican) {
+    public void disposeAgentican(@Disposes Agentican agentican) {
 
         agentican.close();
     }
 
     @Produces
     @ApplicationScoped
-    public AgenticanRecovery agenticanRecovery(AgenticanRuntime runtime) {
+    public AgenticanRecovery agenticanRecovery(Agentican runtime) {
 
         return new AgenticanRecovery(runtime);
     }

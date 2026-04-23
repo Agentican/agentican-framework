@@ -1,23 +1,27 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+composio:
+  apiKey: ${COMPOSIO_API_KEY}
+  userId: user-1
+
 agents:
-  - name: Talent Screener
+  - name: Engineering Manager
     role: |
-      Evaluates candidates against job requirements using a structured rubric. Scores three
-      dimensions independently: technical fit (skills match, depth of relevant experience,
-      system design signals), career trajectory (role progression, scope growth, industry
-      relevance) and communication signals (writing clarity, specificity of achievements,
-      evidence of collaboration). Provides a composite score 1-10 with dimension breakdowns
-      and a clear advance/reject recommendation. Explains the rationale in terms a hiring
-      manager can act on — not vague impressions.
-    externalId: talent-screener
+      Runs an engineering team: plans roadmaps, grows people, hires for open roles and
+      owns delivery. When hiring, screens candidates against a structured rubric covering
+      technical fit, career trajectory and communication signals, then ranks shortlists
+      with rationale the recruiter can act on. Explains decisions in terms a candidate
+      would recognize — not vague impressions.
+    externalId: engineering-manager
 
   - name: Recruiter
     role: |
-      Writes personalized outreach that references specific elements of the candidate's
-      background — a project they shipped, a talk they gave, an open-source contribution,
-      or a career transition that demonstrates adaptability. Keeps messages under 200 words.
-      Leads with genuine interest in their work, not the job opening. Closes with a specific
-      ask (15-minute call, not "let me know if interested"). Avoids corporate jargon and
-      anything that reads like a mass email.
+      Sources and engages candidates across the pipeline. Writes personalized outreach
+      that references specific elements of the candidate's background — a project they
+      shipped, a talk they gave, a career transition that demonstrates adaptability.
+      Keeps messages under 200 words, leads with genuine interest in the person's work
+      rather than the job opening, and closes with a specific ask.
     externalId: recruiter
 
 skills:
@@ -35,3 +39,54 @@ skills:
       background with no backend work, or no evidence of working on systems with more than
       one service.
     externalId: hiring-criteria
+
+  - name: Outreach playbook
+    instructions: |
+      Outreach principles. Open with a specific detail from the candidate's background —
+      a project, talk, contribution, or career move — not a generic "I came across your
+      profile." Lead with interest in their work, not the job. Keep the message under
+      200 words. Close with a single specific ask (a 15-minute call at a named time
+      range) rather than "let me know if interested." Avoid superlatives, buzzwords,
+      and anything that reads like a template.
+    externalId: outreach-playbook
+
+plans:
+  - name: Candidate Screening Pipeline
+    externalId: candidate-screening
+    outputStep: outreach
+    params:
+      - name: candidates
+        description: List of candidates to screen
+        required: true
+      - name: role
+        description: Job title
+        required: true
+    steps:
+      - name: screen
+        type: loop
+        over: candidates
+        steps:
+          - name: evaluate
+            agent: Engineering Manager
+            skills: [Hiring criteria]
+            instructions: |
+              Screen {{item.name}} ({{item.years_experience}}yr) for {{param.role}}.
+              Skills: {{item.skills}}
+              Background: {{item.background}}
+      - name: rank
+        agent: Engineering Manager
+        skills: [Hiring criteria]
+        instructions: |
+          Rank all candidates and recommend the top 3:
+          {{step.screen.output}}
+        dependencies: [screen]
+      - name: outreach
+        agent: Recruiter
+        skills: [Outreach playbook]
+        tools: [gmail_create_email_draft]
+        instructions: |
+          Draft personalized outreach for each approved candidate.
+
+          Ranked candidates:
+          {{step.rank.output}}
+        dependencies: [rank]

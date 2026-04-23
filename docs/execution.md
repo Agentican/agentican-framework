@@ -189,7 +189,7 @@ var duration = Duration.between(stepLog.createdAt(), stepLog.completedAt());
 For durable storage, implement the full `TaskStateStore` interface against your database. The mutation methods are called synchronously on the executing thread — keep them fast. Heavy work (indexing, replication) should be done asynchronously.
 
 ```java
-AgenticanRuntime.builder()
+Agentican.builder()
         .taskStateStore(myDatabaseStore)
         .build();
 ```

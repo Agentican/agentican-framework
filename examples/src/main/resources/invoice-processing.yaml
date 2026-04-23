@@ -1,13 +1,19 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+composio:
+  apiKey: ${COMPOSIO_API_KEY}
+  userId: user-1
+
 agents:
-  - name: Invoice Processor
+  - name: Accounts Payable Specialist
     role: |
-      Extracts structured data from invoices: vendor name, invoice number, total amount,
-      currency, line items with descriptions and quantities, payment terms, due date and
-      PO reference. Validates completeness — flags missing fields that are required for
-      processing (PO number, due date, vendor tax ID). Cross-references the vendor name
-      against known vendor records in the system. Normalizes amounts to USD when invoices
-      arrive in other currencies.
-    externalId: invoice-processor
+      Handles day-to-day AP operations. Extracts structured data from incoming invoices
+      (vendor, number, amount, currency, line items, terms, due date, PO reference),
+      validates completeness against required fields, cross-references vendors against
+      the system, and normalizes amounts to USD. Flags missing PO numbers, unknown
+      vendors, and duplicates. Escalates ambiguous cases rather than guessing.
+    externalId: accounts-payable-specialist
 
   - name: Finance Controller
     role: |
@@ -18,13 +24,14 @@ agents:
       criteria that drove the decision. Never approves ambiguous cases — escalates them.
     externalId: finance-controller
 
-  - name: Payment Agent
+  - name: Treasury Analyst
     role: |
-      Processes approved payments through the configured payment system. Generates confirmation
-      records with transaction ID, amount, vendor, and timestamp. Sends payment notification
-      to the vendor contact and posts a summary to the internal finance channel. Logs all
-      transactions with audit-ready detail including the approval chain and policy applied.
-    externalId: payment-agent
+      Executes approved payments through the configured payment system. Generates
+      confirmation records with transaction ID, amount, vendor and timestamp. Notifies
+      the vendor contact and posts a summary to the internal finance channel. Logs
+      transactions with audit-ready detail — approval chain, policy applied, settlement
+      account — so month-end reconciliation is mechanical.
+    externalId: treasury-analyst
 
 skills:
   - name: AP policy
@@ -41,3 +48,65 @@ skills:
       Reject criteria: no PO number provided, vendor on the hold list, duplicate invoice
       number detected, or invoice dated more than 90 days in the past.
     externalId: ap-policy
+
+plans:
+  - name: Invoice Processing
+    externalId: invoice-processing
+    outputStep: validate
+    params:
+      - name: email_id
+        description: Gmail message ID with the invoice
+        required: true
+    steps:
+      - name: extract
+        agent: Accounts Payable Specialist
+        skills: [AP policy]
+        tools: [gmail_get_message]
+        instructions: Extract invoice details from email {{param.email_id}}
+      - name: validate
+        agent: Accounts Payable Specialist
+        skills: [AP policy]
+        instructions: |
+          Validate this invoice against AP policy:
+          {{step.extract.output}}
+        dependencies: [extract]
+      - name: route
+        type: branch
+        from: validate
+        defaultPath: auto
+        pathConfigs:
+          - pathName: auto
+            agent: Treasury Analyst
+            skills: [AP policy]
+            instructions: |
+              Process payment for this approved invoice:
+              {{step.extract.output}}
+          - pathName: needs-approval
+            steps:
+              - name: review
+                agent: Finance Controller
+                skills: [AP policy]
+                instructions: |
+                  Review for approval:
+                  {{step.extract.output}}
+                  Validation: {{step.validate.output}}
+              - name: process
+                agent: Treasury Analyst
+                skills: [AP policy]
+                instructions: |
+                  Process approved payment:
+                  {{step.extract.output}}
+          - pathName: reject
+            agent: Accounts Payable Specialist
+            skills: [AP policy]
+            instructions: |
+              Draft a rejection notice to the vendor:
+              {{step.validate.output}}
+      - name: notify
+        agent: Treasury Analyst
+        skills: [AP policy]
+        tools: [slack_send_message]
+        instructions: |
+          Post result to #finance-ops:
+          {{step.route.output}}
+        dependencies: [route]

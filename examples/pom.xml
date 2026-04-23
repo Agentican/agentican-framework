@@ -23,11 +23,28 @@
         <dependency>
             <groupId>ai.agentican</groupId>
             <artifactId>agentican-framework-core</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-nop</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
             <version>2.18.3</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.5.18</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -40,6 +57,16 @@
                     <release>25</release>
                     <parameters>true</parameters>
                     <enablePreview>true</enablePreview>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>--enable-preview</argLine>
+                    <environmentVariables>
+                        <ANTHROPIC_API_KEY>test-anthropic-key</ANTHROPIC_API_KEY>
+                        <COMPOSIO_API_KEY>test-composio-key</COMPOSIO_API_KEY>
+                    </environmentVariables>
                 </configuration>
             </plugin>
         </plugins>

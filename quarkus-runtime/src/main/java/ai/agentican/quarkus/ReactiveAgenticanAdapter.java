@@ -1,17 +1,17 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.invoker.Agentican;
+import ai.agentican.framework.invoker.AgenticanTask;
 import ai.agentican.framework.orchestration.execution.TaskHandle;
 import ai.agentican.framework.orchestration.execution.TaskResult;
 
 import io.smallrye.mutiny.Uni;
 
-record ReactiveAgenticanAdapter<P, R>(Agentican<P, R> delegate) implements ReactiveAgentican<P, R> {
+record ReactiveAgenticanAdapter<P, R>(AgenticanTask<P, R> delegate) implements ReactiveAgenticanTask<P, R> {
 
     ReactiveAgenticanAdapter {
 
         if (delegate == null)
-            throw new IllegalArgumentException("delegate Agentican is required");
+            throw new IllegalArgumentException("delegate AgenticanTask is required");
     }
 
     @Override

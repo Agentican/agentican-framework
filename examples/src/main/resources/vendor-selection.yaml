@@ -1,0 +1,80 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Procurement Analyst
+    role: |
+      Normalizes vendor proposals into a common comparison structure. Extracts
+      pricing, SLA, security posture, and integration cost into comparable
+      fields. Flags omitted answers rather than inferring.
+    externalId: procurement-analyst
+
+  - name: Procurement Lead
+    role: |
+      Owns vendor selection against an evaluation matrix with explicit weights.
+      Writes a recommendation memo that names the runner-up and the single
+      reason the winner edged them out. Refuses "best overall fit" language —
+      names the decisive criterion.
+    externalId: procurement-lead
+
+skills:
+  - name: Proposal parsing
+    instructions: |
+      For each vendor, pull: annual list price, volume-discount tier, SLA
+      uptime + credit mechanics, security certifications (SOC 2, ISO 27001),
+      integration lift (weeks), and one-liner on support model. If any of
+      these is absent from the proposal, record it as "not stated" — do not
+      infer from marketing copy.
+    externalId: proposal-parsing
+
+  - name: Evaluation matrix
+    instructions: |
+      Evaluation weights: price 25%, SLA 25%, security 20%, integration
+      lift 15%, support model 15%. Score each vendor 1-5 per dimension with
+      a one-sentence justification. Ranking = weighted sum. The memo names
+      the winner, the runner-up, and the single decisive criterion —
+      refuses "best overall fit" framing.
+    externalId: evaluation-matrix
+
+plans:
+  - name: Vendor Selection
+    externalId: vendor-selection
+    outputStep: memo
+    params:
+      - name: rfp_title
+        description: RFP title
+        required: true
+      - name: proposals
+        description: Vendor proposals text
+        required: true
+    steps:
+      - name: normalize
+        agent: Procurement Analyst
+        skills: [Proposal parsing]
+        instructions: |
+          Normalize these vendor proposals into a comparable structure.
+
+          RFP: {{param.rfp_title}}
+          Proposals:
+          {{param.proposals}}
+      - name: rank
+        agent: Procurement Lead
+        skills: [Evaluation matrix]
+        dependencies: [normalize]
+        hitl: true
+        instructions: |
+          Score each vendor per the evaluation matrix and produce a ranking
+          with one-sentence justifications.
+
+          Normalized proposals:
+          {{step.normalize.output}}
+      - name: memo
+        agent: Procurement Lead
+        skills: [Evaluation matrix]
+        dependencies: [rank]
+        instructions: |
+          Draft the selection memo from this approved ranking — name the
+          winner, the runner-up, and the decisive criterion.
+
+          Ranking:
+          {{step.rank.output}}

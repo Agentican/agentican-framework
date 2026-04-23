@@ -14,7 +14,7 @@ var researcher = AgentConfig.builder()
         .llm("default")
         .build();
 
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
         .agent(researcher)
         .build()) {
@@ -22,7 +22,7 @@ try (var agentican = AgenticanRuntime.builder()
 }
 ```
 
-Any agent you register at startup — through `RuntimeConfig.agents` or `AgenticanRuntime.builder().agent(...)` — must declare an `externalId`. Planner-created agents don't need one.
+Any agent you register at startup — through `RuntimeConfig.agents` or `Agentican.builder().agent(...)` — must declare an `externalId`. Planner-created agents don't need one.
 
 Agents from config are pre-registered in the `AgentRegistry` when Agentican starts. They're available for plan steps to reference by name or id.
 
@@ -85,7 +85,7 @@ Agent agent = factory.build(agentConfig);
 Skills are reusable instruction blocks. They live in a top-level `SkillRegistry` (seeded from `RuntimeConfig.skills` and the fluent builder) and are referenced by plan steps.
 
 ```java
-AgenticanRuntime.builder()
+Agentican.builder()
         .llm(...)
         .skill(SkillConfig.builder()
                 .externalId("skill.statistical-rigor.v1").name("statistical-rigor")
@@ -159,7 +159,7 @@ For most cases, you don't need a custom runner. If you build one, the framework 
 The default runner. Configurable via `WorkerConfig`:
 
 ```java
-AgenticanRuntime.builder()
+Agentican.builder()
         .llm(...)
         .worker(WorkerConfig.builder()
                 .maxTurns(20)                    // max LLM turns per step
@@ -204,7 +204,7 @@ AgentConfig.builder()
 Define the LLMs in config:
 
 ```java
-AgenticanRuntime.builder()
+Agentican.builder()
         .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
         .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
         .build();
@@ -213,7 +213,7 @@ AgenticanRuntime.builder()
 Or supply pre-built `LlmClient` instances via the builder:
 
 ```java
-AgenticanRuntime.builder()
+Agentican.builder()
         .llm("custom", myLlmClient)
         .build();
 ```

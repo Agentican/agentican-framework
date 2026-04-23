@@ -67,7 +67,7 @@ Complete list of all `agentican.*` configuration properties across all Quarkus m
 
 > `external-id` is enforced at boot. Any config-declared agent or skill without
 > one causes Agentican to throw `IllegalStateException` during
-> `AgenticanRuntime.builder().build()`. Planner-created entities don't carry one —
+> `Agentican.builder().build()`. Planner-created entities don't carry one —
 > they exist only within the lifetime of the process / DB row.
 
 ### Store backend selection
@@ -223,12 +223,12 @@ quarkus.otel.exporter.otlp.protocol=grpc
 
 ## Reactive Support
 
-`ReactiveAgenticanRuntime` wraps `Agentican` and returns Mutiny `Uni` types instead of blocking.
+`ReactiveAgentican` wraps `Agentican` and returns Mutiny `Uni` types instead of blocking.
 Inject it in reactive REST endpoints or Vert.x handlers:
 
 ```java
 @Inject
-ReactiveAgenticanRuntime agentican;
+ReactiveAgentican agentican;
 
 @POST
 @Path("/tasks")
@@ -243,7 +243,7 @@ public Uni<TaskLog> taskLog(@PathParam("id") String taskId) {
 }
 ```
 
-`ReactiveAgenticanRuntime` is produced automatically by `agentican-quarkus`. It offloads blocking
+`ReactiveAgentican` is produced automatically by `agentican-quarkus`. It offloads blocking
 operations to the framework's virtual thread executor and returns results on the Vert.x
 event loop. Use it when your endpoints run on the event loop (non-`@Blocking` RESTEasy
 Reactive endpoints).

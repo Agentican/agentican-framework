@@ -7,7 +7,7 @@ Common patterns and recipes for using Agentican.
 Plan and execute a task from natural language:
 
 ```java
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
         .build()) {
 
@@ -87,7 +87,7 @@ public class DbToolkit implements Toolkit {
 }
 
 // Register and use:
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .toolkit("db", new DbToolkit(myDataSource))
         .build()) {
 
@@ -119,7 +119,7 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
     }
 });
 
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .toolkit("email", new EmailToolkit())  // send_email is HitlType.APPROVAL
         .hitlManager(hitlManager)
         .build()) {
@@ -190,7 +190,7 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
     }
 });
 
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .hitlManager(hitlManager)
         .build()) {
 
@@ -255,7 +255,7 @@ record HttpInput(String url, String method) {
 }
 record HttpOutput(String body, int status) { }
 
-var agentican = AgenticanRuntime.builder()
+var agentican = Agentican.builder()
         .codeStep("http-get", HttpInput.class, HttpOutput.class,
                 (input, ctx) -> {
                     var response = HttpClient.newHttpClient().send(
@@ -289,7 +289,7 @@ The agent reads individual fields from the typed JSON output via `{{step.X.outpu
 Use a fast/cheap model for classification and a stronger one for content generation:
 
 ```java
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
         .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
         .agent(AgentConfig.builder()
@@ -312,7 +312,7 @@ After a task runs, the `TaskLog` contains the full execution history:
 ```java
 var taskStateStore = new TaskStateStoreMemory();
 
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .taskStateStore(taskStateStore)
         .build()) {
 
@@ -342,7 +342,7 @@ LlmClient myClient = request -> {
     // your custom LLM provider
 };
 
-AgenticanRuntime.builder()
+Agentican.builder()
         .llm("default", myClient)  // still gets automatic retry wrapping
         .build();
 ```

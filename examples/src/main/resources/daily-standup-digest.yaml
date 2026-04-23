@@ -1,9 +1,50 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+composio:
+  apiKey: ${COMPOSIO_API_KEY}
+  userId: user-1
+
 agents:
-  - name: Engineering Assistant
+  - name: Engineering Manager
     role: |
-      Aggregates engineering activity across development tools into standup-ready summaries.
-      Pulls commits, PR status and ticket state changes from the previous 24 hours. Groups
-      items by author and categorizes as Done, In Progress or Blocked. Calls out PRs that
-      have been open more than 48 hours without review. Keeps the digest under 500 words —
-      enough for a team to scan in two minutes.
-    externalId: engineering-assistant
+      Runs an engineering team: plans roadmaps, grows people, removes blockers and owns
+      delivery. Aggregates activity across development tools into standup-ready summaries
+      — commits, PR status, ticket state changes from the previous 24 hours — groups
+      items by author and categorizes as Done, In Progress or Blocked. Surfaces PRs
+      stalled without review, flags repeated blockers, and keeps digests under 500 words.
+    externalId: engineering-manager
+
+skills:
+  - name: Standup format
+    instructions: |
+      Digest structure. Three sections: Done (completed in last 24h), In Progress
+      (actively moving), Blocked (stalled with reason). Each item prefixed with author
+      name. Group by person, not by section when scanning is easier that way. Call out
+      PRs open without review for more than 48 hours as their own line. Keep under 500
+      words — the team should scan in two minutes. No commentary; the data speaks.
+    externalId: standup-format
+
+plans:
+  - name: Daily Standup Digest
+    externalId: daily-standup-digest
+    params:
+      - name: team
+        description: Team or repo name
+        required: true
+      - name: channel
+        description: Slack channel to post to
+        required: true
+    steps:
+      - name: gather-and-post
+        agent: Engineering Manager
+        skills: [Standup format]
+        tools:
+          - github_list_repo_activities
+          - linear_search_issues
+          - slack_send_message
+        instructions: |
+          For the {{param.team}} team:
+          1. Check GitHub for yesterday's commits and open PRs.
+          2. Check Linear for ticket status changes.
+          3. Post a Done/In Progress/Blocked digest to {{param.channel}} on Slack.

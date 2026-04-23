@@ -1,0 +1,83 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Fraud Analyst
+    role: |
+      Scores flagged transactions against known risk signals — velocity,
+      geographic mismatch, device reputation, amount anomaly, merchant
+      category risk. Anchors each score in the specific signals present,
+      never uses a generic "high risk" without naming the signals.
+    externalId: fraud-analyst
+
+  - name: Risk Lead
+    role: |
+      Applies current policy thresholds to scored transactions and produces
+      an action list (auto-reverse, hold for manual review, release).
+      Refuses to assume thresholds from last quarter's policy — asks for
+      the active thresholds before classifying.
+    externalId: risk-lead
+
+skills:
+  - name: Fraud scoring
+    instructions: |
+      Score 0-100. Signals (weighted): velocity (same card 3+ charges in
+      10min: +25), geo mismatch (card country != IP country: +15), device
+      reputation (known-bad fingerprint: +30), amount anomaly (>5x account
+      90-day average: +15), merchant category (gambling, crypto OTC: +15).
+      Cite each signal that contributed with its weight. Never score without
+      citing the triggering signals.
+    externalId: fraud-scoring
+
+  - name: Risk policy
+    instructions: |
+      Thresholds change weekly based on loss appetite. Do not assume the
+      previous week's thresholds — ask. Once thresholds are known, classify
+      each scored transaction as auto-reverse, hold for manual review, or
+      release, and state why per the threshold. Include a one-line
+      customer-comms template per class.
+    externalId: risk-policy
+
+plans:
+  - name: Fraud Triage
+    externalId: fraud-triage
+    outputStep: actions
+    params:
+      - name: batch_id
+        description: Batch identifier for this triage run
+        required: true
+      - name: flagged_transactions
+        description: Flagged transactions to triage
+        required: true
+    steps:
+      - name: score
+        agent: Fraud Analyst
+        skills: [Fraud scoring]
+        instructions: |
+          Score each flagged transaction. Cite which signals contributed
+          with their weights.
+
+          Batch: {{param.batch_id}}
+          Transactions:
+          {{param.flagged_transactions}}
+      - name: classify
+        agent: Risk Lead
+        skills: [Risk policy]
+        dependencies: [score]
+        instructions: |
+          Classify each scored transaction per the active risk thresholds.
+          If the active thresholds aren't stated here, ask before
+          classifying — do not assume last week's thresholds.
+
+          Scored transactions:
+          {{step.score.output}}
+      - name: actions
+        agent: Risk Lead
+        skills: [Risk policy]
+        dependencies: [classify]
+        instructions: |
+          Produce the action list for this classification with a one-line
+          customer-comms template per class.
+
+          Classification:
+          {{step.classify.output}}

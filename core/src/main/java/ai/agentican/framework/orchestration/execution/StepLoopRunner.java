@@ -39,10 +39,13 @@ class StepLoopRunner {
 
         var upstreamOutput = outputs.get(step.over());
 
+        if (upstreamOutput == null) upstreamOutput = params.get(step.over());
+
         if (upstreamOutput == null) {
 
             return new TaskStepResult(step.name(), TaskStatus.FAILED,
-                    "No output found from step: " + step.over(), List.of());
+                    "No output or param found for '" + step.over() + "' (loop step '" + step.name() + "')",
+                    List.of());
         }
 
         var items = Json.findArray(upstreamOutput);

@@ -27,14 +27,14 @@ On Quarkus? Use [`agentican-quarkus-runtime`](quarkus/getting-started.md) instea
 Create a simple program that delegates a task to Agentican:
 
 ```java
-import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.Agentican;
 import ai.agentican.framework.config.LlmConfig;
 
 public class Hello {
 
     public static void main(String[] args) {
 
-        try (var agentican = AgenticanRuntime.builder()
+        try (var agentican = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
                 .build()) {
 
@@ -64,7 +64,7 @@ var llm = LlmConfig.builder()
         .model("gpt-4o-mini")
         .build();
 
-try (var agentican = AgenticanRuntime.builder().llm(llm).build()) { /* use agentican */ }
+try (var agentican = Agentican.builder().llm(llm).build()) { /* use agentican */ }
 ```
 
 ### Using Google Gemini
@@ -78,7 +78,7 @@ var llm = LlmConfig.builder()
         .model("gemini-2.5-flash")
         .build();
 
-try (var agentican = AgenticanRuntime.builder().llm(llm).build()) { /* use agentican */ }
+try (var agentican = Agentican.builder().llm(llm).build()) { /* use agentican */ }
 ```
 
 ### Using OSS-hosted providers
@@ -112,7 +112,7 @@ var llm = LlmConfig.builder()
         .model("anthropic.claude-sonnet-4-5-20250929-v1:0")
         .build();
 
-try (var agentican = AgenticanRuntime.builder().llm(llm).build()) { /* use agentican */ }
+try (var agentican = Agentican.builder().llm(llm).build()) { /* use agentican */ }
 ```
 
 For static credentials — e.g. in tests — pair `apiKey` and `secretKey`:
@@ -137,7 +137,7 @@ var llm = LlmConfig.builder()
         .model("llama3.3:70b")
         .build();
 
-try (var agentican = AgenticanRuntime.builder().llm(llm).build()) { /* use agentican */ }
+try (var agentican = Agentican.builder().llm(llm).build()) { /* use agentican */ }
 ```
 
 See [Configuration → Supported providers](configuration.md#supported-providers) for what's the same and what's not across providers.
@@ -185,7 +185,7 @@ Out of the box, agents can search the web and fetch content (built into Claude).
 ```java
 var myToolkit = new MyCustomToolkit();
 
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
         .toolkit("my-tools", myToolkit)
         .build()) {
@@ -213,7 +213,7 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
     mgr.respond(checkpoint.id(), response);
 });
 
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
         .hitlManager(hitlManager)
         .build()) {

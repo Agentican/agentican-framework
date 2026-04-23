@@ -1,0 +1,71 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Software Architect
+    role: |
+      Owns system design and architectural consistency across services. Reviews pull
+      requests for service boundaries, data flow, failure modes, backwards-compatibility
+      and operational implications. Flags hidden coupling, missing error paths,
+      shared-state introductions and changes that cross team or service lines without
+      coordination. Doesn't comment on syntax or style.
+    externalId: software-architect
+
+  - name: Senior Software Engineer
+    role: |
+      Writes production code and reviews peers' code to a high bar. Checks naming,
+      function length, test coverage of the described change, comment quality and
+      adherence to existing codebase patterns. Flags premature abstraction, dead code,
+      inconsistent error handling and tests that assert implementation instead of
+      behavior. Doesn't second-guess architectural decisions.
+    externalId: senior-software-engineer
+
+  - name: Engineering Manager
+    role: |
+      Runs an engineering team and owns delivery quality. Synthesizes specialist review
+      findings into a single reviewer summary: deduplicates overlapping concerns, ranks
+      by severity (blocking / significant / minor) and writes an overall recommendation.
+      Does not introduce new findings — only consolidates what the specialists surfaced.
+    externalId: engineering-manager
+
+skills:
+  - name: Review checklist
+    instructions: |
+      Severity levels for PR findings. Blocking: correctness defect, security issue, data
+      loss potential, contract break, missing rollback path. Significant: performance
+      regression risk, test gap for a stated change, missing observability, API inconsistency
+      with neighboring code. Minor: naming, comment wording, small dead-code cleanup,
+      readability micro-improvements. Overall recommendations: approve, approve-with-nits,
+      request-changes, block.
+    externalId: review-checklist
+
+plans:
+  - name: PR Review
+    externalId: pr-review
+    outputStep: synthesize
+    params:
+      - name: pr
+        description: Pull request summary
+        required: true
+    steps:
+      - name: architecture
+        agent: Software Architect
+        skills: [Review checklist]
+        instructions: "Review this PR for architectural concerns:\n{{param.pr}}"
+      - name: style
+        agent: Senior Software Engineer
+        skills: [Review checklist]
+        instructions: "Review this PR for readability and consistency:\n{{param.pr}}"
+      - name: synthesize
+        agent: Engineering Manager
+        skills: [Review checklist]
+        instructions: |
+          Combine these specialist reviews into a single ranked finding list and an
+          overall recommendation.
+
+          Architecture:
+          {{step.architecture.output}}
+
+          Style:
+          {{step.style.output}}
+        dependencies: [architecture, style]

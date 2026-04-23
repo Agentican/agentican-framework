@@ -1,0 +1,96 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Account Manager
+    role: |
+      Owns a book of customer accounts: tracks usage signals, runs business reviews,
+      manages renewals and expansions. Analyzes accounts for churn signals — usage
+      trend, support ticket volume, sentiment drift, feature engagement, contract
+      recency — and produces numeric risk scores backed by concrete signals from the
+      account summary. Avoids speculation; every signal cited maps to a data point.
+    externalId: account-manager
+
+  - name: Customer Success Manager
+    role: |
+      Drives adoption and outcomes for a portfolio of customers post-sale. Prescribes
+      intervention plans calibrated to risk: lightweight engagement for healthy
+      accounts, executive business reviews for medium risk, named-sponsor save plans
+      with root-cause investigation timelines for high risk. Every step in a plan
+      names an owner and a date — no generic advice.
+    externalId: customer-success-manager
+
+skills:
+  - name: Churn signals
+    instructions: |
+      Risk tiers. Low (score 0-30): usage flat or growing, ≤2 open tickets, positive or
+      neutral sentiment, engaged with at least one feature in the last 30 days. Medium
+      (31-60): usage declining ≤20%, elevated ticket volume, neutral-to-frustrated
+      sentiment, low feature engagement. High (61-100): usage declining >20%, recurring
+      escalations, negative sentiment, executive-level friction, renewal approaching.
+      Weight: usage trend (40%), sentiment (30%), ticket velocity (20%), feature adoption
+      (10%).
+    externalId: churn-signals
+
+plans:
+  - name: Churn Risk Assessment
+    externalId: churn-risk
+    outputStep: analyze
+    params:
+      - name: account
+        description: Customer account summary
+        required: true
+    steps:
+      - name: analyze
+        agent: Account Manager
+        skills: [Churn signals]
+        instructions: |
+          Score churn risk for this account and identify the top contributing signals:
+          {{param.account}}
+      - name: intervene
+        type: branch
+        from: analyze
+        defaultPath: low
+        pathConfigs:
+          - pathName: low
+            agent: Customer Success Manager
+            skills: [Churn signals]
+            instructions: |
+              Draft a lightweight engagement plan for this low-risk account.
+              Work entirely from the account summary and risk analysis below —
+              do not ask for more information. Every plan item names an owner
+              and a date.
+
+              Account summary:
+              {{param.account}}
+
+              Risk analysis:
+              {{step.analyze.output}}
+          - pathName: medium
+            agent: Customer Success Manager
+            skills: [Churn signals]
+            instructions: |
+              Draft an EBR-focused plan for this medium-risk account. Work
+              entirely from the account summary and risk analysis below — do
+              not ask for more information. Every plan item names an owner
+              and a date.
+
+              Account summary:
+              {{param.account}}
+
+              Risk analysis:
+              {{step.analyze.output}}
+          - pathName: high
+            agent: Customer Success Manager
+            skills: [Churn signals]
+            instructions: |
+              Draft a save plan with a named exec sponsor and deadlines for this
+              high-risk account. Work entirely from the account summary and risk
+              analysis below — do not ask for more information. Every plan item
+              names an owner and a date.
+
+              Account summary:
+              {{param.account}}
+
+              Risk analysis:
+              {{step.analyze.output}}

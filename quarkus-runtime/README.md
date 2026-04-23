@@ -1,6 +1,6 @@
 # Agentican Quarkus Runtime
 
-> CDI runtime for Agentican — `@Inject AgenticanRuntime` and configure from `application.properties`.
+> CDI runtime for Agentican — `@Inject Agentican` and configure from `application.properties`.
 
 [![Quarkus](https://img.shields.io/badge/Quarkus-3.31-blue.svg)](https://quarkus.io/)
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
@@ -32,7 +32,7 @@ agentican.agents[0].external-id=researcher
 > if one is missing.
 
 ```java
-@Inject AgenticanRuntime agentican;
+@Inject Agentican agentican;
 
 var handle = agentican.run("Find papers on agent frameworks");
 var result = handle.result();
@@ -42,10 +42,10 @@ That's it. The framework plans, executes, and returns — with CDI lifecycle, he
 
 ## What's in the box
 
-- **`@Inject AgenticanRuntime`** — singleton CDI bean with full lifecycle management.
+- **`@Inject Agentican`** — singleton CDI bean with full lifecycle management.
 - **`@Inject AgenticanRecovery`** — server-side recovery surface (`resumeInterrupted`, `reapOrphans`); produced from the injected `Agentican` and disposed alongside it.
 - **`@AgenticanAgent("name")`** — qualifier for injecting individual agents by name.
-- **`ReactiveAgenticanRuntime`** — Mutiny `Uni`-based API for reactive / Vert.x callers.
+- **`ReactiveAgentican`** — Mutiny `Uni`-based API for reactive / Vert.x callers.
 - **Config binding** — `RuntimeConfig` → `application.properties` via SmallRye `@ConfigMapping`, validated at boot.
 - **Lifecycle events** — `StartupEvent` / `ShutdownEvent` observers drive `Agentican` construction and `AutoCloseable` teardown.
 - **Resume on start** — `ResumeOnStartObserver` invokes `AgenticanRecovery.resumeInterrupted` on `StartupEvent` to pick up tasks left in flight after a restart (toggleable via `agentican.resume-on-start`).

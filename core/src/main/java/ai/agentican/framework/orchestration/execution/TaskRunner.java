@@ -635,6 +635,12 @@ public class TaskRunner {
                             taskStepsRunning += dispatchDependentsOf(hitlResult.stepName(), depGraph,
                                     dispatchedTaskSteps, taskStepOutputs, taskParams, finishedTaskSteps, pool, taskCancelled, taskStepIds, taskId, stepNameToStepId);
                         }
+                        else {
+
+                            LOG.error(Logs.RUNNER_STEP_FAILED);
+                            drainRemainingSteps(finishedTaskSteps, taskStepResults, taskStepsRunning);
+                            return completeTask.apply(TaskStatus.FAILED);
+                        }
                     }
 
                     continue;
@@ -791,19 +797,7 @@ public class TaskRunner {
 
                 var taskStepResult = runTaskStep(taskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
 
-                if (hitlManager != null && taskStep.hitl()
-                        && taskStepResult.status() == TaskStatus.COMPLETED) {
-
-                    var checkpoint = hitlManager.createStepApprovalCheckpoint(
-                            taskStep.name(), taskStepResult.output());
-
-                    var lastRun = taskStepResult.agentResults().isEmpty()
-                            ? new RunLog(Ids.generate(), 0, (String) null)
-                            : taskStepResult.agentResults().getLast().run();
-                    taskStepResult = new TaskStepResult(taskStep.name(), TaskStatus.SUSPENDED,
-                            taskStepResult.output(),
-                            List.of(AgentResult.builder().status(AgentStatus.SUSPENDED).run(lastRun).checkpoint(checkpoint).build()));
-                }
+                taskStepResult = wrapForHitlIfNeeded(taskStep, taskStepResult, List.of());
 
                 finishedTaskSteps.put(taskStepResult);
             }
@@ -864,7 +858,7 @@ public class TaskRunner {
         var checkpoint = suspendedResult.agentResults().stream()
                 .filter(AgentResult::isSuspended)
                 .map(AgentResult::checkpoint)
-                .findFirst()
+                .reduce((a, b) -> b)
                 .orElse(null);
 
         if (checkpoint == null)
@@ -910,7 +904,7 @@ public class TaskRunner {
 
             var feedback = response.feedback() != null ? response.feedback() : "Please revise.";
 
-            var attempts = suspendedResult.agentResults().size();
+            var attempts = countStepOutputCheckpoints(suspendedResult.agentResults());
 
             var effectiveMaxRetries = (taskStep instanceof PlanStepAgent agent && agent.maxRetries() > 0)
                     ? agent.maxRetries() : maxStepRetries;
@@ -928,7 +922,8 @@ public class TaskRunner {
                     taskStep.name(), attempts + 1, effectiveMaxRetries);
 
             var stepId = stepNameToStepId.get(taskStep.name());
-            return retryTaskStep(taskStep, parentStepOutputs, taskParams, taskCancelled, feedback, taskId, stepId);
+            return retryTaskStep(taskStep, parentStepOutputs, taskParams, taskCancelled, feedback,
+                    suspendedResult.agentResults(), taskId, stepId);
         }
 
         if (taskStep instanceof PlanStepAgent agentStep) {
@@ -941,7 +936,7 @@ public class TaskRunner {
                 var savedRun = suspendedResult.agentResults().stream()
                         .filter(AgentResult::isSuspended)
                         .map(AgentResult::run)
-                        .findFirst()
+                        .reduce((a, b) -> b)
                         .orElse(null);
 
                 if (savedRun != null) {
@@ -957,13 +952,17 @@ public class TaskRunner {
                             taskId, stepId, agentStep.name(),
                             agentStep.timeout(),
                             agentStep.skills(), scopedToolkits,
-                            savedRun, hitlToolResults);
+                            savedRun, hitlToolResults,
+                            structuredOutputFor(agentStep));
 
                     var status = agentResult.isCompleted() ? TaskStatus.COMPLETED
                             : agentResult.isSuspended() ? TaskStatus.SUSPENDED
                             : TaskStatus.FAILED;
 
-                    return new TaskStepResult(taskStep.name(), status, agentResult.text(), List.of(agentResult));
+                    var baseResult = new TaskStepResult(taskStep.name(), status,
+                            agentResult.text(), List.of(agentResult));
+
+                    return wrapForHitlIfNeeded(taskStep, baseResult, suspendedResult.agentResults());
                 }
             }
         }
@@ -972,9 +971,19 @@ public class TaskRunner {
                 "Failed to resume step after HITL", List.of());
     }
 
+    private static int countStepOutputCheckpoints(List<AgentResult> agentResults) {
+
+        return (int) agentResults.stream()
+                .filter(AgentResult::isSuspended)
+                .map(AgentResult::checkpoint)
+                .filter(cp -> cp != null && cp.type() == HitlCheckpoint.Type.STEP_OUTPUT)
+                .count();
+    }
+
     private TaskStepResult retryTaskStep(PlanStep taskStep, Map<String, String> parentStepOutputs,
                                          Map<String, String> taskParams, AtomicBoolean taskCancelled,
-                                         String taskStepFeedback, String taskId, String stepId) {
+                                         String taskStepFeedback, List<AgentResult> priorAgentResults,
+                                         String taskId, String stepId) {
 
         var feedbackSuffix = "\n\n## Reviewer Feedback\n\n"
                 + "A previous attempt at this step was rejected by the reviewer. "
@@ -992,7 +1001,42 @@ public class TaskRunner {
             case PlanStepCode<?> s -> s;
         };
 
-        return runTaskStep(modifiedTaskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
+        var result = runTaskStep(modifiedTaskStep, parentStepOutputs, taskParams, taskCancelled, taskId, stepId);
+
+        return wrapForHitlIfNeeded(taskStep, result, priorAgentResults);
+    }
+
+    private TaskStepResult wrapForHitlIfNeeded(PlanStep step, TaskStepResult result,
+                                               List<AgentResult> priorAgentResults) {
+
+        var shouldCheckpoint = hitlManager != null && step.hitl()
+                && result.status() == TaskStatus.COMPLETED;
+
+        if (priorAgentResults.isEmpty() && !shouldCheckpoint) return result;
+
+        var agentResults = new ArrayList<AgentResult>(priorAgentResults);
+        agentResults.addAll(result.agentResults());
+
+        if (!shouldCheckpoint) {
+
+            return new TaskStepResult(result.stepName(), result.status(),
+                    result.output(), List.copyOf(agentResults));
+        }
+
+        var checkpoint = hitlManager.createStepApprovalCheckpoint(step.name(), result.output());
+
+        var lastRun = agentResults.isEmpty()
+                ? new RunLog(Ids.generate(), 0, (String) null)
+                : agentResults.getLast().run();
+
+        agentResults.add(AgentResult.builder()
+                .status(AgentStatus.SUSPENDED)
+                .run(lastRun)
+                .checkpoint(checkpoint)
+                .build());
+
+        return new TaskStepResult(step.name(), TaskStatus.SUSPENDED,
+                result.output(), List.copyOf(agentResults));
     }
 
     private List<ToolResult> buildHitlToolResults(HitlCheckpoint checkpoint, HitlResponse response) {
@@ -1056,6 +1100,10 @@ public class TaskRunner {
         var dependents = new HashMap<String, Set<String>>();
         var stepsByName = new HashMap<String, PlanStep>();
 
+        var paramNames = plan.params().stream()
+                .map(ai.agentican.framework.orchestration.model.PlanParam::name)
+                .collect(java.util.stream.Collectors.toSet());
+
         for (var taskStep : plan.steps()) {
 
             var name = taskStep.name();
@@ -1072,10 +1120,12 @@ public class TaskRunner {
                     deps.add(matcher.group(1));
             }
 
-            if (taskStep instanceof PlanStepLoop loopTaskStep)
+            if (taskStep instanceof PlanStepLoop loopTaskStep
+                    && !paramNames.contains(loopTaskStep.over()))
                 deps.add(loopTaskStep.over());
 
-            if (taskStep instanceof PlanStepBranch branchTaskStep)
+            if (taskStep instanceof PlanStepBranch branchTaskStep
+                    && !paramNames.contains(branchTaskStep.from()))
                 deps.add(branchTaskStep.from());
 
             forwardDeps.put(name, Set.copyOf(deps));

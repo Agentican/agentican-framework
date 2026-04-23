@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.event;
 
-import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.Agentican;
 import ai.agentican.framework.orchestration.execution.TaskListener;
 import ai.agentican.framework.agent.AgentStatus;
 import ai.agentican.framework.llm.StopReason;
@@ -19,7 +19,7 @@ public class CdiEventBridge implements TaskListener {
 
     @Inject TaskStateStore taskStateStore;
 
-    @Inject Instance<AgenticanRuntime> agentican;
+    @Inject Instance<Agentican> agentican;
 
     private final java.util.concurrent.ConcurrentHashMap<String, String> toolCallIds = new java.util.concurrent.ConcurrentHashMap<>();
 

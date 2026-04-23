@@ -1,0 +1,86 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: UX Researcher
+    role: |
+      Clusters raw interview and usability-test notes into themes grounded in
+      verbatim quotes. Never smooths a participant's language into corporate
+      register. Refuses to cluster by what seems convenient.
+    externalId: ux-researcher
+
+  - name: Insights Lead
+    role: |
+      Frames research themes against a specific product decision. Without a
+      named decision the synthesis becomes a book report — always asks which
+      decision the team is preparing to make before framing. Writes briefs
+      that name implications, not just observations.
+    externalId: insights-lead
+
+skills:
+  - name: Theme clustering
+    instructions: |
+      Clusters are named using the participant's own register ("the whole
+      thing froze for like, two minutes"), not an abstracted label. Include
+      at least one verbatim quote per cluster and the number of participants
+      who expressed it. Do not invent clusters that only one participant hinted
+      at unless the hint is strong and the detail is vivid.
+    externalId: theme-clustering
+
+  - name: Decision framing
+    instructions: |
+      A framed finding states: the observed behavior (one sentence), the
+      implication for the decision at hand, and the confidence level tied to
+      participant count. If the decision at hand isn't named in the brief,
+      ask — the same clusters frame differently for a launch/no-launch call
+      vs a feature-tuning call. Briefs that don't name a decision get filed
+      under "interesting" and forgotten.
+    externalId: decision-framing
+
+plans:
+  - name: Research Synthesis
+    externalId: research-synthesis
+    outputStep: brief
+    params:
+      - name: study_name
+        description: Name of the research study
+        required: true
+      - name: raw_notes
+        description: Raw interview and usability notes
+        required: true
+      - name: participant_count
+        description: Number of participants in the study
+        required: true
+    steps:
+      - name: cluster
+        agent: UX Researcher
+        skills: [Theme clustering]
+        instructions: |
+          Cluster these raw notes into themes. Use participants' own register
+          in cluster names. Include at least one verbatim quote per cluster.
+
+          Study: {{param.study_name}}
+          Participants: {{param.participant_count}}
+          Raw notes:
+          {{param.raw_notes}}
+      - name: frame
+        agent: Insights Lead
+        skills: [Decision framing]
+        dependencies: [cluster]
+        instructions: |
+          Frame these clusters against the product decision the team is
+          making. If the decision isn't stated here, ask before framing —
+          do not default to a generic overview.
+
+          Clusters:
+          {{step.cluster.output}}
+      - name: brief
+        agent: Insights Lead
+        skills: [Decision framing]
+        dependencies: [frame]
+        instructions: |
+          Write the research brief from this framed synthesis. Each finding
+          states the behavior, implication for the decision, and confidence.
+
+          Framed synthesis:
+          {{step.frame.output}}

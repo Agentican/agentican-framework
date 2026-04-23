@@ -272,6 +272,7 @@ public record  PlanConfig(
         private String agent;
         private String instructions;
         private List<String> tools = List.of();
+        private List<String> skills = List.of();
         private final List<PlanStepConfig> steps = new ArrayList<>();
 
         PathBuilder(String pathName) { this.pathName = pathName; }
@@ -280,6 +281,8 @@ public record  PlanConfig(
         public PathBuilder instructions(String instructions) { this.instructions = instructions; return this; }
         public PathBuilder tools(String... tools) { this.tools = List.of(tools); return this; }
         public PathBuilder tools(List<String> tools) { this.tools = tools; return this; }
+        public PathBuilder skills(String... skills) { this.skills = List.of(skills); return this; }
+        public PathBuilder skills(List<String> skills) { this.skills = skills; return this; }
 
         public PathBuilder step(PlanStepConfig step) { steps.add(step); return this; }
         public PathBuilder step(String name, Consumer<StepBuilder> config) {
@@ -291,7 +294,7 @@ public record  PlanConfig(
 
         BranchPathConfig build() {
 
-            return new BranchPathConfig(pathName, agent, instructions, tools,
+            return new BranchPathConfig(pathName, agent, instructions, tools, skills,
                     steps.isEmpty() ? null : steps);
         }
     }
@@ -417,6 +420,7 @@ public record  PlanConfig(
             String agent,
             String instructions,
             List<String> tools,
+            List<String> skills,
             List<PlanStepConfig> steps) {
 
         public BranchPathConfig {
@@ -426,6 +430,9 @@ public record  PlanConfig(
 
             if (tools == null)
                 tools = List.of();
+
+            if (skills == null)
+                skills = List.of();
         }
 
         List<PlanStep> toPlanStep() {
@@ -441,7 +448,7 @@ public record  PlanConfig(
             var stepName = pathName + "-body";
 
             var agentStep =
-                    new PlanStepAgent(stepName, agent, instructions, List.of(), false, List.of(), tools);
+                    new PlanStepAgent(stepName, agent, instructions, List.of(), false, skills, tools);
 
             return List.of(agentStep);
         }

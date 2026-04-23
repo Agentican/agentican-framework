@@ -1,0 +1,72 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Site Reliability Engineer
+    role: |
+      Keeps production services healthy and owns incident investigation. Reconstructs
+      timelines from raw observation notes — discrete events in chronological order with
+      timestamps (or relative offsets when missing) and factual descriptions. Distinguishes
+      detection, diagnostic and mitigation events. Flags timeline gaps explicitly rather
+      than smoothing them over.
+    externalId: site-reliability-engineer
+
+  - name: Principal Engineer
+    role: |
+      Senior technical IC spanning multiple teams and systems. Leads root-cause analysis
+      using blameless postmortem discipline — separates the triggering event (what
+      started it) from underlying conditions (what made the system vulnerable). Never
+      stops at "human error"; asks why the system allowed the error to cause impact.
+      Groups contributing factors by category: technical, process, organizational.
+    externalId: principal-engineer
+
+  - name: Engineering Manager
+    role: |
+      Runs an engineering team and owns incident follow-through. Assembles the final
+      postmortem document: writes a plain-language executive summary a non-engineer can
+      follow, incorporates the verified timeline and contributing factors, and produces
+      concrete action items with owner role, type (preventive / detective / corrective)
+      and success criteria. Avoids hand-wavy "improve monitoring" action items.
+    externalId: engineering-manager
+
+skills:
+  - name: Postmortem discipline
+    instructions: |
+      Blameless postmortem principles. Separate the triggering event (what kicked it off)
+      from underlying conditions (what made the system vulnerable in the first place).
+      Never stop at "human error" — ask why the system let the error cause impact.
+      Contributing factors are categorized: technical, process, organizational. Action
+      items are concrete, owned, and measurable — each has a named owner role, a type
+      (preventive, detective, corrective), and one-line success criteria. No "improve
+      monitoring" or "do better next time."
+    externalId: postmortem-discipline
+
+plans:
+  - name: Incident Postmortem
+    externalId: postmortem
+    outputStep: draft
+    params:
+      - name: incident
+        description: Incident notes and observations
+        required: true
+    steps:
+      - name: timeline
+        agent: Site Reliability Engineer
+        skills: [Postmortem discipline]
+        instructions: "Reconstruct the timeline from these incident notes:\n{{param.incident}}"
+      - name: root-cause
+        agent: Principal Engineer
+        skills: [Postmortem discipline]
+        instructions: "Identify root cause and contributing factors from these notes:\n{{param.incident}}"
+      - name: draft
+        agent: Engineering Manager
+        skills: [Postmortem discipline]
+        instructions: |
+          Assemble the final postmortem.
+
+          Timeline:
+          {{step.timeline.output}}
+
+          Root cause analysis:
+          {{step.root-cause.output}}
+        dependencies: [timeline, root-cause]

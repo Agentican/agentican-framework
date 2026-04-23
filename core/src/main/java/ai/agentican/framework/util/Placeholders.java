@@ -18,13 +18,18 @@ public class Placeholders {
     public static final Pattern STEP_OUTPUT_FIELD_PATTERN =
             Pattern.compile("\\{\\{step\\.([a-zA-Z0-9 _-]+)\\.output\\.([a-zA-Z0-9_.-]+)}}");
     private static final Pattern PARAM_PLACEHOLDER = Pattern.compile("\\{\\{param\\.([a-zA-Z0-9_-]+)}}");
+    private static final Pattern PARAM_FIELD_PLACEHOLDER =
+            Pattern.compile("\\{\\{param\\.([a-zA-Z0-9_-]+)\\.([a-zA-Z0-9_.-]+)}}");
+    private static final Pattern INPUT_PLACEHOLDER = Pattern.compile("\\{\\{input}}");
 
     public static String resolveParams(String text, Map<String, String> params) {
 
-        if (params.isEmpty())
+        if (params.isEmpty() && !INPUT_PLACEHOLDER.matcher(text).find())
             return text;
 
-        return PARAM_PLACEHOLDER.matcher(text).replaceAll(match -> {
+        var afterFields = resolveParamFields(text, params);
+
+        var afterNames = PARAM_PLACEHOLDER.matcher(afterFields).replaceAll(match -> {
 
             var paramName = match.group(1);
             var paramValue = params.get(paramName);
@@ -36,6 +41,67 @@ public class Placeholders {
             }
 
             return Matcher.quoteReplacement(paramValue);
+        });
+
+        return resolveInput(afterNames, params);
+    }
+
+    private static String resolveInput(String text, Map<String, String> params) {
+
+        if (!INPUT_PLACEHOLDER.matcher(text).find())
+            return text;
+
+        return INPUT_PLACEHOLDER.matcher(text).replaceAll(Matcher.quoteReplacement(renderInput(params)));
+    }
+
+    private static String renderInput(Map<String, String> params) {
+
+        var mapper = Json.mapper();
+        var out = mapper.createObjectNode();
+
+        for (var entry : params.entrySet()) {
+
+            var key = entry.getKey();
+            var value = entry.getValue();
+
+            if (value == null) { out.putNull(key); continue; }
+
+            JsonNode parsed = null;
+            try { parsed = mapper.readTree(value); }
+            catch (JsonProcessingException _) { }
+
+            // Only unpack nested JSON structures — scalars stay as strings so a real
+            // String field of "5" doesn't silently become the number 5 in output.
+            if (parsed != null && (parsed.isObject() || parsed.isArray()))
+                out.set(key, parsed);
+            else
+                out.put(key, value);
+        }
+
+        try {
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(out);
+        }
+        catch (JsonProcessingException e) {
+            return out.toString();
+        }
+    }
+
+    private static String resolveParamFields(String text, Map<String, String> params) {
+
+        return PARAM_FIELD_PLACEHOLDER.matcher(text).replaceAll(match -> {
+
+            var paramName = match.group(1);
+            var path = match.group(2).split("\\.");
+            var raw = params.get(paramName);
+            var resolved = extractJsonPath(raw, path);
+
+            if (resolved == null) {
+                LOG.debug("Field placeholder '{}' for param '{}' resolved to empty (param missing, non-JSON, or path not found)",
+                        match.group(), paramName);
+                return Matcher.quoteReplacement("");
+            }
+
+            return Matcher.quoteReplacement(resolved);
         });
     }
 

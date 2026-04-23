@@ -1,23 +1,30 @@
-agents:
-  - name: Incident Triage Agent
-    role: |
-      Classifies alerts by analyzing error patterns, affected services and customer impact.
-      Determines severity using scope (how many users), duration (how long) and business
-      criticality (revenue path, SLA exposure). Gathers initial diagnostic context: error
-      rates, recent deployments, and correlated alerts from the same time window. Outputs
-      a structured triage report, not a narrative — severity, affected services, blast radius
-      estimate, and likely contributing factors.
-    externalId: incident-triage
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
 
-  - name: Incident Responder
+composio:
+  apiKey: ${COMPOSIO_API_KEY}
+  userId: user-1
+
+agents:
+  - name: Site Reliability Engineer
     role: |
-      Executes incident response procedures calibrated to severity. Creates structured
-      incident tickets with impact summary, timeline and affected components. For P1/P2,
-      establishes a dedicated Slack channel, pages the on-call engineer and posts a
-      stakeholder-facing status update. For P3/P4, creates a prioritized ticket and notifies
-      the team channel. Always includes recent deployment history as initial context for
-      the responding engineer.
-    externalId: incident-responder
+      Keeps production services healthy. Reviews and tunes alerts, writes runbooks,
+      investigates incidents with blameless postmortem discipline, and owns the
+      reliability roadmap. Classifies active incidents by scope, duration and business
+      criticality, gathers diagnostic context from error rates and deployment history,
+      and produces structured triage reports — severity, affected services, blast-radius
+      estimate, likely contributing factors.
+    externalId: site-reliability-engineer
+
+  - name: Software Engineer
+    role: |
+      Writes and operates production code for a specific service. When their service has
+      an incident, executes response procedures calibrated to severity: creates structured
+      tickets, pages the right people for P1/P2, establishes war rooms, and posts
+      stakeholder updates. Investigates causes starting from recent deployment history to
+      their service, not hunches. Never silently closes an incident without a clear
+      resolution note the next responder can reconstruct.
+    externalId: software-engineer
 
 skills:
   - name: Incident runbook
@@ -31,3 +38,50 @@ skills:
       update within 30 minutes. P2: page within 30 minutes, incident ticket within 1 hour.
       P3/P4: ticket created, triaged in next business day standup.
     externalId: incident-runbook
+
+plans:
+  - name: Incident Response
+    externalId: incident-response
+    outputStep: triage
+    params:
+      - name: alert
+        description: Alert message from monitoring
+        required: true
+      - name: service
+        description: Affected service name
+        required: true
+    steps:
+      - name: triage
+        agent: Site Reliability Engineer
+        skills: [Incident runbook]
+        instructions: "Triage this alert for {{param.service}}: {{param.alert}}"
+      - name: respond
+        type: branch
+        from: triage
+        defaultPath: low
+        pathConfigs:
+          - pathName: low
+            agent: Software Engineer
+            skills: [Incident runbook]
+            instructions: |
+              Low-severity incident for {{param.service}}. Create a ticket and notify #ops-alerts.
+              Triage: {{step.triage.output}}
+          - pathName: high
+            steps:
+              - name: create-incident
+                agent: Software Engineer
+                skills: [Incident runbook]
+                tools: [linear_create_issue]
+                instructions: |
+                  Create P1/P2 incident ticket:
+                  {{step.triage.output}}
+              - name: page-oncall
+                agent: Software Engineer
+                skills: [Incident runbook]
+                tools: [slack_send_message]
+                instructions: "Page on-call in #incidents and create a war-room channel"
+              - name: gather-context
+                agent: Site Reliability Engineer
+                skills: [Incident runbook]
+                tools: [github_search_code]
+                instructions: Search recent commits to {{param.service}} for causes

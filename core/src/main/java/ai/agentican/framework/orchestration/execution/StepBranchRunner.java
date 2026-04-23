@@ -32,10 +32,13 @@ class StepBranchRunner {
 
         var upstreamOutput = outputs.get(step.from());
 
+        if (upstreamOutput == null) upstreamOutput = params.get(step.from());
+
         if (upstreamOutput == null) {
 
             return new TaskStepResult(step.name(), TaskStatus.FAILED,
-                    "No output found from step: " + step.from(), List.of());
+                    "No output or param found for '" + step.from() + "' (branch step '" + step.name() + "')",
+                    List.of());
         }
 
         var selectedPath = selectBranch(step, upstreamOutput);

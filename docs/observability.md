@@ -170,7 +170,7 @@ public class DetailedListener implements TaskListener {
 Register via the Agentican builder:
 
 ```java
-AgenticanRuntime.builder()
+Agentican.builder()
         .stepListener(myListener)
         .build();
 ```
@@ -207,7 +207,7 @@ Without `snapshot()`, steps dispatched to new threads would lose the parent trac
 Register via the builder:
 
 ```java
-AgenticanRuntime.builder()
+Agentican.builder()
         .taskDecorator(myDecorator)
         .build();
 ```

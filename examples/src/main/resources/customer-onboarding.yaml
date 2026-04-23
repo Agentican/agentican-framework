@@ -1,3 +1,10 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+composio:
+  apiKey: ${COMPOSIO_API_KEY}
+  userId: user-1
+
 agents:
   - name: Compliance Officer
     role: |
@@ -61,6 +68,25 @@ skills:
       a FATF black-list jurisdiction, or evidence of fraudulent documentation.
     externalId: compliance-policy
 
+  - name: Credit evaluation
+    instructions: |
+      Signals to evaluate: credit bureau score (if available), funding history (rounds,
+      recency, investor quality), revenue trajectory (YoY growth, retention), vendor
+      payment history, and public financial filings when available. Recommended credit
+      limits: <$10K = prepaid, $10-50K = net-30, $50-250K = net-45 with review at 6 months,
+      >$250K = executive approval + contract guarantee. Flag insufficient data explicitly
+      rather than inflating confidence.
+    externalId: credit-evaluation
+
+  - name: Product fit matrix
+    instructions: |
+      Matching criteria. Starter package: <50 employees, first-time buyer, basic use case,
+      integrations via out-of-box connectors. Business package: 50-500 employees, defined
+      use case, needs SSO/SCIM/audit logs, moderate integration complexity. Enterprise
+      package: >500 employees, multi-team use, requires custom integrations, regulatory
+      obligations, dedicated CSM. Always recommend one package with rationale, not a menu.
+    externalId: product-fit-matrix
+
   - name: Risk framework
     instructions: |
       Composite score 1-100. Lower is better.
@@ -74,3 +100,91 @@ skills:
 
       Thresholds: approve (0-30), manual review (31-60), escalate to leadership (61-100).
     externalId: risk-framework
+
+  - name: Onboarding playbook
+    instructions: |
+      Welcome sequence components. Email: personalized greeting with customer name and
+      company, product access instructions with magic-link or temporary credentials,
+      links to getting-started docs relevant to the customer's use case, and named
+      contacts on the account team. Kickoff call: 30 minutes, scheduled within 5
+      business days of approval, time zone-aware. Internal handoff: summary note to
+      CS channel with risk score, package tier, and recommended focus areas for the
+      first 90 days.
+    externalId: onboarding-playbook
+
+plans:
+  - name: Customer Onboarding
+    externalId: customer-onboarding
+    outputStep: risk-score
+    params:
+      - name: customer_id
+        description: Customer identifier
+        required: true
+      - name: company
+        description: Company name
+        required: true
+      - name: contact_email
+        description: Primary contact email
+        required: true
+    steps:
+      - name: kyc
+        agent: Compliance Officer
+        skills: [Compliance policy]
+        tools: [hubspot_search_contacts]
+        instructions: Run KYC for {{param.company}} ({{param.customer_id}})
+      - name: credit-check
+        agent: Credit Analyst
+        skills: [Credit evaluation]
+        instructions: Evaluate creditworthiness of {{param.company}}
+      - name: product-fit
+        agent: Account Executive
+        skills: [Product fit matrix]
+        tools: [hubspot_search_contacts]
+        instructions: Recommend a product package for {{param.company}}
+      - name: risk-score
+        agent: Risk Manager
+        skills: [Risk framework]
+        instructions: |
+          Score risk for onboarding {{param.company}}.
+
+          KYC: {{step.kyc.output}}
+          Credit: {{step.credit-check.output}}
+          Product fit: {{step.product-fit.output}}
+        dependencies: [kyc, credit-check, product-fit]
+      - name: approval
+        type: branch
+        from: risk-score
+        defaultPath: auto-approve
+        pathConfigs:
+          - pathName: auto-approve
+            agent: Risk Manager
+            skills: [Risk framework]
+            instructions: Low-risk customer. Approve onboarding.
+          - pathName: manual-review
+            steps:
+              - name: review
+                agent: Risk Manager
+                skills: [Risk framework]
+                instructions: |
+                  Present risk assessment for review:
+                  {{step.risk-score.output}}
+      - name: welcome-email
+        agent: Onboarding Manager
+        skills: [Onboarding playbook]
+        tools: [gmail_send_email]
+        instructions: |
+          Send welcome email to {{param.contact_email}} with product details
+          from {{step.product-fit.output}}
+        dependencies: [approval]
+      - name: schedule-kickoff
+        agent: Onboarding Manager
+        skills: [Onboarding playbook]
+        tools: [googlecalendar_create_event]
+        instructions: Schedule a 30-min kickoff call with {{param.contact_email}}
+        dependencies: [approval]
+      - name: notify-team
+        agent: Onboarding Manager
+        skills: [Onboarding playbook]
+        tools: [slack_send_message]
+        instructions: "Post to #customer-success: new customer {{param.company}} onboarded"
+        dependencies: [approval]

@@ -1,7 +1,9 @@
 package ai.agentican.framework.invoker;
 
+import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.orchestration.execution.TaskResult;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.orchestration.execution.TaskStepResult;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.util.Json;
 
@@ -47,8 +49,26 @@ final class AgenticanOutputReader {
         }
         catch (Exception e) {
 
-            throw new OutputParseException(raw, outputType, e);
+            var stopReason = lastStopReason(result, outputStep);
+            var hint = stopReason == StopReason.MAX_TOKENS
+                    ? " [stopReason=MAX_TOKENS — LLM hit maxTokens limit; increase llm.maxTokens in config]"
+                    : stopReason != null ? " [stopReason=" + stopReason + "]" : "";
+            throw new OutputParseException(raw, outputType,
+                    new RuntimeException(e.getMessage() + hint, e));
         }
+    }
+
+    private static StopReason lastStopReason(TaskResult result, String outputStep) {
+
+        return result.stepResults().stream()
+                .filter(s -> outputStep.equals(s.stepName()))
+                .findFirst()
+                .map(TaskStepResult::agentResults)
+                .filter(ars -> !ars.isEmpty())
+                .map(ars -> ars.getLast().run())
+                .filter(run -> !run.turns().isEmpty())
+                .map(run -> run.turns().getLast().response().stopReason())
+                .orElse(null);
     }
 
     private AgenticanOutputReader() {}

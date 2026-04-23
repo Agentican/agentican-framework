@@ -1,5 +1,7 @@
 package ai.agentican.framework.config;
 
+import ai.agentican.framework.util.DotEnv;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -54,9 +56,20 @@ public record RuntimeConfig(
             String envName = matcher.group(1);
             String envValue = System.getenv(envName);
 
-            if (envValue == null)
+            if (envValue == null) envValue = DotEnv.get(envName);
+
+            if (envValue == null) {
+
+                var dotEnvInfo = DotEnv.loadedFrom() != null
+                        ? "Loaded .env from: " + DotEnv.loadedFrom() + " (but it has no '" + envName + "' entry)."
+                        : "No .env file found. Searched:\n  " + String.join(
+                                "\n  ", DotEnv.searchedPaths().stream().map(Path::toString).toList());
+
                 throw new IllegalStateException(
-                        "Environment variable '" + envName + "' is not set (referenced in config as ${" + envName + "})");
+                        "Environment variable '" + envName + "' is not set (referenced in config as ${" + envName
+                                + "}).\nCWD: " + Path.of(".").toAbsolutePath().normalize()
+                                + "\n" + dotEnvInfo);
+            }
 
             matcher.appendReplacement(sb, Matcher.quoteReplacement(envValue));
         }

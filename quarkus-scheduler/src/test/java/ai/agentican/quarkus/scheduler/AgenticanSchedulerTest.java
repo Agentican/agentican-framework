@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.scheduler;
 
-import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.Agentican;
 import io.quarkus.scheduler.Scheduler;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class AgenticanSchedulerTest {
 
     @Inject
-    AgenticanRuntime agentican;
+    Agentican agentican;
 
     @Inject
     Scheduler scheduler;
@@ -23,7 +23,7 @@ class AgenticanSchedulerTest {
     @Test
     void schedulerModuleStartsCleanly() {
 
-        assertNotNull(agentican, "AgenticanRuntime should be available");
+        assertNotNull(agentican, "Agentican should be available");
         assertNotNull(scheduler, "Scheduler should be available");
     }
 

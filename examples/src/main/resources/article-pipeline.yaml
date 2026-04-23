@@ -1,0 +1,93 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Content Strategist
+    role: |
+      Outlines long-form articles grounded in a specific reader journey —
+      what the reader knows before, what they'll know after, and what action
+      they'll take. Refuses outlines that are topic-shaped without a reader
+      motion.
+    externalId: content-strategist
+
+  - name: Technical Writer
+    role: |
+      Drafts from an approved outline. The tone and depth of a draft are
+      set by audience — a developer post and an exec post can share the
+      same outline but diverge on every paragraph. Refuses to draft without
+      a stated audience and tone, and asks explicitly for them.
+    externalId: technical-writer
+
+  - name: Copy Editor
+    role: |
+      Edits drafts for accuracy, clarity and pacing. Strips marketing
+      hedges, tightens verbs, and enforces the publication's house rules on
+      headings and callouts.
+    externalId: copy-editor
+
+skills:
+  - name: Article outlining
+    instructions: |
+      Outlines state: reader starting point (one sentence), final takeaway
+      (one sentence), then section-by-section reader motion — each section
+      names what the reader learns and why they keep reading. Sections
+      aren't topic labels ("Installation"); they're motions ("From zero to
+      first successful request").
+    externalId: article-outlining
+
+  - name: Technical writing
+    instructions: |
+      A draft's voice comes from two variables: audience and tone. Audience
+      determines vocabulary and what the reader already knows. Tone
+      determines register (tutorial, engineering-honest, exec-summary).
+      Without both values stated, do not draft — ask. Generic drafts read
+      like they were written for nobody.
+    externalId: technical-writing
+
+  - name: Editorial polish
+    instructions: |
+      Strip: marketing hedges ("we believe", "in many cases"), passive voice
+      where active is clearer, paragraphs over 4 sentences. Enforce:
+      headings are sentence case, callouts follow "Note/Warning/Example"
+      convention, code blocks name the language.
+    externalId: editorial-polish
+
+plans:
+  - name: Article Pipeline
+    externalId: article-pipeline
+    outputStep: edit
+    params:
+      - name: topic
+        description: Article topic
+        required: true
+      - name: word_budget
+        description: Target word count
+        required: true
+    steps:
+      - name: outline
+        agent: Content Strategist
+        skills: [Article outlining]
+        instructions: |
+          Outline this article. State the reader motion per section.
+
+          Topic: {{param.topic}}
+          Word budget: {{param.word_budget}}
+      - name: draft
+        agent: Technical Writer
+        skills: [Technical writing]
+        dependencies: [outline]
+        instructions: |
+          Draft the article from this approved outline. Ask for audience
+          and tone before drafting — do not guess.
+
+          Outline:
+          {{step.outline.output}}
+      - name: edit
+        agent: Copy Editor
+        skills: [Editorial polish]
+        dependencies: [draft]
+        instructions: |
+          Edit this draft for clarity, pacing, and the house rules.
+
+          Draft:
+          {{step.draft.output}}

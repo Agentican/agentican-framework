@@ -1,6 +1,7 @@
 package ai.agentican.framework.invoker;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.github.victools.jsonschema.generator.Option;
 import com.github.victools.jsonschema.generator.OptionPreset;
 import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder;
 import com.github.victools.jsonschema.generator.SchemaVersion;
@@ -20,6 +21,8 @@ final class SchemaGenerator {
         var configBuilder = new SchemaGeneratorConfigBuilder(SchemaVersion.DRAFT_2020_12, OptionPreset.PLAIN_JSON);
 
         configBuilder.with(new JacksonModule());
+        configBuilder.with(Option.FORBIDDEN_ADDITIONAL_PROPERTIES_BY_DEFAULT);
+        configBuilder.forFields().withRequiredCheck(field -> true);
 
         GENERATOR = new com.github.victools.jsonschema.generator.SchemaGenerator(configBuilder.build());
     }

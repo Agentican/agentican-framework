@@ -1,6 +1,6 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.Agentican;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.Dependent;
@@ -12,12 +12,12 @@ import jakarta.inject.Inject;
 public class ReactiveAgenticanPlanProducer {
 
     @Inject
-    AgenticanRuntime runtime;
+    Agentican runtime;
 
     @Produces
     @Dependent
     @AgenticanPlan("")
-    public <P, R> ReactiveAgentican<P, R> produce(InjectionPoint ip) {
+    public <P, R> ReactiveAgenticanTask<P, R> produce(InjectionPoint ip) {
 
         var planName = AgenticanPlanInjection.planName(ip);
         var typeArgs = AgenticanPlanInjection.typeArgs(ip);
@@ -25,6 +25,7 @@ public class ReactiveAgenticanPlanProducer {
         @SuppressWarnings("unchecked") Class<P> paramsType = (Class<P>) typeArgs[0];
         @SuppressWarnings("unchecked") Class<R> outputType = (Class<R>) typeArgs[1];
 
-        return ReactiveAgentican.of(runtime.agentican(planName, paramsType, outputType));
+        return ReactiveAgenticanTask.of(
+                runtime.workflowTask(planName).plan(planName).input(paramsType).output(outputType).build());
     }
 }

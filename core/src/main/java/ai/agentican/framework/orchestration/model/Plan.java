@@ -70,6 +70,7 @@ public record Plan(
         public PlanBuilder param(String paramName, String description) { params.add(new PlanParam(paramName, description, null, true)); return this; }
         public PlanBuilder param(String paramName, String description, String defaultValue) { params.add(new PlanParam(paramName, description, defaultValue, false)); return this; }
         public PlanBuilder param(PlanParam param) { params.add(param); return this; }
+        public PlanBuilder params(List<PlanParam> planParams) { this.params.addAll(planParams); return this; }
 
         public PlanBuilder step(PlanStep node) { steps.add(node); return this; }
         public PlanBuilder steps(List<PlanStep> bodySteps) { this.steps.addAll(bodySteps); return this; }

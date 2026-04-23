@@ -1,6 +1,6 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.Agentican;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class AgenticanProducerTest {
 
     @Inject
-    AgenticanRuntime agentican;
+    Agentican agentican;
 
     @Inject
     AgenticanConfig config;
@@ -20,7 +20,7 @@ class AgenticanProducerTest {
     @Test
     void agenticanIsProducedAsApplicationScopedBean() {
 
-        assertNotNull(agentican, "AgenticanRuntime bean should be injected");
+        assertNotNull(agentican, "Agentican bean should be injected");
         assertNotNull(agentican.registry().agents(), "Agent registry should be initialized");
     }
 

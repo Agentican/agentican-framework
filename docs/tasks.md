@@ -17,7 +17,7 @@ record Plan(
 
 A plan has an auto-generated internal UUID, a name, description, optional parameters, and a list of steps. Steps can depend on each other; the runner builds a dependency graph and executes independent steps in parallel.
 
-Plans registered at boot (via `RuntimeConfig.plans` or `AgenticanRuntime.builder().plan(...)`) must carry an `externalId` so a catalog can upsert on redeploys. Use the builder for all construction — pass `.externalId(...)` for cataloged plans, omit it for ephemeral ones (planner output, tests):
+Plans registered at boot (via `RuntimeConfig.plans` or `Agentican.builder().plan(...)`) must carry an `externalId` so a catalog can upsert on redeploys. Use the builder for all construction — pass `.externalId(...)` for cataloged plans, omit it for ephemeral ones (planner output, tests):
 
 ```java
 Plan.builder(name)
@@ -147,7 +147,7 @@ record HttpOutput(String body, int status) { }
 #### 2. Register the executor at build
 
 ```java
-AgenticanRuntime.builder()
+Agentican.builder()
     .codeStep("http-get", HttpInput.class, HttpOutput.class,
         (input, ctx) -> {
             var response = httpClient.send(
@@ -277,14 +277,17 @@ A `Plan` by itself runs as an untyped task — params are a `Map<String, String>
 record TriageParams(String customerId, String priority) {}
 record TriageOutput(String classification, String reason) {}
 
-var triage = runtime.agentican(plan, TriageParams.class, TriageOutput.class);
+var triage = runtime.agentican(plan)
+        .input(TriageParams.class)
+        .output(TriageOutput.class)
+        .build();
 
 TriageOutput out = triage.runAndAwait(new TriageParams("cust-42", "HIGH"));
 ```
 
 - Params convert via Jackson with `SNAKE_CASE` — `customerId` → plan param `customer_id`.
-- `Void.class` on either slot skips that side (no typed params, no typed output).
-- `runtime.agentican("planName", P.class, R.class)` resolves by name from the registry on each call — picks up late-registered or persisted plans.
+- `Void.class` on either slot skips that side (no typed params, no typed output). Omit `.output(...)` to default `R` to `Void`.
+- `runtime.agentican("planName").input(P.class).output(R.class).build()` resolves by name from the registry on each call — picks up late-registered or persisted plans.
 
 ### Designating the output step
 
@@ -314,7 +317,7 @@ Under Quarkus, inject the typed invoker directly:
 Agentican<TriageParams, TriageOutput> triage;
 ```
 
-For reactive composition (returns `Uni<R>` instead of blocking), inject `ReactiveAgentican<P, R>` with the same qualifier — see [CDI Integration — typed reactive invoker](quarkus/cdi.md#typed-reactive-invoker--reactiveagenticanp-r).
+For reactive composition (returns `Uni<R>` instead of blocking), inject `ReactiveAgenticanTask<P, R>` with the same qualifier — see [CDI Integration — typed reactive invoker](quarkus/cdi.md#typed-reactive-invoker--reactiveagenticanp-r).
 
 ## Placeholder Resolution
 

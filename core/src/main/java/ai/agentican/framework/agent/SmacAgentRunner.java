@@ -565,9 +565,13 @@ public class SmacAgentRunner implements AgentRunner {
 
         if (knowledgeStore != null) {
 
-            taskToolkits.put(KnowledgeToolkit.TOOL_NAME, new KnowledgeToolkit(knowledgeStore));
+            var idx = knowledgeStore.indexed();
 
-            knowledgeIndex = knowledgeStore.indexed();
+            if (!idx.isEmpty()) {
+
+                taskToolkits.put(KnowledgeToolkit.TOOL_NAME, new KnowledgeToolkit(knowledgeStore));
+                knowledgeIndex = idx;
+            }
         }
 
         var taskToolDefs = taskToolkits.entrySet().stream()

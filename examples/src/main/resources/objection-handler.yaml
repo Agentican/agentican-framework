@@ -1,0 +1,49 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Sales Coach
+    role: |
+      Trains sales reps on handling objections using the feel-felt-found structure, value
+      reframes and proof-point anchoring. Generates multiple response strategies for any
+      objection — acknowledging the concern honestly rather than deflecting — and scores
+      each strategy by situational fit (who the buyer is, where they are in the cycle,
+      what they've said before). Avoids canned scripts that sound rehearsed.
+    externalId: sales-coach
+
+skills:
+  - name: Objection playbook
+    instructions: |
+      Strategies to cover when responding to objections. Acknowledge-and-redirect: validate
+      the concern, then reframe against a value the buyer already cares about. Evidence-led:
+      counter with a concrete customer case or measurable outcome. Clarifying-question:
+      probe what's actually behind the surface objection — often budget is really timing,
+      features is really trust. Cost-of-inaction: make the status quo feel expensive.
+      Rules: no strategy starts with "but"; no response longer than 60 words spoken aloud;
+      every response names one concrete next step.
+    externalId: objection-playbook
+
+plans:
+  - name: Objection Handler
+    externalId: objection-handler
+    params:
+      - name: objection
+        description: The customer's objection
+        required: true
+      - name: product
+        description: Product being pitched
+        required: true
+      - name: context
+        description: Buyer context (role, stage, prior signals)
+        required: true
+    steps:
+      - name: generate
+        agent: Sales Coach
+        skills: [Objection playbook]
+        instructions: |
+          Generate four response strategies for this objection, each using a different
+          approach from the playbook.
+
+          Objection: {{param.objection}}
+          Product: {{param.product}}
+          Buyer context: {{param.context}}

@@ -1,0 +1,2 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}

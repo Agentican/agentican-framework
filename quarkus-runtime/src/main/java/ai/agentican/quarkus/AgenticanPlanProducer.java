@@ -1,7 +1,7 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.invoker.Agentican;
-import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.invoker.AgenticanTask;
+import ai.agentican.framework.Agentican;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.Dependent;
@@ -18,12 +18,12 @@ public class AgenticanPlanProducer {
     private static final Logger LOG = LoggerFactory.getLogger(AgenticanPlanProducer.class);
 
     @Inject
-    AgenticanRuntime runtime;
+    Agentican runtime;
 
     @Produces
     @Dependent
     @AgenticanPlan("")
-    public <P, R> Agentican<P, R> produce(InjectionPoint ip) {
+    public <P, R> AgenticanTask<P, R> produce(InjectionPoint ip) {
 
         var planName = AgenticanPlanInjection.planName(ip);
         var typeArgs = AgenticanPlanInjection.typeArgs(ip);
@@ -40,6 +40,6 @@ public class AgenticanPlanProducer {
                     planName, plan.params().stream().map(p -> p.name()).toList(), outputType.getSimpleName());
         }
 
-        return runtime.agentican(planName, paramsType, outputType);
+        return runtime.workflowTask(planName).plan(planName).input(paramsType).output(outputType).build();
     }
 }

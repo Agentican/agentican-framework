@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.rest.resource;
 
-import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.Agentican;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -14,7 +14,7 @@ import java.util.List;
 public class ToolsResource {
 
     @Inject
-    AgenticanRuntime agentican;
+    Agentican agentican;
 
     public record ToolkitView(String slug, String displayName, List<ToolView> tools) {}
     public record ToolView(String name, String displayName, String description) {}

@@ -1,16 +1,32 @@
 package ai.agentican.framework.invoker;
 
+import ai.agentican.framework.orchestration.model.PlanParam;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 final class AgenticanParamMapper {
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+
+    static List<PlanParam> paramsFor(Class<?> inputType) {
+
+        if (inputType == null || inputType == Void.class) return List.of();
+        if (Map.class.isAssignableFrom(inputType)) return List.of();
+
+        var javaType = MAPPER.constructType(inputType);
+        var description = MAPPER.getSerializationConfig().introspect(javaType);
+
+        return description.findProperties().stream()
+                .map(p -> new PlanParam(p.getName(), null, null, true))
+                .toList();
+    }
 
     static Map<String, String> toStringMap(Object params) {
 

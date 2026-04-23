@@ -174,7 +174,7 @@ even with `devservices.reuse=true`.
 @ApplicationScoped
 public class MyService {
 
-    @Inject AgenticanRuntime agentican;
+    @Inject Agentican agentican;
 
     public String research(String topic) {
         var handle = agentican.run("Research " + topic + " and summarize findings");
@@ -190,7 +190,7 @@ public class MyService {
 @ApplicationScoped
 public class MyService {
 
-    @Inject ReactiveAgenticanRuntime agentican;
+    @Inject ReactiveAgentican agentican;
 
     public Uni<String> research(String topic) {
         return agentican.runAndAwait("Research " + topic)

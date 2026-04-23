@@ -61,7 +61,7 @@ import ai.agentican.framework.store.KnowledgeStoreMemory;
 
 var knowledgeStore = new KnowledgeStoreMemory();
 
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .knowledgeStore(knowledgeStore)
         .build()) {
 

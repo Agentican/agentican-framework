@@ -6,7 +6,7 @@ import ai.agentican.framework.orchestration.execution.TaskStatus;
 import ai.agentican.framework.orchestration.model.Plan;
 import ai.agentican.framework.orchestration.model.PlanParam;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.invoker.Agentican;
+import ai.agentican.framework.invoker.AgenticanTask;
 import ai.agentican.framework.invoker.OutputParseException;
 
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ class AgenticanTypedTest {
         var mockLlm = new MockLlmClient()
                 .onSend("Triage customer cust-42 priority HIGH", "Triaged");
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", mockLlm.toLlmClient())
                 .agent(AgentConfig.builder()
@@ -44,7 +44,7 @@ class AgenticanTypedTest {
                             .build())
                     .build();
 
-            Agentican<TriageParams, Void> triage = runtime.agentican(plan, TriageParams.class);
+            AgenticanTask<TriageParams, Void> triage = runtime.workflowTask("test").plan(plan).input(TriageParams.class).build();
 
             var result = triage.awaitTaskResult(new TriageParams("cust-42", "HIGH"));
 
@@ -58,7 +58,7 @@ class AgenticanTypedTest {
         var mockLlm = new MockLlmClient()
                 .onSend("Triage cust-99 priority NORMAL", "OK");
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", mockLlm.toLlmClient())
                 .agent(AgentConfig.builder()
@@ -77,7 +77,7 @@ class AgenticanTypedTest {
 
             runtime.registry().plans().register(plan);
 
-            Agentican<TriageParams, Void> triage = runtime.agentican("triage-by-name", TriageParams.class);
+            AgenticanTask<TriageParams, Void> triage = runtime.workflowTask("test").plan("triage-by-name").input(TriageParams.class).build();
 
             var result = triage.awaitTaskResult(new TriageParams("cust-99", "NORMAL"));
             assertEquals(TaskStatus.COMPLETED, result.status());
@@ -87,12 +87,12 @@ class AgenticanTypedTest {
     @Test
     void resolvingAgenticanFailsWhenPlanMissing() {
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", request -> endTurn("ok"))
                 .build()) {
 
-            Agentican<TriageParams, Void> triage = runtime.agentican("nonexistent", TriageParams.class);
+            AgenticanTask<TriageParams, Void> triage = runtime.workflowTask("test").plan("nonexistent").input(TriageParams.class).build();
 
             assertThrows(IllegalStateException.class,
                     () -> triage.run(new TriageParams("cust-1", "NORMAL")));
@@ -105,7 +105,7 @@ class AgenticanTypedTest {
         var mockLlm = new MockLlmClient()
                 .onSend("Late-registered run with cust-7", "OK");
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", mockLlm.toLlmClient())
                 .agent(AgentConfig.builder()
@@ -113,7 +113,7 @@ class AgenticanTypedTest {
                         .role("Triage agent").llm("default").build())
                 .build()) {
 
-            Agentican<TriageParams, Void> triage = runtime.agentican("late-plan", TriageParams.class);
+            AgenticanTask<TriageParams, Void> triage = runtime.workflowTask("test").plan("late-plan").input(TriageParams.class).build();
 
             // Plan isn't registered yet — construction still succeeds (resolution is per-invoke)
             var plan = Plan.builder("late-plan")
@@ -137,7 +137,7 @@ class AgenticanTypedTest {
 
         var mockLlm = new MockLlmClient().onSend("Run without params", "OK");
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", mockLlm.toLlmClient())
                 .agent(AgentConfig.builder()
@@ -152,7 +152,7 @@ class AgenticanTypedTest {
                             .build())
                     .build();
 
-            Agentican<Void, Void> invoker = runtime.agentican(plan, Void.class);
+            AgenticanTask<Void, Void> invoker = runtime.workflowTask("test").plan(plan).input(Void.class).build();
 
             var result = invoker.awaitTaskResult();
             assertEquals(TaskStatus.COMPLETED, result.status());
@@ -164,7 +164,7 @@ class AgenticanTypedTest {
 
         var mockLlm = new MockLlmClient().onSend("Map-based cust-m1", "OK");
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", mockLlm.toLlmClient())
                 .agent(AgentConfig.builder()
@@ -181,7 +181,7 @@ class AgenticanTypedTest {
                     .build();
 
             @SuppressWarnings({"rawtypes", "unchecked"})
-            Agentican<Map, Void> invoker = (Agentican<Map, Void>) (Agentican) runtime.agentican(plan, Map.class);
+            AgenticanTask<Map, Void> invoker = (AgenticanTask<Map, Void>) (AgenticanTask) runtime.workflowTask("test").plan(plan).input(Map.class).build();
 
             var result = invoker.awaitTaskResult(Map.of("customer_id", "cust-m1"));
             assertEquals(TaskStatus.COMPLETED, result.status());
@@ -193,7 +193,7 @@ class AgenticanTypedTest {
 
         var mockLlm = new MockLlmClient().onSend("Snake params account-7", "OK");
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", mockLlm.toLlmClient())
                 .agent(AgentConfig.builder()
@@ -211,7 +211,7 @@ class AgenticanTypedTest {
                             .build())
                     .build();
 
-            Agentican<AccountParams, Void> invoker = runtime.agentican(plan, AccountParams.class);
+            AgenticanTask<AccountParams, Void> invoker = runtime.workflowTask("test").plan(plan).input(AccountParams.class).build();
 
             var result = invoker.awaitTaskResult(new AccountParams("account-7"));
             assertEquals(TaskStatus.COMPLETED, result.status());
@@ -227,7 +227,7 @@ class AgenticanTypedTest {
                 .onSend("Respond JSON for cust-99",
                         "{\"classification\":\"refund\",\"reason\":\"order arrived broken\"}");
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", mockLlm.toLlmClient())
                 .agent(AgentConfig.builder()
@@ -243,8 +243,8 @@ class AgenticanTypedTest {
                             .build())
                     .build();
 
-            Agentican<TriageParams, TriageOutput> triage =
-                    runtime.agentican(plan, TriageParams.class, TriageOutput.class);
+            AgenticanTask<TriageParams, TriageOutput> triage =
+                    runtime.workflowTask("test").plan(plan).input(TriageParams.class).output(TriageOutput.class).build();
 
             TriageOutput out = triage.runAndAwait(new TriageParams("cust-99", "NORMAL"));
 
@@ -259,7 +259,7 @@ class AgenticanTypedTest {
         var mockLlm = new MockLlmClient()
                 .onSend("respond", "this is not JSON");
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", mockLlm.toLlmClient())
                 .agent(AgentConfig.builder()
@@ -274,8 +274,8 @@ class AgenticanTypedTest {
                             .build())
                     .build();
 
-            Agentican<Void, TriageOutput> triage =
-                    runtime.agentican(plan, Void.class, TriageOutput.class);
+            AgenticanTask<Void, TriageOutput> triage =
+                    runtime.workflowTask("test").plan(plan).input(Void.class).output(TriageOutput.class).build();
 
             assertThrows(OutputParseException.class, triage::runAndAwait);
         }
@@ -284,7 +284,7 @@ class AgenticanTypedTest {
     @Test
     void multiStepPlanWithoutOutputStepFailsAtConstruction() {
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", request -> endTurn("ok"))
                 .agent(AgentConfig.builder()
@@ -299,7 +299,7 @@ class AgenticanTypedTest {
                     .build();
 
             assertThrows(IllegalStateException.class,
-                    () -> runtime.agentican(plan, Void.class, TriageOutput.class));
+                    () -> runtime.workflowTask("test").plan(plan).input(Void.class).output(TriageOutput.class).build());
         }
     }
 
@@ -313,7 +313,7 @@ class AgenticanTypedTest {
             return endTurn("{\"classification\":\"ok\",\"reason\":\"done\"}");
         };
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", llmClient)
                 .agent(AgentConfig.builder()
@@ -328,8 +328,8 @@ class AgenticanTypedTest {
                             .build())
                     .build();
 
-            Agentican<Void, TriageOutput> triage =
-                    runtime.agentican(plan, Void.class, TriageOutput.class);
+            AgenticanTask<Void, TriageOutput> triage =
+                    runtime.workflowTask("test").plan(plan).input(Void.class).output(TriageOutput.class).build();
 
             triage.runAndAwait();
 
@@ -352,7 +352,7 @@ class AgenticanTypedTest {
             return endTurn("plain text response");
         };
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", llmClient)
                 .agent(AgentConfig.builder()
@@ -364,7 +364,7 @@ class AgenticanTypedTest {
                     .step(PlanStepAgent.builder("do").agent("triage").instructions("go").build())
                     .build();
 
-            Agentican<Void, Void> invoker = runtime.agentican(plan, Void.class, Void.class);
+            AgenticanTask<Void, Void> invoker = runtime.workflowTask("test").plan(plan).input(Void.class).output(Void.class).build();
             invoker.run();
 
             Thread.yield();   // let the async task submit
@@ -385,7 +385,7 @@ class AgenticanTypedTest {
                 .onSend("a", "first")
                 .onSend("b", "{\"classification\":\"x\",\"reason\":\"y\"}");
 
-        try (var runtime = AgenticanRuntime.builder()
+        try (var runtime = Agentican.builder()
                 .llm(LlmConfig.builder().apiKey("mock").build())
                 .llm("default", mockLlm.toLlmClient())
                 .agent(AgentConfig.builder()
@@ -400,8 +400,8 @@ class AgenticanTypedTest {
                             .dependencies(java.util.List.of("a")).build())
                     .build();
 
-            Agentican<Void, TriageOutput> triage =
-                    runtime.agentican(plan, Void.class, TriageOutput.class);
+            AgenticanTask<Void, TriageOutput> triage =
+                    runtime.workflowTask("test").plan(plan).input(Void.class).output(TriageOutput.class).build();
 
             TriageOutput out = triage.runAndAwait();
             assertEquals("x", out.classification());

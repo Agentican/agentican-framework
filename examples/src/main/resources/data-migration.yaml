@@ -1,0 +1,82 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Infrastructure Lead
+    role: |
+      Owns platform migrations end-to-end. Drafts plans that maximize forward
+      progress while preserving a real rollback. Insists on explicit cutover
+      windows (with timezone) and never waves away the window where a
+      customer-facing error is possible. Refuses plans without a named rollback.
+    externalId: infrastructure-lead
+
+  - name: Runbook Author
+    role: |
+      Converts approved migration plans into operator-ready runbooks. Every step
+      names the exact command, the expected output, the failure action, and the
+      person on the hook. No implicit "check logs" steps.
+    externalId: runbook-author
+
+skills:
+  - name: Migration planning
+    instructions: |
+      Plans must name: source, target, data-volume estimate, cutover window with
+      timezone, rollback procedure with a measurable trigger, and the specific
+      moment in the plan where a customer-facing error is possible. Do not
+      accept "zero downtime" without a dual-write strategy; do not accept
+      rollback-by-time-travel without a named snapshot.
+    externalId: migration-planning
+
+  - name: Runbook writing
+    instructions: |
+      Runbook steps are numbered. Each step has: exact command, expected output
+      (one line), failure action ("if output does not match, run X and page Y"),
+      and owner. The runbook ends with an explicit acceptance check — the step
+      the operator runs to confirm migration success.
+    externalId: runbook-writing
+
+plans:
+  - name: Data Migration Plan
+    externalId: data-migration-plan
+    outputStep: runbook
+    params:
+      - name: current_system
+        description: Current system description
+        required: true
+      - name: target_system
+        description: Target system description
+        required: true
+      - name: constraints
+        description: Timing or business constraints
+        required: true
+    steps:
+      - name: analyze
+        agent: Infrastructure Lead
+        skills: [Migration planning]
+        instructions: |
+          Analyze this migration scenario. Identify data-volume risk, downtime
+          requirements, and hard dependencies.
+
+          Current system: {{param.current_system}}
+          Target system: {{param.target_system}}
+          Constraints: {{param.constraints}}
+      - name: plan
+        agent: Infrastructure Lead
+        skills: [Migration planning]
+        dependencies: [analyze]
+        hitl: true
+        instructions: |
+          Draft the migration plan grounded in this analysis. It must include
+          explicit cutover window, rollback procedure with a measurable trigger,
+          and the customer-impact window.
+
+          Analysis:
+          {{step.analyze.output}}
+      - name: runbook
+        agent: Runbook Author
+        skills: [Runbook writing]
+        dependencies: [plan]
+        instructions: |
+          Convert this approved migration plan into an operator-ready runbook:
+
+          {{step.plan.output}}

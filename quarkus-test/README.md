@@ -23,7 +23,7 @@ A `@Singleton` CDI bean registered as `@Named("default")` — it **replaces** th
 @QuarkusTest
 class MyTest {
 
-    @Inject AgenticanRuntime agentican;
+    @Inject Agentican agentican;
     @Inject MockLlmClient llm;
 
     @BeforeEach void reset() { llm.reset(); }

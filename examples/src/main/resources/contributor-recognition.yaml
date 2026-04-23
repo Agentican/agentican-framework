@@ -1,0 +1,88 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Community Manager
+    role: |
+      Analyzes recent contributor activity across issues, PRs, and
+      discussions. Builds a factual summary per contributor grounded in
+      specific artifacts — PR titles, issue ids, discussion threads — never
+      generic "active contributor" labels.
+    externalId: community-manager
+
+  - name: Developer Advocate
+    role: |
+      Categorizes contributors into recognition tiers and drafts per-person
+      acknowledgement messages. Refuses to categorize without knowing the
+      recognition tier criteria — they vary by quarter and by the lead's
+      call. Always asks before categorizing. Drafts that name specific
+      contributions, not generic thanks.
+    externalId: developer-advocate
+
+skills:
+  - name: Contribution analysis
+    instructions: |
+      Per contributor, summarize: merged PRs (titles + one-liner impact),
+      reviewed PRs (titles), issues triaged (ids + one-liner), notable
+      discussion posts (thread title + what they contributed). Exclude
+      drive-by doc typos unless they're part of a larger pattern. Be
+      factual: never "amazing community member" — state what they did.
+    externalId: contribution-analysis
+
+  - name: Recognition writing
+    instructions: |
+      Recognition tiers determine the message type (shout-out, feature in
+      release notes, core-contributor invitation, maintainer nomination).
+      Without the current quarter's tier criteria stated, ask before
+      categorizing — last quarter's criteria are not a safe default. Each
+      message names at least one specific contribution verbatim; generic
+      thank-you messages are worse than silence.
+    externalId: recognition-writing
+
+plans:
+  - name: Contributor Recognition
+    externalId: contributor-recognition
+    outputStep: messages
+    params:
+      - name: repo_name
+        description: Repository the contributions are from
+        required: true
+      - name: period_label
+        description: Period the recognition covers (e.g. Q2 2026)
+        required: true
+      - name: activity
+        description: Raw activity log — PRs, issues, discussions
+        required: true
+    steps:
+      - name: analyze
+        agent: Community Manager
+        skills: [Contribution analysis]
+        instructions: |
+          Analyze this period's contributor activity. Build a factual summary
+          per contributor grounded in specific PRs, issues, and threads.
+
+          Repo: {{param.repo_name}}
+          Period: {{param.period_label}}
+          Activity:
+          {{param.activity}}
+      - name: categorize
+        agent: Developer Advocate
+        skills: [Recognition writing]
+        dependencies: [analyze]
+        instructions: |
+          Categorize each contributor into a recognition tier per the
+          current quarter's criteria. If the criteria aren't stated here,
+          ask before categorizing — do not use last quarter's.
+
+          Contributor summaries:
+          {{step.analyze.output}}
+      - name: messages
+        agent: Developer Advocate
+        skills: [Recognition writing]
+        dependencies: [categorize]
+        instructions: |
+          Draft the recognition message per contributor based on their tier.
+          Each message names at least one specific contribution.
+
+          Categorization:
+          {{step.categorize.output}}

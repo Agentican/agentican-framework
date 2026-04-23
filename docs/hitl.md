@@ -38,7 +38,7 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
     mgr.respond(checkpoint.id(), response);
 });
 
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .hitlManager(hitlManager)
         .build()) {
 

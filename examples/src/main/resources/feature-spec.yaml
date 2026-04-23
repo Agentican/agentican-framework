@@ -1,0 +1,87 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+agents:
+  - name: Product Manager
+    role: |
+      Owns feature specs end-to-end. Converts fuzzy tickets into crisp
+      requirements, names the in-scope and out-of-scope items, and forces
+      product decisions (edge cases, acceptance criteria, success metrics) to
+      be resolved in the spec rather than in-flight. Rejects specs that handwave
+      the scope boundary.
+    externalId: product-manager
+
+  - name: Tech Lead
+    role: |
+      Breaks approved specs into engineering tasks. Each task is sized in
+      days, names the owning team, and lists dependencies on other tasks.
+      Refuses to break down a spec that still has "TBD" in the acceptance
+      criteria.
+    externalId: tech-lead
+
+skills:
+  - name: Spec rubric
+    instructions: |
+      A feature spec names: user story, acceptance criteria (bullet list,
+      testable), explicit in-scope items, explicit out-of-scope items, success
+      metrics with baselines, and any UX/API decisions that the team must
+      follow. Edge cases the spec doesn't cover should be listed as "open
+      questions" so the reviewer can force a decision — do not paper over them.
+    externalId: spec-rubric
+
+  - name: Task breakdown
+    instructions: |
+      Task list is flat. Each task: title, description (one sentence),
+      estimated days, owning team, and explicit dependencies on other tasks.
+      Group only if it clarifies — otherwise keep flat. If a task can't be
+      estimated because the spec is ambiguous, name the ambiguity instead of
+      making up a number.
+    externalId: task-breakdown
+
+plans:
+  - name: Feature Spec Review
+    externalId: feature-spec-review
+    outputStep: tasks
+    params:
+      - name: title
+        description: Feature title
+        required: true
+      - name: user_story
+        description: The user story / ticket body
+        required: true
+      - name: business_context
+        description: Why this matters right now
+        required: true
+    steps:
+      - name: clarify
+        agent: Product Manager
+        skills: [Spec rubric]
+        instructions: |
+          Convert this ticket into structured requirements: the user story in
+          one paragraph, acceptance criteria as testable bullets, and a list
+          of open questions.
+
+          Title: {{param.title}}
+          User story: {{param.user_story}}
+          Business context: {{param.business_context}}
+      - name: spec
+        agent: Product Manager
+        skills: [Spec rubric]
+        dependencies: [clarify]
+        hitl: true
+        instructions: |
+          Draft the feature spec from these clarified requirements. Name
+          in-scope and out-of-scope items explicitly, and call out the UX/API
+          decisions the team must follow.
+
+          Clarified requirements:
+          {{step.clarify.output}}
+      - name: tasks
+        agent: Tech Lead
+        skills: [Task breakdown]
+        dependencies: [spec]
+        instructions: |
+          Break this approved spec into engineering tasks.
+
+          Spec:
+          {{step.spec.output}}

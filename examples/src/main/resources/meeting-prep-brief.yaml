@@ -1,3 +1,10 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+composio:
+  apiKey: ${COMPOSIO_API_KEY}
+  userId: user-1
+
 agents:
   - name: Executive Assistant
     role: |
@@ -7,3 +14,28 @@ agents:
       background context and three prioritized talking points. Flags meetings that lack a clear
       agenda so the user can follow up before the meeting starts.
     externalId: executive-assistant
+
+skills:
+  - name: Brief format
+    instructions: |
+      Meeting brief structure. One brief per meeting, ordered chronologically. Each brief
+      contains: title (as on the calendar), attendees (names when available, emails as
+      fallback), purpose (one sentence, not copied from agenda verbatim), and exactly
+      three talking points prioritized by urgency and the user's interest. Flag meetings
+      with no agenda or no attendees beyond the user — those need a follow-up before the
+      meeting.
+    externalId: brief-format
+
+plans:
+  - name: Meeting Prep Brief
+    externalId: meeting-prep-brief
+    params:
+      - name: date
+        description: Date to prepare briefs for
+        required: true
+    steps:
+      - name: prepare
+        agent: Executive Assistant
+        skills: [Brief format]
+        tools: [googlecalendar_find_event]
+        instructions: Pull my calendar for {{param.date}} and prepare a brief for each meeting.

@@ -1,36 +1,48 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.invoker.Agentican;
+import ai.agentican.framework.Agentican;
 import ai.agentican.framework.orchestration.execution.TaskHandle;
 import ai.agentican.framework.orchestration.execution.TaskResult;
-
+import ai.agentican.framework.orchestration.model.Plan;
 import io.smallrye.mutiny.Uni;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
-public interface ReactiveAgentican<P, R> {
+import java.util.Map;
 
-    Uni<TaskHandle> run(P params);
+@ApplicationScoped
+public class ReactiveAgentican {
 
-    default Uni<TaskHandle> run() {
+    @Inject
+    Agentican agentican;
 
-        return run(null);
+    public Uni<TaskHandle> run(String description) {
+
+        return Uni.createFrom().item(() -> agentican.run(description));
     }
 
-    Uni<R> runAndAwait(P params);
+    public Uni<TaskHandle> run(Plan plan) {
 
-    default Uni<R> runAndAwait() {
-
-        return runAndAwait(null);
+        return Uni.createFrom().item(() -> agentican.run(plan));
     }
 
-    Uni<TaskResult> awaitTaskResult(P params);
+    public Uni<TaskHandle> run(Plan plan, Map<String, String> inputs) {
 
-    default Uni<TaskResult> awaitTaskResult() {
-
-        return awaitTaskResult(null);
+        return Uni.createFrom().item(() -> agentican.run(plan, inputs));
     }
 
-    static <P, R> ReactiveAgentican<P, R> of(Agentican<P, R> delegate) {
+    public Uni<TaskResult> runAndAwait(String description) {
 
-        return new ReactiveAgenticanAdapter<>(delegate);
+        return Uni.createFrom().completionStage(() -> agentican.run(description).resultAsync());
+    }
+
+    public Uni<TaskResult> runAndAwait(Plan plan) {
+
+        return Uni.createFrom().completionStage(() -> agentican.run(plan).resultAsync());
+    }
+
+    public Uni<TaskResult> runAndAwait(Plan plan, Map<String, String> inputs) {
+
+        return Uni.createFrom().completionStage(() -> agentican.run(plan, inputs).resultAsync());
     }
 }

@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.health;
 
-import ai.agentican.framework.AgenticanRuntime;
+import ai.agentican.framework.Agentican;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.health.HealthCheck;
@@ -12,7 +12,7 @@ import org.eclipse.microprofile.health.Liveness;
 public class AgenticanLivenessCheck implements HealthCheck {
 
     @Inject
-    AgenticanRuntime agentican;
+    Agentican agentican;
 
     @Override
     public HealthCheckResponse call() {
@@ -20,7 +20,7 @@ public class AgenticanLivenessCheck implements HealthCheck {
         var builder = HealthCheckResponse.named("agentican");
 
         if (agentican == null)
-            return builder.down().withData("reason", "AgenticanRuntime bean not initialized").build();
+            return builder.down().withData("reason", "Agentican bean not initialized").build();
 
         return builder.up().build();
     }

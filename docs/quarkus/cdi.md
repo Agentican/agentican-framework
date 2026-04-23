@@ -1,12 +1,12 @@
 # CDI Integration
 
-## `@Inject AgenticanRuntime`
+## `@Inject Agentican`
 
 The core module produces a singleton `Agentican` bean via `AgenticanProducer`. It's built
 from your `agentican.*` config at startup and disposed on shutdown.
 
 ```java
-@Inject AgenticanRuntime agentican;
+@Inject Agentican agentican;
 
 var handle = agentican.run("Find papers on agents");
 var taskId = handle.taskId();      // available immediately
@@ -49,7 +49,7 @@ Agentican<TriageParams, TriageOutput> triage;
 TriageOutput out = triage.runAndAwait(new TriageParams("cust-42", "HIGH"));
 ```
 
-- The qualifier value is the plan **name** (not `externalId`). Any plan in `AgenticanRuntime.registry().plans()` qualifies — YAML, fluent builder, JPA catalog, programmatic registration, or planner output (if it has a known name).
+- The qualifier value is the plan **name** (not `externalId`). Any plan in `Agentican.registry().plans()` qualifies — YAML, fluent builder, JPA catalog, programmatic registration, or planner output (if it has a known name).
 - The plan is resolved from the registry on each invocation, so plans added or updated at runtime are honored.
 - `P` is the typed params record. Jackson's `SNAKE_CASE` strategy maps `customerId` → `customer_id`. Use `Void` for parameterless plans; use `Map<String, Object>` as a dynamic-map escape hatch.
 - `R` is the typed output. The framework reads the plan's output step (declared via `Plan.builder(...).outputStep(name)` or implicit when the plan has one step) and Jackson-parses the text into `R`. Use `Void` to skip output parsing.
@@ -62,13 +62,18 @@ Failure modes from `runAndAwait`:
 For dynamic plan lookups, construct in code instead of injecting:
 
 ```java
-@Inject AgenticanRuntime runtime;
+@Inject Agentican runtime;
 
 // Typed output
-var invoker = runtime.agentican("some-runtime-plan", MyParams.class, MyOutput.class);
+var invoker = runtime.agentican("some-runtime-plan")
+        .input(MyParams.class)
+        .output(MyOutput.class)
+        .build();
 
-// Untyped output (current behavior)
-var invoker = runtime.agentican("some-runtime-plan", MyParams.class);
+// Untyped output (current behavior) — omit .output(...) to default R = Void
+var invoker = runtime.agentican("some-runtime-plan")
+        .input(MyParams.class)
+        .build();
 ```
 
 ## `@AgenticanAgent` qualifier
@@ -86,13 +91,13 @@ log.info("Agent: {} — {}", researcher.name(), researcher.role());
 
 The agent must be declared in `agentican.agents[*]` configuration.
 
-## ReactiveAgenticanRuntime
+## ReactiveAgentican
 
 Mutiny-native wrapper for reactive Quarkus applications. Returns `Uni<T>` for natural
 composition with Vert.x, RESTEasy Reactive, and reactive pipelines.
 
 ```java
-@Inject ReactiveAgenticanRuntime agentican;
+@Inject ReactiveAgentican agentican;
 
 // Non-blocking: returns Uni<TaskHandle> immediately
 public Uni<Response> submit(String description) {
@@ -120,13 +125,13 @@ public Uni<String> research(String topic) {
 All task execution runs on the framework's virtual thread executor, never on the Vert.x
 event loop.
 
-## Typed reactive invoker — `ReactiveAgentican<P, R>`
+## Typed reactive invoker — `ReactiveAgenticanTask<P, R>`
 
 The reactive counterpart to `@AgenticanPlan("name") Agentican<P, R>`. Same qualifier, same generic params, just returns `Uni<...>` so you can compose without blocking:
 
 ```java
 @Inject @AgenticanPlan("triage")
-ReactiveAgentican<TriageParams, TriageOutput> triage;
+ReactiveAgenticanTask<TriageParams, TriageOutput> triage;
 
 @GET
 @Path("/triage/{customer}")
@@ -208,7 +213,7 @@ Events fire exactly once per lifecycle callback.
 ## Bean overrides
 
 `AgenticanProducer` injects every framework collaborator and passes it to the
-`AgenticanRuntime.builder()`. `AgenticanBeansProducer` supplies in-memory `@DefaultBean`
+`Agentican.builder()`. `AgenticanBeansProducer` supplies in-memory `@DefaultBean`
 fallbacks for all of them, so an app with only `agentican-quarkus-runtime` on
 the classpath still works.
 

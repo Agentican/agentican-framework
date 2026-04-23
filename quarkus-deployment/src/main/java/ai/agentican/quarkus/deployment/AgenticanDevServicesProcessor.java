@@ -12,6 +12,6 @@ class AgenticanDevServicesProcessor {
     @BuildStep(onlyIf = IsDevelopment.class)
     void logDevModeInfo() {
 
-        LOG.info("AgenticanRuntime Dev UI available at /q/dev-ui (look for the AgenticanRuntime card)");
+        LOG.info("Agentican Dev UI available at /q/dev-ui (look for the Agentican card)");
     }
 }

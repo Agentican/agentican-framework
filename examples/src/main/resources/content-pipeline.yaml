@@ -1,12 +1,19 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+composio:
+  apiKey: ${COMPOSIO_API_KEY}
+  userId: user-1
+
 agents:
-  - name: Content Researcher
+  - name: Research Analyst
     role: |
       Investigates topics by gathering recent data, expert quotes and statistical evidence.
       Prioritizes primary sources — company blogs, research papers, official documentation —
       over news aggregators. Notes methodology and sample sizes when citing research.
       Organizes findings into themes rather than a raw list. Flags when data is older than
       12 months or when conflicting sources exist.
-    externalId: content-researcher
+    externalId: research-analyst
 
   - name: Content Writer
     role: |
@@ -27,6 +34,25 @@ agents:
     externalId: copy-editor
 
 skills:
+  - name: Research standards
+    instructions: |
+      Source quality rules. Prefer primary sources (company blog posts, research papers,
+      official documentation) over aggregators and recaps. Cite methodology, sample sizes,
+      and publication dates when referencing studies. Flag data older than 12 months
+      unless it's explicitly historical. Surface conflicting sources rather than picking
+      one. Every claim needs a citeable origin — no "it is widely believed" padding.
+    externalId: research-standards
+
+  - name: Editorial style
+    instructions: |
+      Long-form writing style. Open with a hook that names why the reader should care.
+      Use progressive disclosure — concrete example before abstraction. Short paragraphs
+      (3-5 sentences), active voice, no hedging language. Headers should scan — a reader
+      who reads only H2/H3s should get the argument. Adapt register to audience: technical
+      for engineers, strategic for executives, operational for practitioners. No jargon
+      unless the audience expects it.
+    externalId: editorial-style
+
   - name: SEO optimization
     instructions: |
       Optimize content for search visibility. Write meta descriptions under 160 characters
@@ -35,3 +61,52 @@ skills:
       grade 8-10). Include the primary keyword in the first 100 words without forcing it.
       Add internal links to related content where relevant.
     externalId: seo-optimization
+
+plans:
+  - name: Content Pipeline
+    externalId: content-pipeline
+    outputStep: publish
+    params:
+      - name: topic
+        description: Article topic
+        required: true
+      - name: audience
+        description: Target audience
+        required: true
+    steps:
+      - name: research
+        agent: Research Analyst
+        skills: [Research standards]
+        instructions: |
+          Research {{param.topic}} for a {{param.audience}} audience. Gather 5+ data points,
+          expert quotes and recent developments.
+      - name: outline
+        agent: Content Writer
+        skills: [Editorial style]
+        instructions: |
+          Create a detailed article outline from this research:
+          {{step.research.output}}
+        dependencies: [research]
+      - name: draft
+        agent: Content Writer
+        skills: [Editorial style, SEO optimization]
+        instructions: |
+          Write the full article from this outline:
+          {{step.outline.output}}
+        dependencies: [outline]
+      - name: edit
+        agent: Copy Editor
+        skills: [Editorial style, SEO optimization]
+        instructions: |
+          Edit this article for publication:
+          {{step.draft.output}}
+        dependencies: [draft]
+      - name: publish
+        agent: Content Writer
+        skills: [SEO optimization]
+        tools: [notion_create_page]
+        instructions: |
+          Publish this article to the content database:
+
+          {{step.edit.output}}
+        dependencies: [edit]

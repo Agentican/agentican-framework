@@ -139,4 +139,120 @@ class PlaceholdersTest {
 
         assertEquals("url=https://x", result);
     }
+
+    @Test
+    void resolveParamFieldExtractsFromJson() {
+
+        var result = Placeholders.resolveParams(
+                "email={{param.user.email}} name={{param.user.name}}",
+                Map.of("user", "{\"email\":\"a@b.com\",\"name\":\"Alice\"}"));
+
+        assertEquals("email=a@b.com name=Alice", result);
+    }
+
+    @Test
+    void resolveParamFieldNestedPath() {
+
+        var result = Placeholders.resolveParams(
+                "city={{param.user.address.city}}",
+                Map.of("user", "{\"address\":{\"city\":\"Austin\"}}"));
+
+        assertEquals("city=Austin", result);
+    }
+
+    @Test
+    void resolveParamFieldMixedWithSingleSegment() {
+
+        var result = Placeholders.resolveParams(
+                "Hello {{param.name}}, email={{param.user.email}}",
+                Map.of("name", "Bob", "user", "{\"email\":\"b@c.com\"}"));
+
+        assertEquals("Hello Bob, email=b@c.com", result);
+    }
+
+    @Test
+    void resolveParamFieldMissingFieldYieldsEmpty() {
+
+        var result = Placeholders.resolveParams(
+                "missing=[{{param.user.nope}}]",
+                Map.of("user", "{\"email\":\"a@b.com\"}"));
+
+        assertEquals("missing=[]", result);
+    }
+
+    @Test
+    void resolveParamFieldOnNonJsonYieldsEmpty() {
+
+        var result = Placeholders.resolveParams(
+                "field=[{{param.name.first}}]",
+                Map.of("name", "plain string, not json"));
+
+        assertEquals("field=[]", result);
+    }
+
+    @Test
+    void resolveParamFieldMissingParamYieldsEmpty() {
+
+        var result = Placeholders.resolveParams(
+                "x=[{{param.nope.field}}]",
+                Map.of("other", "{\"field\":\"ignored\"}"));
+
+        assertEquals("x=[]", result);
+    }
+
+    @Test
+    void resolveInputRendersFlatParamsAsJson() {
+
+        var result = Placeholders.resolveParams(
+                "Inputs:\n{{input}}",
+                Map.of("name", "alice", "count", "5"));
+
+        assertTrue(result.startsWith("Inputs:\n{"), "Expected pretty-JSON object, got: " + result);
+        assertTrue(result.contains("\"name\" : \"alice\""), "Expected flat string value: " + result);
+        assertTrue(result.contains("\"count\" : \"5\""), "Expected flat string value: " + result);
+    }
+
+    @Test
+    void resolveInputUnescapesJsonStringValues() {
+
+        var result = Placeholders.resolveParams(
+                "{{input}}",
+                Map.of("user", "{\"email\":\"a@b.com\",\"name\":\"Alice\"}"));
+
+        assertTrue(result.contains("\"email\" : \"a@b.com\""),
+                "Nested object should expand, not be escaped: " + result);
+        assertTrue(result.contains("\"name\" : \"Alice\""), result);
+        assertFalse(result.contains("\\\""), "Output should not contain escaped quotes: " + result);
+    }
+
+    @Test
+    void resolveInputCoexistsWithParamPlaceholders() {
+
+        var result = Placeholders.resolveParams(
+                "Hello {{param.name}}. Full input:\n{{input}}",
+                Map.of("name", "World", "role", "dev"));
+
+        assertTrue(result.startsWith("Hello World. Full input:"), result);
+        assertTrue(result.contains("\"name\" : \"World\""), result);
+        assertTrue(result.contains("\"role\" : \"dev\""), result);
+    }
+
+    @Test
+    void resolveInputWithEmptyParamsRendersEmptyObject() {
+
+        var result = Placeholders.resolveParams("Inputs: {{input}}", Map.of());
+
+        assertEquals("Inputs: { }", result);
+    }
+
+    @Test
+    void missingInputPlaceholderIsUnchanged() {
+
+        var result = Placeholders.resolveParams(
+                "Hello {{param.name}}",
+                Map.of("name", "Alice"));
+
+        assertEquals("Hello Alice", result);
+        assertFalse(result.contains("{"));
+    }
 }

@@ -1,6 +1,6 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.invoker.Agentican;
+import ai.agentican.framework.invoker.AgenticanTask;
 import ai.agentican.framework.orchestration.execution.TaskHandle;
 import ai.agentican.framework.orchestration.execution.TaskResult;
 import ai.agentican.framework.orchestration.execution.TaskStatus;
@@ -26,10 +26,10 @@ class ReactiveAgenticanAdapterTest {
         var handle = new TaskHandle("tid", CompletableFuture.completedFuture(okResult()),
                                     new java.util.concurrent.atomic.AtomicBoolean());
 
-        Agentican<String, String> sync = new FakeAgentican<>(
+        AgenticanTask<String, String> sync = new FakeAgentican<>(
                 p -> { called.set(p); return handle; }, null, null);
 
-        var got = ReactiveAgentican.of(sync).run("params").await().atMost(Duration.ofSeconds(1));
+        var got = ReactiveAgenticanTask.of(sync).run("params").await().atMost(Duration.ofSeconds(1));
 
         assertEquals(handle, got);
         assertEquals("params", called.get());
@@ -38,10 +38,10 @@ class ReactiveAgenticanAdapterTest {
     @Test
     void runAndAwaitDelegatesToRunAsync() {
 
-        Agentican<String, String> sync = new FakeAgentican<>(
+        AgenticanTask<String, String> sync = new FakeAgentican<>(
                 null, null, p -> CompletableFuture.completedFuture("value:" + p));
 
-        var got = ReactiveAgentican.of(sync).runAndAwait("x").await().atMost(Duration.ofSeconds(1));
+        var got = ReactiveAgenticanTask.of(sync).runAndAwait("x").await().atMost(Duration.ofSeconds(1));
 
         assertEquals("value:x", got);
     }
@@ -53,9 +53,9 @@ class ReactiveAgenticanAdapterTest {
         var handle = new TaskHandle("tid", CompletableFuture.completedFuture(result),
                                     new java.util.concurrent.atomic.AtomicBoolean());
 
-        Agentican<String, String> sync = new FakeAgentican<>(p -> handle, null, null);
+        AgenticanTask<String, String> sync = new FakeAgentican<>(p -> handle, null, null);
 
-        var got = ReactiveAgentican.of(sync).awaitTaskResult("p").await().atMost(Duration.ofSeconds(1));
+        var got = ReactiveAgenticanTask.of(sync).awaitTaskResult("p").await().atMost(Duration.ofSeconds(1));
 
         assertEquals(result, got);
     }
@@ -65,11 +65,11 @@ class ReactiveAgenticanAdapterTest {
 
         var submitted = new AtomicBoolean();
 
-        Agentican<String, String> sync = new FakeAgentican<>(
+        AgenticanTask<String, String> sync = new FakeAgentican<>(
                 null, null,
                 p -> { submitted.set(true); return CompletableFuture.completedFuture(null); });
 
-        var uni = ReactiveAgentican.of(sync).runAndAwait("x");
+        var uni = ReactiveAgenticanTask.of(sync).runAndAwait("x");
 
         assertTrue(!submitted.get(), "Uni should not trigger submission before subscription");
 
@@ -86,7 +86,7 @@ class ReactiveAgenticanAdapterTest {
     private record FakeAgentican<P, R>(
             java.util.function.Function<P, TaskHandle> runFn,
             java.util.function.Function<P, R> runAndAwaitFn,
-            java.util.function.Function<P, CompletableFuture<R>> runAsyncFn) implements Agentican<P, R> {
+            java.util.function.Function<P, CompletableFuture<R>> runAsyncFn) implements AgenticanTask<P, R> {
 
         @Override public TaskHandle run(P params) {
             assertNotNull(runFn, "run() not expected");

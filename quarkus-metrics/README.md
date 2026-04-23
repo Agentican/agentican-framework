@@ -111,7 +111,7 @@ agentican_tasks_active
 ### LLM client decoration
 
 The module produces a `LlmClientDecorator` bean. The `AgenticanProducer` in `agentican-quarkus`
-detects it and passes it to the `AgenticanRuntime.builder()`. During construction, every LLM client
+detects it and passes it to the `Agentican.builder()`. During construction, every LLM client
 built from `agentican.llm[*]` config passes through the decorator and gets wrapped with
 `MeteredLlmClient`.
 

@@ -1,31 +1,36 @@
+llm:
+  - apiKey: ${ANTHROPIC_API_KEY}
+
+composio:
+  apiKey: ${COMPOSIO_API_KEY}
+  userId: user-1
+
 agents:
-  - name: Lead Researcher
+  - name: Sales Development Representative
     role: |
-      Builds prospect profiles by cross-referencing CRM records with public data. Gathers
-      company size, funding stage, technology stack, recent executive hires and news mentions.
-      Identifies the likely decision-maker and potential champions within the org. Notes any
-      existing vendor relationships that could be competitive or complementary. Produces a
-      structured profile, not a narrative — bullet points grouped by category.
-    externalId: lead-researcher
+      Prospects and qualifies inbound and outbound leads. Builds prospect profiles from
+      CRM records and public data — company size, funding stage, tech stack, recent exec
+      hires, news mentions — identifies likely decision-makers and champions, and notes
+      competitive or complementary vendor relationships. Produces structured profiles as
+      bullet points grouped by category, not narrative.
+    externalId: sales-development-representative
 
-  - name: Lead Qualification Specialist
+  - name: Account Executive
     role: |
-      Evaluates leads against the ideal customer profile using BANT criteria: Budget (has
-      allocation or authority to create one), Authority (contact can sign or directly influence
-      the decision), Need (pain point aligns with the product), Timeline (active evaluation
-      within 6 months). Assigns a composite score 1-10 with per-dimension breakdowns and a
-      clear recommendation — advance, nurture, or disqualify — with the specific rationale
-      a sales manager needs to agree or disagree.
-    externalId: lead-qualifier
+      Owns opportunities from qualification to close. Evaluates leads against the ICP using
+      BANT (Budget, Authority, Need, Timeline), assigns composite scores with per-dimension
+      breakdowns, and recommends advance / nurture / disqualify with the specific rationale
+      a sales manager needs to agree or disagree. Never advances a lead on optimism alone.
+    externalId: account-executive
 
-  - name: Outreach Specialist
+  - name: Sales Manager
     role: |
-      Crafts personalized outreach that references specific prospect pain points, achievements
-      or recent company events. Keeps emails under 150 words. Opens with a relevant insight
-      about their business, not a pitch about the product. Includes a single clear ask — a
-      15-minute call, not an open-ended "let me know." Avoids superlatives, buzzwords and
-      anything that reads like a template.
-    externalId: outreach-specialist
+      Runs the sales team and represents the function to customers at key moments. Crafts
+      personalized outreach that references specific prospect pain points, achievements or
+      recent company events — emails under 150 words, opening with insight rather than
+      pitch, closing with a single clear ask like a 15-minute call. Avoids superlatives,
+      buzzwords and template phrasing.
+    externalId: sales-manager
 
 skills:
   - name: Sales playbook
@@ -37,3 +42,42 @@ skills:
       signals: no technical team, currently mid-contract with a competitor (>12 months left),
       or company in active downsizing.
     externalId: sales-playbook
+
+plans:
+  - name: Lead Qualification Pipeline
+    externalId: lead-qualification
+    outputStep: qualify
+    params:
+      - name: company
+        description: Company name
+        required: true
+      - name: contact
+        description: Contact name and title
+        required: true
+    steps:
+      - name: research
+        agent: Sales Development Representative
+        skills: [Sales playbook]
+        tools: [hubspot_search_contacts]
+        instructions: |
+          Research {{param.company}} and {{param.contact}}. Check HubSpot for existing records.
+          Build a profile.
+      - name: qualify
+        agent: Account Executive
+        skills: [Sales playbook]
+        instructions: |
+          Score and qualify this lead:
+          {{step.research.output}}
+        dependencies: [research]
+      - name: outreach
+        agent: Sales Manager
+        skills: [Sales playbook]
+        tools: [gmail_send_email, hubspot_create_contact_note]
+        instructions: |
+          Draft and send outreach to {{param.contact}} at {{param.company}}.
+
+          Research: {{step.research.output}}
+          Qualification: {{step.qualify.output}}
+
+          Log the outreach in HubSpot.
+        dependencies: [qualify]

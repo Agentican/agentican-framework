@@ -6,7 +6,7 @@ This page explains the core abstractions in Agentican and how they fit together.
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                       AgenticanRuntime                     │
+│                       Agentican                     │
 └───┬──────────────┬──────────────┬────────────┬─────────────┘
     │              │              │            │
     ▼              ▼              ▼            ▼
@@ -42,12 +42,12 @@ This page explains the core abstractions in Agentican and how they fit together.
 
 ## Key Concepts
 
-### AgenticanRuntime
+### Agentican
 
-The main entry point. Owns the runtime configuration, registries, planner, and task runner. Build it with `AgenticanRuntime.builder()` and use it via `run(String)` or `run(Plan)`.
+The main entry point. Owns the runtime configuration, registries, planner, and task runner. Build it with `Agentican.builder()` and use it via `run(String)` or `run(Plan)`.
 
 ```java
-try (var runtime = AgenticanRuntime.builder()
+try (var runtime = Agentican.builder()
         .llm(LlmConfig.builder().apiKey(apiKey).build())
         .build()) {
 
@@ -57,7 +57,7 @@ try (var runtime = AgenticanRuntime.builder()
 }
 ```
 
-`AgenticanRuntime` is `AutoCloseable` — close it to release the virtual thread executor and any toolkits that hold resources.
+`Agentican` is `AutoCloseable` — close it to release the virtual thread executor and any toolkits that hold resources.
 
 At `build()` time, the framework validates that every `AgentConfig`, `SkillConfig`, and `PlanConfig` supplied via the config file or the fluent builder declares an `externalId`. See [External IDs](#external-ids) below.
 
@@ -71,11 +71,17 @@ record TriageOutput(String classification, String reason) {}
 
 // Plain Java — capture a Plan reference
 Agentican<TriageParams, TriageOutput> triage =
-        runtime.agentican(plan, TriageParams.class, TriageOutput.class);
+        runtime.agentican(plan)
+                .input(TriageParams.class)
+                .output(TriageOutput.class)
+                .build();
 
 // Or resolve by plan name (picks up runtime-registered plans)
 Agentican<TriageParams, TriageOutput> triage =
-        runtime.agentican("triage", TriageParams.class, TriageOutput.class);
+        runtime.agentican("triage")
+                .input(TriageParams.class)
+                .output(TriageOutput.class)
+                .build();
 
 // Run with typed in + typed out
 TriageOutput out = triage.runAndAwait(new TriageParams("cust-42", "HIGH"));
@@ -90,10 +96,12 @@ Use `Void` for either type parameter when no inputs or no typed output is needed
 - `Agentican<Void, R>` — parameterless plan, typed output. `runAndAwait()` (no args) parses the output.
 - `Agentican<Void, Void>` — both untyped.
 
-Two factory forms on `AgenticanRuntime`, each with a Void-output overload:
+Two factory forms on `Agentican`, each returning the same progressive-typing builder:
 
-- **`runtime.agentican(Plan, Class<P>, Class<R>)`** — captures the Plan reference. No per-invoke lookup; plan mutations are invisible.
-- **`runtime.agentican(String planName, Class<P>, Class<R>)`** — resolves by name in the `PlanRegistry` on each invocation.
+- **`runtime.agentican(Plan)`** — captures the Plan reference. No per-invoke lookup; plan mutations are invisible.
+- **`runtime.agentican(String planName)`** — resolves by name in the `PlanRegistry` on each invocation.
+
+Chain `.input(P.class)` (required), then `.output(R.class)` (optional; defaults to `Void`), then `.build()` to get `Agentican<P, R>`.
 
 The plan name is the runtime lookup key — any plan in the registry qualifies regardless of source (YAML, fluent builder, JPA catalog, planner output, programmatic registration). `externalId` is persistence-dedup metadata and is not used for invoker binding.
 
@@ -126,10 +134,10 @@ Agentican<TriageParams, TriageOutput> triage;
 
 ### AgenticanRecovery
 
-A separate, server-oriented companion to `AgenticanRuntime` that owns the recovery surface — `resumeInterrupted(...)` and `reapOrphans(...)`. Construct it by composing onto a runtime:
+A separate, server-oriented companion to `Agentican` that owns the recovery surface — `resumeInterrupted(...)` and `reapOrphans(...)`. Construct it by composing onto a runtime:
 
 ```java
-try (var runtime = AgenticanRuntime.builder()...build();
+try (var runtime = Agentican.builder()...build();
      var recovery = new AgenticanRecovery(runtime)) {
 
     recovery.resumeInterrupted();   // pick up tasks left in flight after restart
@@ -137,9 +145,9 @@ try (var runtime = AgenticanRuntime.builder()...build();
 }
 ```
 
-`AgenticanRecovery` is also `AutoCloseable` — declare it after the `AgenticanRuntime` in try-with-resources so it closes first (it awaits in-flight knowledge re-ingestion using the shared executor before the executor shuts down).
+`AgenticanRecovery` is also `AutoCloseable` — declare it after the `Agentican` in try-with-resources so it closes first (it awaits in-flight knowledge re-ingestion using the shared executor before the executor shuts down).
 
-In Quarkus, `AgenticanRecovery` is a CDI bean produced from the injected `AgenticanRuntime`; the framework's `ResumeOnStartObserver` invokes `resumeInterrupted` on `StartupEvent` (toggleable via `agentican.resume-on-start`).
+In Quarkus, `AgenticanRecovery` is a CDI bean produced from the injected `Agentican`; the framework's `ResumeOnStartObserver` invokes `resumeInterrupted` on `StartupEvent` (toggleable via `agentican.resume-on-start`).
 
 ### Plan
 
@@ -284,7 +292,7 @@ All four registries are bundled on `agentican.registry()` (an `AgenticanRegistry
 All three of `AgentRegistry`, `SkillRegistry`, and `PlanRegistry` are **interfaces** with an `InMemory*` implementation as the default. A persistent backend (e.g., the JPA-backed registries in `agentican-quarkus`) plugs in via the builder:
 
 ```java
-AgenticanRuntime.builder()
+Agentican.builder()
         .agentRegistry(myJpaAgentRegistry)
         .skillRegistry(myJpaSkillRegistry)
         .planRegistry(myJpaPlanRegistry)
@@ -297,7 +305,7 @@ Each interface has a `default seed(...)` hook the framework calls once at boot. 
 
 Every `AgentConfig`, `SkillConfig`, `PlanConfig`, and `Plan` has an optional `externalId` — a stable business key separate from the internal UUID `id`. A persistent catalog upserts on `externalId` so redeploys don't create duplicates.
 
-Anything declared via the config file or the fluent builder **must** set an `externalId`. The framework throws `IllegalStateException` at `AgenticanRuntime.build()` if it's missing, because without it every boot would auto-generate a fresh UUID and pile up duplicate catalog rows.
+Anything declared via the config file or the fluent builder **must** set an `externalId`. The framework throws `IllegalStateException` at `Agentican.build()` if it's missing, because without it every boot would auto-generate a fresh UUID and pile up duplicate catalog rows.
 
 Set `externalId(...)` on the builder:
 
@@ -354,7 +362,7 @@ Server applications wire this in by calling `service.resumeInterrupted()` on sta
 
 Agentican uses **virtual threads exclusively** from the moment you call `run()`:
 
-- `AgenticanRuntime` owns an `Executors.newVirtualThreadPerTaskExecutor()` for task execution
+- `Agentican` owns an `Executors.newVirtualThreadPerTaskExecutor()` for task execution
 - Each task step runs on its own virtual thread
 - Parallel tool execution and loop iterations use `StructuredTaskScope`
 - HITL waits **park** the virtual thread — no OS threads are blocked, even for hours-long human approvals

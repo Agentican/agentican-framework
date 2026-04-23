@@ -41,7 +41,7 @@ public class AgenticanRecovery implements AutoCloseable {
 
     private final CopyOnWriteArrayList<CompletableFuture<?>> reingestFutures = new CopyOnWriteArrayList<>();
 
-    public AgenticanRecovery(AgenticanRuntime agentican) {
+    public AgenticanRecovery(Agentican agentican) {
 
         var internals = agentican.internals();
 

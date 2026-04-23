@@ -21,7 +21,7 @@ Requires Java 25.
 ## Quickstart
 
 ```java
-try (var agentican = AgenticanRuntime.builder()
+try (var agentican = Agentican.builder()
         .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
         .build()) {
     var task = agentican.run("Research the top 5 CDC tools and compare them");
@@ -36,7 +36,7 @@ No agents, skills, or plans registered — the built-in `PlannerAgent` creates t
 Everything is under `ai.agentican.framework.*`.
 
 **Entry point**
-- `AgenticanRuntime` — orchestrator, `AutoCloseable`; fluent builder for decorators, listeners, registries, and state stores.
+- `Agentican` — orchestrator, `AutoCloseable`; fluent builder for decorators, listeners, registries, and state stores.
 - `invoker.Agentican<P, R>` — typed invoker bound to a plan: turns typed params (`P`) into a `TaskHandle` with a typed result (`R`). Structured output on the plan's designated step is enforced via native provider JSON-schema modes.
 - `invoker.AgenticanRegistry` — read-only view over `plans()`, `agents()`, `toolkits()`, `skills()`.
 - `AgenticanRecovery` — crash-recovery helper: `resumeInterrupted()` / `reapOrphans()` pick up tasks left in flight after a restart.
@@ -85,7 +85,7 @@ Everything is under `ai.agentican.framework.*`.
 
 ## When to reach for a peer module instead
 
-If your app already runs on Quarkus, use [`agentican-quarkus-runtime`](../quarkus-runtime/) — it injects `AgenticanRuntime` as a CDI bean, reads `RuntimeConfig` from `application.properties`, and unlocks the REST / metrics / tracing / JPA / scheduler modules. This core module is the engine underneath; you don't need to depend on it directly when using the Quarkus stack.
+If your app already runs on Quarkus, use [`agentican-quarkus-runtime`](../quarkus-runtime/) — it injects `Agentican` as a CDI bean, reads `RuntimeConfig` from `application.properties`, and unlocks the REST / metrics / tracing / JPA / scheduler modules. This core module is the engine underneath; you don't need to depend on it directly when using the Quarkus stack.
 
 ## Documentation
 
