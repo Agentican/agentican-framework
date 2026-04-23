@@ -24,10 +24,14 @@ import ai.agentican.framework.orchestration.model.PlanStep;
 import ai.agentican.framework.orchestration.model.PlanStepAgent;
 import ai.agentican.framework.orchestration.model.PlanStepBranch;
 import ai.agentican.framework.orchestration.model.PlanStepLoop;
+import ai.agentican.quarkus.AgentTask;
 import ai.agentican.quarkus.AgenticanBeansProducer;
 import ai.agentican.quarkus.AgenticanConfig;
 import ai.agentican.quarkus.AgenticanProducer;
+import ai.agentican.quarkus.AgenticanTaskProducer;
 import ai.agentican.quarkus.AgentProducer;
+import ai.agentican.quarkus.ReactiveAgenticanTaskProducer;
+import ai.agentican.quarkus.WorkflowTask;
 import ai.agentican.quarkus.devui.AgenticanDevUIService;
 import ai.agentican.quarkus.event.CdiEventBridge;
 import ai.agentican.quarkus.health.AgenticanLivenessCheck;
@@ -36,12 +40,23 @@ import ai.agentican.quarkus.health.AgenticanReadinessCheck;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.AdditionalIndexedClassesBuildItem;
+import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.ReflectiveClassBuildItem;
 
+import org.jboss.jandex.DotName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.HashSet;
+
 class AgenticanProcessor {
 
+    private static final Logger LOG = LoggerFactory.getLogger(AgenticanProcessor.class);
     private static final String FEATURE = "agentican";
+
+    private static final DotName AGENT_TASK_DOT    = DotName.createSimple(AgentTask.class.getName());
+    private static final DotName WORKFLOW_TASK_DOT = DotName.createSimple(WorkflowTask.class.getName());
 
     @BuildStep
     FeatureBuildItem feature() {
@@ -57,6 +72,8 @@ class AgenticanProcessor {
                         AgenticanProducer.class,
                         AgenticanBeansProducer.class,
                         AgentProducer.class,
+                        AgenticanTaskProducer.class,
+                        ReactiveAgenticanTaskProducer.class,
                         CdiEventBridge.class,
                         AgenticanDevUIService.class,
                         AgenticanLivenessCheck.class,
@@ -72,11 +89,67 @@ class AgenticanProcessor {
                 AgenticanProducer.class.getName(),
                 AgenticanBeansProducer.class.getName(),
                 AgentProducer.class.getName(),
+                AgenticanTaskProducer.class.getName(),
+                ReactiveAgenticanTaskProducer.class.getName(),
                 CdiEventBridge.class.getName(),
                 AgenticanDevUIService.class.getName(),
                 AgenticanConfig.class.getName(),
                 AgenticanLivenessCheck.class.getName(),
                 AgenticanReadinessCheck.class.getName());
+    }
+
+    /**
+     * Validates {@code @AgentTask} and {@code @WorkflowTask} injection points at build
+     * time: warns when an {@code agent} or {@code skills} reference isn't declared in
+     * {@code agentican.agents} / {@code agentican.skills}. Missing plans are not
+     * checked — plans can be registered at runtime (YAML, DB hydration, programmatic).
+     */
+    @BuildStep
+    void validateTaskInjectionPoints(CombinedIndexBuildItem indexItem, AgenticanConfig config) {
+
+        var index = indexItem.getIndex();
+
+        var declaredAgents = new HashSet<String>();
+        config.agents().forEach(a -> {
+            declaredAgents.add(a.name());
+            a.externalId().ifPresent(declaredAgents::add);
+        });
+
+        var declaredSkills = new HashSet<String>();
+        config.skills().forEach(s -> {
+            declaredSkills.add(s.name());
+            s.externalId().ifPresent(declaredSkills::add);
+        });
+
+        for (var ann : index.getAnnotations(AGENT_TASK_DOT)) {
+
+            var agent = ann.value("agent").asString();
+
+            if (!agent.isEmpty() && !declaredAgents.isEmpty() && !declaredAgents.contains(agent))
+                LOG.warn("@AgentTask at {} references agent '{}' not declared in agentican.agents; "
+                        + "will fail at bean resolution unless registered programmatically",
+                        ann.target(), agent);
+
+            var skillsValue = ann.value("skills");
+
+            if (skillsValue != null && !declaredSkills.isEmpty()) {
+
+                for (var skill : skillsValue.asStringArray()) {
+                    if (!skill.isEmpty() && !declaredSkills.contains(skill))
+                        LOG.warn("@AgentTask at {} references skill '{}' not declared in agentican.skills",
+                                ann.target(), skill);
+                }
+            }
+        }
+
+        for (var ann : index.getAnnotations(WORKFLOW_TASK_DOT)) {
+
+            var planName = ann.value("plan").asString();
+
+            if (!planName.isEmpty())
+                LOG.debug("@WorkflowTask at {} references plan '{}'; build-time validation skipped "
+                        + "(plans may be registered at runtime)", ann.target(), planName);
+        }
     }
 
     @BuildStep
