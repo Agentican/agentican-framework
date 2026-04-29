@@ -1,7 +1,3 @@
-/**
- * Domain: Marketing
- * Tools: Notion (via Composio)
- */
 package ai.agentican.framework.examples.withtools;
 
 import ai.agentican.framework.Agentican;

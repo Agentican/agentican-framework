@@ -280,7 +280,6 @@ class SmacAgentRunnerResumeTest {
 
         var store = new TaskStateStoreMemory();
 
-        // MockLlmClient with zero entries — throws on any invocation. Short-circuit must skip LLM entirely.
         var mockLlm = new MockLlmClient();
 
         var runner = SmacAgentRunner.builder()
@@ -301,7 +300,6 @@ class SmacAgentRunnerResumeTest {
         store.messageSent(taskId, turnId,
                 new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c"));
 
-        // Response arrived with END_TURN, no tool calls — turn was logically complete pre-crash.
         var response = new ai.agentican.framework.llm.LlmResponse(
                 "all done", List.of(), StopReason.END_TURN, 1, 1, 0, 0, 0);
         store.responseReceived(taskId, turnId, response);

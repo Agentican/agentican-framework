@@ -53,9 +53,6 @@ class JpaSpanExporterTest {
     @Test
     void getByTaskIdReturnsAllSpansInTraceIncludingUntaggedChildren() {
 
-        // Real agent runs stamp `agentican.task.id` on task/step spans but NOT on
-        // run/turn/llm/tool spans — those rely on OTel context propagation for their parent
-        // linkage. getByTaskId must still return the full waterfall for that trace.
         var task = "task-mix-" + System.nanoTime();
         var trace = "e".repeat(32);
         var tagged = makeSpan("e1234567abcdef01", trace, null, "agentican.task", 1_000_000L, 9_000_000L, task);
@@ -94,10 +91,6 @@ class JpaSpanExporterTest {
     @Test
     void getByTaskIdIncludesSubTaskSpansInTheSameTrace() {
 
-        // Sub-tasks (loop iterations, branch paths) run with their own taskId but share the
-        // parent task's traceId because TracedLifecycleListener explicitly parents the sub-task's
-        // task span under the dispatching parent step. Querying by the ROOT taskId must return
-        // every span in the unified trace: parent task/step/run AND sub-task task/step/turn.
         var trace = "f".repeat(32);
         var parentTask = "parent-" + System.nanoTime();
         var subTask = "sub-" + System.nanoTime();
@@ -139,7 +132,6 @@ class JpaSpanExporterTest {
         assertTrue(parentNames.contains("agentican.step inner"),
                 "Sub-task step span should be reachable from parent taskId. Got: " + parentNames);
 
-        // Asymmetric-but-correct: querying by the child taskId returns the same unified trace.
         var viaChild = exporter.getByTaskId(subTask);
         assertEquals(6, viaChild.size(),
                 "Querying by sub-task id returns the whole trace — same semantics as in-memory exporter");

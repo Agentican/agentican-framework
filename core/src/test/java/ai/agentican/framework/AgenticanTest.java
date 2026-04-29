@@ -398,7 +398,7 @@ class AgenticanTest {
 
         var mockLlm = new MockLlmClient()
 
-                .onSendRepeated("curate a team knowledge base", endTurn("{\"entries\":[]}"))
+                .onSendRepeated("curate a team vector index", endTurn("{\"entries\":[]}"))
                 .onSend("planning-process", readResource(MOCK + "pass1-response.json"))
                 .onSend("<name>setup-notion</name>", readResource(MOCK + "pass2-setup-response.txt"))
                 .onSend("<name>create-page</name>", readResource(MOCK + "pass2-create-response.txt"))
@@ -727,7 +727,7 @@ class AgenticanTest {
     void resumeDispatchesRemainingParallelSiblingsConcurrently() throws Exception {
 
         var mockLlm = new MockLlmClient()
-                .onSendRepeated("curate a team knowledge base", endTurn("{\"entries\":[]}"))
+                .onSendRepeated("curate a team vector index", endTurn("{\"entries\":[]}"))
                 .onSend("sibling-a", "A done")
                 .onSend("sibling-b", "B done")
                 .onSend("sibling-c", "C done")
@@ -852,8 +852,6 @@ class AgenticanTest {
     @Test
     void resumeBranchStepUsesExistingCompletedChildWithoutReDispatch() throws Exception {
 
-        // Covers gap #13: when the branch-step's chosen child sub-task is already COMPLETED,
-        // resume must reuse its output — not re-dispatch the path body.
         var llmCallCount = new java.util.concurrent.atomic.AtomicInteger(0);
 
         var mockLlm = new MockLlmClient()
@@ -903,7 +901,6 @@ class AgenticanTest {
             store.stepStarted(taskId, stepId, "choose");
             store.branchPathChosen(taskId, stepId, "A");
 
-            // Pre-seed a COMPLETED child sub-task for the chosen path.
             var childPlan = ai.agentican.framework.orchestration.model.Plan.builder("choose-A")
                     .description("").step(pathBodyStep).build();
             store.taskStarted(childId, "choose-A", childPlan, Map.of(), taskId, stepId, 0);
@@ -934,8 +931,6 @@ class AgenticanTest {
     @Test
     void resumeLoopStepSkipsCompletedIterations() throws Exception {
 
-        // Covers gap #14: when a loop step has a completed iteration 0 and missing iteration 1,
-        // resume must preserve iter-0's output and dispatch iter-1 fresh — never re-run iter-0.
         var llmCallCount = new java.util.concurrent.atomic.AtomicInteger(0);
 
         var mockLlm = new MockLlmClient()
@@ -984,7 +979,6 @@ class AgenticanTest {
 
             store.stepStarted(taskId, loopStepId, "each");
 
-            // Pre-seed iter-0 as COMPLETED, iter-1 absent.
             var iterPlan = ai.agentican.framework.orchestration.model.Plan.builder("each-iter-1")
                     .description("").step(bodyStep).build();
             store.taskStarted(iter0Id, "each-iter-1", iterPlan, Map.of(), taskId, loopStepId, 0);
@@ -1008,13 +1002,11 @@ class AgenticanTest {
             assertEquals(TaskStatus.COMPLETED, finalLog.status(),
                     "Loop-resume should complete after dispatching only the missing iteration");
 
-            // iter-0 child sub-task must remain COMPLETED with its prerecorded output — NOT re-run.
             var iter0Log = store.load(iter0Id);
             assertEquals(TaskStatus.COMPLETED, iter0Log.status());
             assertEquals("iter-0 prerecorded", iter0Log.step("iter-body").output(),
                     "Completed iteration output must be preserved verbatim — iter-0 was not re-run");
 
-            // Exactly one LLM call: the missing iter-1. iter-0 must NOT be re-run.
             assertEquals(before + 1, llmCallCount.get(),
                     "Exactly one LLM call expected — for the missing iteration only");
         }
@@ -1023,11 +1015,7 @@ class AgenticanTest {
     @Test
     void resumeSuspendedStepWithRejectedStepOutputMarksTaskFailedWithFeedback() throws Exception {
 
-        // Covers gap #11 (full integration): SUSPENDED step with persisted rejected STEP_OUTPUT
-        // HITL response — resumeSuspendedAgentStep's rejection shortcut must mark the step FAILED
-        // with the feedback text, without invoking the LLM.
-
-        var mockLlm = new MockLlmClient();  // zero entries: throws if invoked
+        var mockLlm = new MockLlmClient();
 
         var store = new TaskStateStoreMemory();
 

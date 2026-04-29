@@ -115,7 +115,6 @@ class AgenticanTypedTest {
 
             AgenticanTask<TriageParams, Void> triage = runtime.workflowTask("test").plan("late-plan").input(TriageParams.class).build();
 
-            // Plan isn't registered yet — construction still succeeds (resolution is per-invoke)
             var plan = Plan.builder("late-plan")
                     .param(new PlanParam("customer_id", "Customer ID", null, true))
                     .param(new PlanParam("priority", "Priority", "NORMAL", false))
@@ -367,7 +366,7 @@ class AgenticanTypedTest {
             AgenticanTask<Void, Void> invoker = runtime.workflowTask("test").plan(plan).input(Void.class).output(Void.class).build();
             invoker.run();
 
-            Thread.yield();   // let the async task submit
+            Thread.yield();
 
             var result = invoker.awaitTaskResult();
             assertEquals(TaskStatus.COMPLETED, result.status());

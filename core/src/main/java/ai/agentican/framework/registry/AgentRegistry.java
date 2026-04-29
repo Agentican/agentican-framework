@@ -19,9 +19,23 @@ public interface AgentRegistry {
 
     Agent getByName(String name);
 
+    default Agent getByExternalId(String externalId) {
+
+        if (externalId == null) return null;
+        for (var agent : getAll())
+            if (externalId.equals(agent.config().externalId())) return agent;
+        return null;
+    }
+
     Collection<Agent> getAll();
 
     Map<String, Agent> asMap();
 
     default void seed(Function<AgentConfig, Agent> factory) { }
+
+    default void delete(String ref) {
+
+        throw new UnsupportedOperationException(
+                getClass().getSimpleName() + " is read-only; delete not supported");
+    }
 }

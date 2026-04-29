@@ -1,9 +1,3 @@
-/**
- * Domain: Engineering / Incident Response
- * Tools: None
- * HITL: Step approval via CLI — customer-facing postmortem copy goes to every
- *       affected account, so a human must sign off before anything is sent.
- */
 package ai.agentican.framework.examples.notools.agents.hitl;
 
 import ai.agentican.framework.Agentican;

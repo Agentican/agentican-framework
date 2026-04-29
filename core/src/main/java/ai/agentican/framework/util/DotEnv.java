@@ -8,16 +8,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Reads a {@code .env} file once (starting in the current working directory and
- * walking upward up to 5 parent levels) and exposes its entries as a fallback
- * for {@code System.getenv()} lookups.
- *
- * <p>Format: one {@code KEY=VALUE} per line. Blank lines and lines starting with
- * {@code #} are ignored. An optional {@code export } prefix is stripped. Values
- * may be wrapped in single or double quotes; inline {@code #} comments are
- * stripped only from unquoted values.
- */
 public final class DotEnv {
 
     private static final int MAX_PARENTS = 8;

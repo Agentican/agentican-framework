@@ -1,5 +1,6 @@
 package ai.agentican.framework;
 
+import ai.agentican.framework.agent.Agent;
 import ai.agentican.framework.agent.AgentFactory;
 import ai.agentican.framework.registry.AgentRegistry;
 import ai.agentican.framework.invoker.AgentInvokerBuilder;
@@ -15,7 +16,13 @@ import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.config.WorkerConfig;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlNotifier;
+import ai.agentican.framework.vector.VectorIndex;
+import ai.agentican.framework.vector.VectorIndexRegistry;
 import ai.agentican.framework.knowledge.KnowledgeIngestor;
+import ai.agentican.framework.vector.code.RetrieveCodeStep;
+import ai.agentican.framework.vector.code.RetrieveOutput;
+import ai.agentican.framework.vector.code.RetrieveQuery;
+import ai.agentican.framework.tools.vector.RetrievalToolkit;
 import ai.agentican.framework.store.KnowledgeStore;
 import ai.agentican.framework.knowledge.LlmKnowledgeExtractor;
 import ai.agentican.framework.store.KnowledgeStoreMemory;
@@ -84,10 +91,12 @@ public class Agentican implements AutoCloseable {
     private final ExecutorService taskExecutor;
     private final boolean ownsExecutor;
 
+    private final AgentFactory agentFactory;
+
     private Agentican(AgenticanRegistry registry, PlannerAgent taskPlanner, TaskRunner taskRunner,
                       TaskStateStore taskStateStore, HitlManager hitlManager, KnowledgeIngestor knowledgeIngestor,
                       TaskDecorator taskDecorator, TaskListener taskListener, ExecutorService taskExecutor,
-                      boolean ownsExecutor) {
+                      boolean ownsExecutor, AgentFactory agentFactory) {
 
         this.registry = registry;
         this.taskPlanner = taskPlanner;
@@ -99,6 +108,12 @@ public class Agentican implements AutoCloseable {
         this.taskListener = taskListener;
         this.taskExecutor = taskExecutor;
         this.ownsExecutor = ownsExecutor;
+        this.agentFactory = agentFactory;
+    }
+
+    public Agent buildAgent(AgentConfig config) {
+
+        return agentFactory.build(config);
     }
 
     public TaskHandle run(String taskDescription) {
@@ -249,6 +264,7 @@ public class Agentican implements AutoCloseable {
         private final Map<String, LlmClient> llms = new LinkedHashMap<>();
         private final Map<String, Toolkit> toolkits = new LinkedHashMap<>();
         private final CodeStepRegistry codeStepRegistry = new CodeStepRegistry();
+        private final VectorIndexRegistry vectorIndexRegistry = new VectorIndexRegistry();
 
         private HitlManager hitlManager;
         private KnowledgeStore knowledgeStore;
@@ -290,6 +306,11 @@ public class Agentican implements AutoCloseable {
         public <I, O> Builder codeStep(String slug, Class<I> inputType, Class<O> outputType,
                                                 CodeStep<I, O> executor) {
             codeStepRegistry.register(new CodeStepSpec<>(slug, null, inputType, outputType), executor);
+            return this;
+        }
+
+        public Builder vectorIndex(VectorIndex kb) {
+            vectorIndexRegistry.register(kb);
             return this;
         }
 
@@ -381,6 +402,29 @@ public class Agentican implements AutoCloseable {
 
             toolkits.forEach(toolkitRegistry::register);
 
+            if (!vectorIndexRegistry.isEmpty()) {
+
+                if (toolkits.containsKey(RetrievalToolkit.SLUG))
+                    throw new IllegalStateException(
+                            "Toolkit slug '" + RetrievalToolkit.SLUG
+                          + "' is reserved when vector indexs are configured. "
+                          + "Don't register a custom toolkit under that slug.");
+
+                toolkitRegistry.register(RetrievalToolkit.SLUG,
+                        new RetrievalToolkit(vectorIndexRegistry));
+
+                if (codeStepRegistry.contains(RetrieveCodeStep.SLUG))
+                    throw new IllegalStateException(
+                            "Code-step slug '" + RetrieveCodeStep.SLUG
+                          + "' is reserved when vector indexs are configured. "
+                          + "Don't register a custom code step under that slug.");
+
+                codeStepRegistry.register(
+                        new CodeStepSpec<>(RetrieveCodeStep.SLUG, RetrieveCodeStep.DESCRIPTION,
+                                           RetrieveQuery.class, RetrieveOutput.class),
+                        new RetrieveCodeStep(vectorIndexRegistry));
+            }
+
             SkillRegistry sr = skillRegistry != null ? skillRegistry : new SkillRegistryMemory();
             sr.seed();
 
@@ -426,10 +470,10 @@ public class Agentican implements AutoCloseable {
             LOG.info(Logs.AGENTICAN_INIT,
                     llmClients.size(), toolkitRegistry.slugs().size(), ar.asMap().size(), pr.asMap().size());
 
-            var registry = new AgenticanRegistry(pr, ar, toolkitRegistry, sr);
+            var registry = new AgenticanRegistry(pr, ar, toolkitRegistry, sr, vectorIndexRegistry);
 
             return new Agentican(registry, taskPlanner, taskRunner, finalTss, hm,
-                    knowledgeIngestor, taskDecorator, tl, executor, ownsExecutor);
+                    knowledgeIngestor, taskDecorator, tl, executor, ownsExecutor, agentFactory);
         }
     }
 }

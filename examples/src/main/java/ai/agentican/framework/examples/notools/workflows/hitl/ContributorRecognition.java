@@ -1,10 +1,3 @@
-/**
- * Domain: Community / OSS
- * Tools: None
- * HITL: Question on the intermediate `categorize` step — the agent asks for
- *       the current quarter's recognition-tier criteria before categorizing,
- *       since criteria change quarter-to-quarter.
- */
 package ai.agentican.framework.examples.notools.workflows.hitl;
 
 import ai.agentican.framework.Agentican;

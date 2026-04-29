@@ -1,9 +1,3 @@
-/**
- * Domain: Marketing
- * Tools: None
- * HITL: Question via CLI — the brief intentionally omits the target audience,
- *       so the agent uses ASK_QUESTION to find out before writing copy.
- */
 package ai.agentican.framework.examples.notools.agents.hitl;
 
 import ai.agentican.framework.Agentican;

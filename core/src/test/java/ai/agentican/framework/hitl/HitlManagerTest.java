@@ -103,9 +103,6 @@ class HitlManagerTest {
     @Test
     void rehydrateRestoresCheckpointSoWaitingResumerReceivesResponse() throws Exception {
 
-        // Covers the SUSPENDED-step HITL resume path: after restart, rehydrate re-opens the
-        // pending future so a resumed step waiting on awaitResponse unblocks when respond()
-        // fires with the persisted approval.
         var manager = new HitlManager((mgr, cp) -> {});
 
         var checkpoint = new HitlCheckpoint("cp-rehydrated", HitlCheckpoint.Type.TOOL_CALL,
@@ -130,7 +127,6 @@ class HitlManagerTest {
     @Test
     void rehydrateRestoresCheckpointForRejectedStepOutput() throws Exception {
 
-        // Covers the rejected-STEP_OUTPUT HITL resume path.
         var manager = new HitlManager((mgr, cp) -> {});
 
         var checkpoint = new HitlCheckpoint("cp-reject", HitlCheckpoint.Type.STEP_OUTPUT,

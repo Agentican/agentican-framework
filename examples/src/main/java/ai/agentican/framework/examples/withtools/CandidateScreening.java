@@ -1,7 +1,3 @@
-/**
- * Domain: HR / Recruiting
- * Tools: Gmail (via Composio)
- */
 package ai.agentican.framework.examples.withtools;
 
 import ai.agentican.framework.Agentican;

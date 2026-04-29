@@ -25,13 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * One client for every provider that speaks the OpenAI Chat Completions wire format.
- * Covers hosted providers with a registered base URL (SambaNova, Together, Fireworks)
- * and the {@code openai-compatible} escape hatch for self-hosted endpoints
- * (Ollama, vLLM, LiteLLM, LocalAI, custom proxies) where the user supplies
- * {@link LlmConfig#baseUrl()} directly.
- */
 public class OpenAiCompatibleLlmClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenAiCompatibleLlmClient.class);

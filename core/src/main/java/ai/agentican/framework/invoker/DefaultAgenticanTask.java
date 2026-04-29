@@ -61,7 +61,7 @@ record DefaultAgenticanTask<P, R>(
     private static OutputBinding buildOutputBinding(String stepName, Class<?> outputType) {
 
         if (stepName == null || outputType == null || outputType == Void.class) return null;
-        if (outputType == String.class) return null;   // free-text expected
+        if (outputType == String.class) return null;
 
         var schema = SchemaGenerator.schemaFor(outputType);
 

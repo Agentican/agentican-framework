@@ -1,10 +1,3 @@
-/**
- * Domain: Leadership / Planning
- * Tools: None
- * HITL: Question via CLI — the team context is provided but the company's
- *       strategic priorities for the quarter are omitted, so the agent asks
- *       before drafting objectives that would otherwise drift.
- */
 package ai.agentican.framework.examples.notools.agents.hitl;
 
 import ai.agentican.framework.Agentican;

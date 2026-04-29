@@ -6,11 +6,6 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
-/**
- * Shared utility for {@link AgentTask} / {@link WorkflowTask} producers:
- * extracts the {@code <I, O>} type arguments from an injection point and
- * locates the qualifier annotation on it.
- */
 final class TaskTypeArgs {
 
     private TaskTypeArgs() {}

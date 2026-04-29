@@ -1,7 +1,3 @@
-/**
- * Domain: Engineering
- * Tools: None
- */
 package ai.agentican.framework.examples.notools.agents;
 
 import ai.agentican.framework.Agentican;

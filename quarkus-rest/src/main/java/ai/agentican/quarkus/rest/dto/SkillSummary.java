@@ -2,10 +2,21 @@ package ai.agentican.quarkus.rest.dto;
 
 import ai.agentican.framework.config.SkillConfig;
 
-public record SkillSummary(String id, String name, String instructions, String externalId) {
+public record SkillSummary(
 
-    public static SkillSummary of(SkillConfig skill) {
+        String id,
+        String name,
+        String instructions,
+        String externalId,
+        boolean declaredInConfig) {
 
-        return new SkillSummary(skill.id(), skill.name(), skill.instructions(), skill.externalId());
+    public static SkillSummary of(SkillConfig skill, boolean declaredInConfig) {
+
+        return new SkillSummary(
+                skill.id(),
+                skill.name(),
+                skill.instructions(),
+                skill.externalId(),
+                declaredInConfig);
     }
 }

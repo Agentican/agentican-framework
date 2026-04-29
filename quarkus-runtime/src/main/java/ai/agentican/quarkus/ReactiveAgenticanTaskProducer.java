@@ -8,11 +8,6 @@ import jakarta.enterprise.inject.Produces;
 import jakarta.enterprise.inject.spi.InjectionPoint;
 import jakarta.inject.Inject;
 
-/**
- * Reactive counterpart to {@link AgenticanTaskProducer}. Produces
- * {@link ReactiveAgenticanTask} beans for injection points qualified with
- * {@link AgentTask} or {@link WorkflowTask}.
- */
 @ApplicationScoped
 public class ReactiveAgenticanTaskProducer {
 

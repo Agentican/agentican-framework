@@ -124,4 +124,38 @@ public class JpaAgentRegistry implements AgentRegistry {
 
     @Override
     public Map<String, Agent> asMap() { return Collections.unmodifiableMap(byId); }
+
+    @Override
+    @Transactional
+    public void delete(String ref) {
+
+        var agent = resolve(ref);
+
+        if (agent == null) {
+            LOG.debug("delete('{}'): no agent registered under this ref", ref);
+            return;
+        }
+
+        var cfg = agent.config();
+
+        if (cfg.externalId() != null)
+            AgentEntity.delete("externalId", cfg.externalId());
+
+        byId.remove(agent.id());
+        idByName.remove(agent.name());
+        if (cfg.externalId() != null) idByExternalId.remove(cfg.externalId());
+
+        LOG.info("Agent '{}' (externalId={}) deleted from catalog", agent.name(), cfg.externalId());
+    }
+
+    private Agent resolve(String ref) {
+
+        var byExternal = getByExternalId(ref);
+        if (byExternal != null) return byExternal;
+
+        var byIdHit = byId.get(ref);
+        if (byIdHit != null) return byIdHit;
+
+        return getByName(ref);
+    }
 }

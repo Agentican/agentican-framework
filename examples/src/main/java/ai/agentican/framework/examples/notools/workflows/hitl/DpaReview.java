@@ -1,9 +1,3 @@
-/**
- * Domain: Legal / Compliance
- * Tools: None
- * HITL: Step approval on the intermediate `assess` step — legal reviews the
- *       compliance analyst's risk flags before redline positions are drafted.
- */
 package ai.agentican.framework.examples.notools.workflows.hitl;
 
 import ai.agentican.framework.Agentican;

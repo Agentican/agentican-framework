@@ -124,6 +124,40 @@ public class JpaPlanRegistry implements PlanRegistry {
     @Override
     public Map<String, Plan> asMap() { return Collections.unmodifiableMap(byId); }
 
+    @Override
+    @Transactional
+    public void delete(String ref) {
+
+        var plan = resolve(ref);
+
+        if (plan == null) {
+            LOG.debug("delete('{}'): no plan registered under this ref", ref);
+            return;
+        }
+
+        if (plan.externalId() != null)
+            PlanEntity.delete("externalId", plan.externalId());
+        else
+            PlanEntity.deleteById(plan.id());
+
+        byId.remove(plan.id());
+        idByName.remove(plan.name());
+        if (plan.externalId() != null) idByExternalId.remove(plan.externalId());
+
+        LOG.info("Plan '{}' (externalId={}) deleted from catalog", plan.name(), plan.externalId());
+    }
+
+    private Plan resolve(String ref) {
+
+        var byExt = getByExternalId(ref);
+        if (byExt != null) return byExt;
+
+        var byIdHit = byId.get(ref);
+        if (byIdHit != null) return byIdHit;
+
+        return get(ref);
+    }
+
     private Plan persistAndAlign(Plan plan) {
 
         if (plan.externalId() != null) {

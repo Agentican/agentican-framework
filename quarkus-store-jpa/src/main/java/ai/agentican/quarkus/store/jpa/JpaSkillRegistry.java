@@ -113,6 +113,40 @@ public class JpaSkillRegistry implements SkillRegistry {
     @Override
     public Map<String, SkillConfig> asMap() { return Collections.unmodifiableMap(byId); }
 
+    @Override
+    @Transactional
+    public void delete(String ref) {
+
+        var skill = resolve(ref);
+
+        if (skill == null) {
+            LOG.debug("delete('{}'): no skill registered under this ref", ref);
+            return;
+        }
+
+        if (skill.externalId() != null)
+            SkillEntity.delete("externalId", skill.externalId());
+        else
+            SkillEntity.deleteById(skill.id());
+
+        byId.remove(skill.id());
+        idByName.remove(skill.name());
+        if (skill.externalId() != null) idByExternalId.remove(skill.externalId());
+
+        LOG.info("Skill '{}' (externalId={}) deleted from catalog", skill.name(), skill.externalId());
+    }
+
+    private SkillConfig resolve(String ref) {
+
+        var byExternal = getByExternalId(ref);
+        if (byExternal != null) return byExternal;
+
+        var byIdHit = byId.get(ref);
+        if (byIdHit != null) return byIdHit;
+
+        return getByName(ref);
+    }
+
     private SkillConfig persistAndAlign(SkillConfig skill) {
 
         if (skill.externalId() != null) {

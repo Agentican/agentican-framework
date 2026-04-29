@@ -1,10 +1,3 @@
-/**
- * Domain: Sales / Deal Desk
- * Tools: None
- * HITL: Step approval via CLI — discount decisions bind the company to a
- *       margin impact, so a human signs off before the rep takes it back to
- *       the customer.
- */
 package ai.agentican.framework.examples.notools.agents.hitl;
 
 import ai.agentican.framework.Agentican;

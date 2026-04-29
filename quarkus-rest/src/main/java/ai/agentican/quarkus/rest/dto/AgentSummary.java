@@ -2,11 +2,23 @@ package ai.agentican.quarkus.rest.dto;
 
 import ai.agentican.framework.agent.Agent;
 
-public record AgentSummary(String id, String name, String role, String llm, String externalId) {
+public record AgentSummary(
 
-    public static AgentSummary of(Agent agent) {
+        String id,
+        String name,
+        String role,
+        String llm,
+        String externalId,
+        boolean declaredInConfig) {
 
-        return new AgentSummary(agent.id(), agent.name(), agent.role(),
-                agent.config().llm(), agent.config().externalId());
+    public static AgentSummary of(Agent agent, boolean declaredInConfig) {
+
+        return new AgentSummary(
+                agent.id(),
+                agent.name(),
+                agent.role(),
+                agent.config().llm(),
+                agent.config().externalId(),
+                declaredInConfig);
     }
 }

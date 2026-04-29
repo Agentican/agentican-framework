@@ -65,7 +65,6 @@ public class GeminiLlmClient {
 
         var hasNativeSchema = request.structuredOutput() != null;
 
-        // Native responseJsonSchema replaces prompt-steering when set.
         var systemContent = Content.fromParts(Part.fromText(
                 request.systemPrompt()));
         var userText = buildUserText(request);

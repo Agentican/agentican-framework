@@ -118,11 +118,6 @@ public class OpenAiLlmClient {
         return translate(response);
     }
 
-    /**
-     * OpenAI Responses API supports native {@code response_format: json_schema} on
-     * the {@code openai} provider. Groq's Responses adapter does not yet honor it
-     * reliably, so we keep prompt-steering for groq.
-     */
     private boolean nativeStructuredOutputSupported(LlmRequest request) {
 
         return request.structuredOutput() != null && "openai".equals(provider);
@@ -265,12 +260,6 @@ public class OpenAiLlmClient {
 
     private static final Tool GROQ_BROWSER_SEARCH_TOOL = buildRawTool("browser_search");
 
-    // Groq's Responses API supports a built-in tool named `browser_search`,
-    // but the OpenAI SDK has no typed variant for it (OpenAI's own API uses
-    // `web_search`). Constructing a Tool with raw JSON via reflection is the
-    // least-bad option — it's bounded to a single static initializer, and
-    // produces the same wire shape as the SDK's `Tool.ofLocalShell()` trick
-    // for its own generic JsonValue slot.
     private static Tool buildRawTool(String typeName) {
 
         try {

@@ -1,7 +1,3 @@
-/**
- * Domain: Any
- * Tools: None (the Planner invents agents and skills from the task description)
- */
 package ai.agentican.framework.examples.notools.workflows;
 
 import ai.agentican.framework.Agentican;

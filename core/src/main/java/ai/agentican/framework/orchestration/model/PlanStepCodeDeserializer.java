@@ -12,19 +12,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Registry-aware deserializer for {@link PlanStepCode}. Looks up the
- * registered {@link ai.agentican.framework.orchestration.code.CodeStepSpec}
- * by {@code codeSlug} to discover the typed input class, then deserializes
- * the {@code inputs} field into that type.
- *
- * <p>The {@code CodeStepRegistry} must be supplied via Jackson's
- * {@code InjectableValues} (see
- * {@code ai.agentican.framework.orchestration.model.PlanCodec}). If no
- * registry is injected, the deserializer falls back to leaving the inputs
- * as a {@link JsonNode} — useful for read-only callers that only need to
- * inspect a plan's structure.
- */
 public class PlanStepCodeDeserializer extends StdDeserializer<PlanStepCode<?>> {
 
     public PlanStepCodeDeserializer() {

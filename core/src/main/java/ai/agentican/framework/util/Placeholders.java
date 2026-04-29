@@ -70,8 +70,6 @@ public class Placeholders {
             try { parsed = mapper.readTree(value); }
             catch (JsonProcessingException _) { }
 
-            // Only unpack nested JSON structures — scalars stay as strings so a real
-            // String field of "5" doesn't silently become the number 5 in output.
             if (parsed != null && (parsed.isObject() || parsed.isArray()))
                 out.set(key, parsed);
             else
@@ -128,13 +126,6 @@ public class Placeholders {
         });
     }
 
-    /**
-     * Resolves {@code {{step.X.output}}} and {@code {{step.X.output.field}}}
-     * with raw substitution (no prompt-injection guard wrapping). Use this
-     * when the resolved value is consumed by deterministic code (e.g. inside
-     * a {@code PlanStepCode}'s typed input) rather than appearing in an LLM
-     * prompt.
-     */
     public static String resolveStepOutputsRaw(String text, Map<String, String> stepOutputs) {
 
         var afterFields = resolveStepOutputFields(text, stepOutputs);

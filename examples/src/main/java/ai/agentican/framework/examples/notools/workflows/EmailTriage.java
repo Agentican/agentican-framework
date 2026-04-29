@@ -1,7 +1,3 @@
-/**
- * Domain: Productivity
- * Tools: None
- */
 package ai.agentican.framework.examples.notools.workflows;
 
 import ai.agentican.framework.Agentican;

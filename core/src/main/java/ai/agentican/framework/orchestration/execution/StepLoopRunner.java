@@ -143,7 +143,7 @@ class StepLoopRunner {
                             resolveLoopBody(p.body(), item, params))).toList(),
                     s.defaultPath(), s.dependencies(), s.hitl());
 
-            case PlanStepCode<?> s -> s;  // code steps don't contain templated instructions to resolve
+            case PlanStepCode<?> s -> s;
         }).toList();
     }
 

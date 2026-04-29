@@ -1,10 +1,3 @@
-/**
- * Domain: Operations / IT
- * Tools: None
- * HITL: Step approval on the intermediate `plan` step — human signs off on
- *       the migration plan before the runbook author turns it into operator
- *       steps.
- */
 package ai.agentican.framework.examples.notools.workflows.hitl;
 
 import ai.agentican.framework.Agentican;

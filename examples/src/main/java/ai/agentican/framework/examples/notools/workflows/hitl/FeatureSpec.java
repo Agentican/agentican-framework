@@ -1,10 +1,3 @@
-/**
- * Domain: Product Management
- * Tools: None
- * HITL: Step approval on the intermediate `spec` step — the Product Manager
- *       drafts the feature spec and the human signs off before the Tech
- *       Lead breaks it into engineering tasks.
- */
 package ai.agentican.framework.examples.notools.workflows.hitl;
 
 import ai.agentican.framework.Agentican;

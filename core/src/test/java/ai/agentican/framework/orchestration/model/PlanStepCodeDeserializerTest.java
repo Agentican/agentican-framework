@@ -38,7 +38,6 @@ class PlanStepCodeDeserializerTest {
         assertEquals("http", deserStep.codeSlug());
         assertEquals(List.of("upstream"), deserStep.dependencies());
 
-        // Input typed as HttpInput because the codec injected the registry
         assertInstanceOf(HttpInput.class, deserStep.input());
         var typed = (HttpInput) deserStep.input();
         assertEquals("https://example.com", typed.url());
@@ -57,8 +56,7 @@ class PlanStepCodeDeserializerTest {
         var roundTripped = Json.readValue(json, Plan.class);
 
         var deserStep = (PlanStepCode<?>) roundTripped.steps().getFirst();
-        // Without the codec injecting the registry, the deserializer falls
-        // back to a JsonNode so plan structure can still be inspected.
+
         assertInstanceOf(JsonNode.class, deserStep.input());
         var node = (JsonNode) deserStep.input();
         assertEquals("https://example.com", node.get("url").asText());

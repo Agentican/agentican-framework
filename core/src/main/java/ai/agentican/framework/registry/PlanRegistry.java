@@ -22,4 +22,18 @@ public interface PlanRegistry {
     Map<String, Plan> asMap();
 
     default void seed() { }
+
+    default Plan getByExternalId(String externalId) {
+
+        if (externalId == null) return null;
+        for (var plan : getAll())
+            if (externalId.equals(plan.externalId())) return plan;
+        return null;
+    }
+
+    default void delete(String ref) {
+
+        throw new UnsupportedOperationException(
+                getClass().getSimpleName() + " is read-only; delete not supported");
+    }
 }

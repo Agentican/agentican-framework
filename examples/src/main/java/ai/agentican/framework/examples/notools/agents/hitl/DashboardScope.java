@@ -1,10 +1,3 @@
-/**
- * Domain: Data / Analytics
- * Tools: None
- * HITL: Question via CLI — the data domain and timeframe are provided, but
- *       the specific decisions the dashboard should support are intentionally
- *       missing, so the agent asks before scoping metrics.
- */
 package ai.agentican.framework.examples.notools.agents.hitl;
 
 import ai.agentican.framework.Agentican;

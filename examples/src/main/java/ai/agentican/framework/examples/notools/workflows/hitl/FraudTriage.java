@@ -1,10 +1,3 @@
-/**
- * Domain: Risk / Fraud
- * Tools: None
- * HITL: Question on the intermediate `classify` step — the agent asks for
- *       this week's active risk thresholds before classifying scored
- *       transactions, since thresholds change weekly with loss appetite.
- */
 package ai.agentican.framework.examples.notools.workflows.hitl;
 
 import ai.agentican.framework.Agentican;

@@ -1,7 +1,3 @@
-/**
- * Domain: Finance
- * Tools: Gmail, Slack (all via Composio)
- */
 package ai.agentican.framework.examples.withtools;
 
 import ai.agentican.framework.Agentican;

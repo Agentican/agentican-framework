@@ -1,9 +1,3 @@
-/**
- * Domain: Customer Success
- * Tools: None
- * HITL: Step approval via CLI — the refund decision is drafted by the agent
- *       and must be approved by a human before it is treated as final.
- */
 package ai.agentican.framework.examples.notools.agents.hitl;
 
 import ai.agentican.framework.Agentican;

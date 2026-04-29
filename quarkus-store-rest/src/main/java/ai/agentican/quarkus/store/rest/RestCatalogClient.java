@@ -18,10 +18,6 @@ import java.util.List;
 @RegisterRestClient(configKey = "agentican-catalog")
 public interface RestCatalogClient {
 
-    // Plans are returned as raw JSON (String) so the registry can
-    // deserialize with a PlanCodec-aware reader — code steps carry
-    // typed I inputs that need the CodeStepRegistry for reconstruction.
-
     @GET
     @Path("/plans")
     String listPlansJson();

@@ -13,7 +13,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public interface AgentRunner {
 
-
     AgentResult run(Agent agent, String task, String taskId, String stepId, String stepName, Duration timeout,
                     List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema);
 

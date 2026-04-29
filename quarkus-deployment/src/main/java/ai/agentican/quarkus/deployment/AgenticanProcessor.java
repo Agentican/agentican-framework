@@ -98,12 +98,6 @@ class AgenticanProcessor {
                 AgenticanReadinessCheck.class.getName());
     }
 
-    /**
-     * Validates {@code @AgentTask} and {@code @WorkflowTask} injection points at build
-     * time: warns when an {@code agent} or {@code skills} reference isn't declared in
-     * {@code agentican.agents} / {@code agentican.skills}. Missing plans are not
-     * checked — plans can be registered at runtime (YAML, DB hydration, programmatic).
-     */
     @BuildStep
     void validateTaskInjectionPoints(CombinedIndexBuildItem indexItem, AgenticanConfig config) {
 

@@ -1,10 +1,3 @@
-/**
- * Domain: HR / People Operations
- * Tools: None
- * HITL: Step approval via CLI — a promotion packet commits the company to
- *       new comp, a new level and a team announcement, so a human signs off
- *       before anything ships.
- */
 package ai.agentican.framework.examples.notools.agents.hitl;
 
 import ai.agentican.framework.Agentican;

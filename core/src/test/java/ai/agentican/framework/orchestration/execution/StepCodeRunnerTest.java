@@ -116,10 +116,6 @@ class StepCodeRunnerTest {
     @Test
     void downstreamAgentReadsOutputField() {
 
-        // The mock matches on a substring; if {{step.produce.output.body}} and
-        // .status resolve correctly, the agent's prompt will contain
-        // "body=hello world status=201" and the mock returns DONE. If
-        // resolution fails, no entry matches and the mock throws.
         var mockLlm = new MockLlmClient()
                 .onSend("body=hello world status=201", endTurn("DONE"));
 

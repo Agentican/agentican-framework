@@ -12,11 +12,6 @@ import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Produces {@link AgenticanTask} beans for injection points qualified with
- * {@link AgentTask} or {@link WorkflowTask}. Each method reads the annotation
- * from the injection point and delegates to the imperative builder.
- */
 @ApplicationScoped
 public class AgenticanTaskProducer {
 

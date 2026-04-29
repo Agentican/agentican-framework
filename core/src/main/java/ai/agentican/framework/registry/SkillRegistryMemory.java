@@ -69,4 +69,17 @@ public class SkillRegistryMemory implements SkillRegistry {
 
         return Collections.unmodifiableMap(byId);
     }
+
+    @Override
+    public void delete(String ref) {
+
+        var skill = getByExternalId(ref);
+        if (skill == null) skill = byId.get(ref);
+        if (skill == null) skill = byName.get(ref);
+
+        if (skill == null) return;
+
+        byId.remove(skill.id());
+        byName.remove(skill.name());
+    }
 }

@@ -1,11 +1,3 @@
-/**
- * Domain: Design / UX
- * Tools: None
- * HITL: Question on the intermediate `frame` step — the agent asks which
- *       product decision the synthesis is informing before framing the
- *       clusters, since the same clusters frame differently for different
- *       decisions.
- */
 package ai.agentican.framework.examples.notools.workflows.hitl;
 
 import ai.agentican.framework.Agentican;

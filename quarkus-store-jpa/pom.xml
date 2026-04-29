@@ -52,6 +52,11 @@
             <artifactId>quarkus-arc</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-scheduler</artifactId>
+        </dependency>
+
         <!-- H2 for unit tests (fast, no devservices) -->
         <dependency>
             <groupId>io.quarkus</groupId>

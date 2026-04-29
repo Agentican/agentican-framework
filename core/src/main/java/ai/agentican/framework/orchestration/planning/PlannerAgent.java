@@ -197,7 +197,7 @@ public class PlannerAgent {
                 case PlanStepAgent s -> tools.addAll(s.tools());
                 case PlanStepLoop s -> tools.addAll(collectToolNames(s.body()));
                 case PlanStepBranch s -> s.paths().forEach(p -> tools.addAll(collectToolNames(p.body())));
-                case PlanStepCode<?> s -> { /* code steps don't reference toolkit tools */ }
+                case PlanStepCode<?> s -> {  }
             }
         }
 
@@ -227,7 +227,7 @@ public class PlannerAgent {
                             p.body().stream().map(this::reconcileStep).toList())).toList(),
                     s.defaultPath(), s.dependencies(), s.hitl());
 
-            case PlanStepCode<?> s -> s;  // code steps reference a registered slug; nothing to reconcile
+            case PlanStepCode<?> s -> s;
         };
     }
 

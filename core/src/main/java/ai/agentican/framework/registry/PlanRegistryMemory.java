@@ -62,4 +62,17 @@ public class PlanRegistryMemory implements PlanRegistry {
 
         return Collections.unmodifiableMap(byName);
     }
+
+    @Override
+    public void delete(String ref) {
+
+        var plan = getByExternalId(ref);
+        if (plan == null) plan = byId.get(ref);
+        if (plan == null) plan = byName.get(ref);
+
+        if (plan == null) return;
+
+        byId.remove(plan.id());
+        byName.remove(plan.name());
+    }
 }

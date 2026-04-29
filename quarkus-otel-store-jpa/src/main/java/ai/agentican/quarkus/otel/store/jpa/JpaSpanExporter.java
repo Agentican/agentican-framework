@@ -74,10 +74,6 @@ public class JpaSpanExporter implements SpanExporter, SpanStore {
     @Transactional
     public List<SpanView> getByTaskId(String taskId) {
 
-        // Only the task and step spans carry the `agentican.task.id` attribute at write time —
-        // run/turn/llm/tool/hitl spans inherit their parent via OTel context propagation, not via
-        // a duplicated attribute. Resolve taskId → traceId first, then return every span in that
-        // trace so the waterfall includes all levels. Matches InMemorySpanExporter semantics.
         SpanEntity anchor = SpanEntity.find("taskId", taskId).firstResult();
         if (anchor == null) return List.of();
 

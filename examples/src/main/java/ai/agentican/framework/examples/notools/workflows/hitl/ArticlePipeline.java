@@ -1,11 +1,3 @@
-/**
- * Domain: Content / Editorial
- * Tools: None
- * HITL: Question on the intermediate `draft` step — the writer asks for
- *       audience and tone before drafting, since a developer article and an
- *       exec article can share the same outline but diverge on every
- *       paragraph.
- */
 package ai.agentican.framework.examples.notools.workflows.hitl;
 
 import ai.agentican.framework.Agentican;

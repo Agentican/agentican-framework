@@ -6,22 +6,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * A step in a {@link Plan} that runs a registered deterministic function
- * (no LLM round-trip). References a registered {@code CodeStepSpec} by
- * {@link #codeSlug()}; the runtime executor and {@code Class<I>} are
- * resolved via the framework's {@code CodeStepRegistry} at dispatch time.
- *
- * <p>Code steps have no turn-level granularity and always have
- * {@link #hitl()} of {@code false}. On crash recovery, interrupted code
- * steps re-run from scratch — developers are responsible for making their
- * functions idempotent or fast.
- *
- * <p>Deserialization is registry-aware: the custom
- * {@link PlanStepCodeDeserializer} consults a {@code CodeStepRegistry}
- * injected via Jackson's {@code InjectableValues} to resolve the slug to a
- * {@code Class<I>} and produce a typed input value.
- */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonDeserialize(using = PlanStepCodeDeserializer.class)
 public record PlanStepCode<I>(

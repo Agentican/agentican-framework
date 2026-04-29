@@ -18,7 +18,7 @@ public class KnowledgeToolkit implements Toolkit {
     private static final Tool RECALL_TOOL = new ToolRecord(
             TOOL_NAME,
             "Retrieve full details for one or more knowledge entries by id. Use this when an "
-                    + "entry in the knowledge base index looks relevant to your task — it returns "
+                    + "entry in the vector index index looks relevant to your task — it returns "
                     + "the entry's facts, descriptions, and tags so you can use them in your reasoning.",
             Map.of("entry_ids", Map.of(
                     "type", "array",

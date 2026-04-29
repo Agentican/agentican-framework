@@ -1,14 +1,31 @@
 package ai.agentican.quarkus.rest.resource;
 
 import ai.agentican.framework.Agentican;
+import ai.agentican.framework.orchestration.model.Plan;
+import ai.agentican.framework.orchestration.model.PlanValidator;
+import ai.agentican.framework.util.Ids;
+import ai.agentican.quarkus.audit.CatalogAuditLog;
 import ai.agentican.quarkus.rest.dto.PlanView;
+import ai.agentican.quarkus.rest.dto.UpsertPlanRequest;
+import ai.agentican.quarkus.rest.error.CatalogConflictException;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+
 import jakarta.inject.Inject;
+import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
 import java.util.List;
 
@@ -16,8 +33,17 @@ import java.util.List;
 @Produces(MediaType.APPLICATION_JSON)
 public class PlansResource {
 
+    private static final String APPLICATION_YAML = "application/yaml";
+    private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
+
     @Inject
     Agentican agentican;
+
+    @Inject
+    CatalogAuditLog audit;
+
+    @Inject
+    ObjectMapper objectMapper;
 
     @GET
     public List<PlanView> list() {
@@ -28,14 +54,152 @@ public class PlansResource {
     }
 
     @GET
-    @Path("/{planId}")
-    public PlanView get(@PathParam("planId") String planId) {
+    @Path("/{ref}")
+    public PlanView get(@PathParam("ref") String ref) {
 
-        var plan = agentican.registry().plans().getById(planId);
-
-        if (plan == null)
-            throw new NotFoundException("No plan definition with id: " + planId);
+        var plan = resolve(ref);
+        if (plan == null) throw new NotFoundException("No plan with id, externalId or name: " + ref);
 
         return PlanView.of(plan);
+    }
+
+    @POST
+    @Consumes({MediaType.APPLICATION_JSON, APPLICATION_YAML, "text/yaml", "application/x-yaml"})
+    public Response create(String body, @HeaderParam("Content-Type") String contentType) {
+
+        var request = parseBody(body, contentType);
+        var plan = extractPlan(request);
+
+        if (plan.externalId() == null || plan.externalId().isBlank())
+            throw new BadRequestException("plan.externalId is required for UI-authored plans");
+
+        if (agentican.registry().plans().getByExternalId(plan.externalId()) != null)
+            throw new CatalogConflictException("already_exists",
+                    "Plan with externalId '" + plan.externalId() + "' already exists");
+
+        var issues = PlanValidator.validate(plan,
+                agentican.registry().agents(), agentican.registry().skills());
+        if (!issues.isEmpty())
+            throw new CatalogConflictException("invalid_plan",
+                    "Plan failed validation: " + issues.size() + " issue(s)", issues);
+
+        var saved = agentican.registry().plans().register(plan);
+        audit.record(CatalogAuditLog.PLAN, saved.externalId(), CatalogAuditLog.CREATED,
+                null, null, toJson(saved));
+
+        return Response.status(Response.Status.CREATED)
+                .entity(PlanView.of(saved))
+                .build();
+    }
+
+    @PUT
+    @Path("/{ref}")
+    @Consumes({MediaType.APPLICATION_JSON, APPLICATION_YAML, "text/yaml", "application/x-yaml"})
+    public PlanView update(@PathParam("ref") String ref, String body,
+                            @HeaderParam("Content-Type") String contentType) {
+
+        var existing = resolve(ref);
+        if (existing == null) throw new NotFoundException("No plan with id, externalId or name: " + ref);
+
+        var request = parseBody(body, contentType);
+        var incoming = extractPlan(request);
+
+        var aligned = new Plan(
+                existing.id(),
+                incoming.name() != null ? incoming.name() : existing.name(),
+                incoming.description() != null ? incoming.description() : existing.description(),
+                incoming.params() != null ? incoming.params() : existing.params(),
+                incoming.steps() != null ? incoming.steps() : existing.steps(),
+                existing.externalId(),
+                incoming.outputStep() != null ? incoming.outputStep() : existing.outputStep());
+
+        var issues = PlanValidator.validate(aligned,
+                agentican.registry().agents(), agentican.registry().skills());
+        if (!issues.isEmpty())
+            throw new CatalogConflictException("invalid_plan",
+                    "Plan failed validation: " + issues.size() + " issue(s)", issues);
+
+        var beforeJson = toJson(existing);
+        var saved = agentican.registry().plans().register(aligned);
+
+        audit.record(CatalogAuditLog.PLAN,
+                saved.externalId() != null ? saved.externalId() : saved.id(),
+                CatalogAuditLog.UPDATED, null, beforeJson, toJson(saved));
+
+        return PlanView.of(saved);
+    }
+
+    @DELETE
+    @Path("/{ref}")
+    public Response delete(@PathParam("ref") String ref) {
+
+        var existing = resolve(ref);
+        if (existing == null) throw new NotFoundException("No plan with id, externalId or name: " + ref);
+
+        var beforeJson = toJson(existing);
+
+        agentican.registry().plans().delete(ref);
+
+        audit.record(CatalogAuditLog.PLAN,
+                existing.externalId() != null ? existing.externalId() : existing.id(),
+                CatalogAuditLog.DELETED, null, beforeJson, null);
+
+        return Response.noContent().build();
+    }
+
+    private String toJson(Object value) {
+
+        try {
+            return objectMapper.writeValueAsString(value);
+        }
+        catch (Exception e) {
+            return null;
+        }
+    }
+
+    private UpsertPlanRequest parseBody(String body, String contentType) {
+
+        if (body == null || body.isBlank())
+            throw new BadRequestException("Request body is empty");
+
+        var mapper = isYaml(contentType) ? YAML : objectMapper;
+        try {
+            return mapper.readValue(body, UpsertPlanRequest.class);
+        }
+        catch (Exception e) {
+            throw new BadRequestException("Failed to parse " + (isYaml(contentType) ? "YAML" : "JSON")
+                    + " body: " + e.getMessage());
+        }
+    }
+
+    private static boolean isYaml(String contentType) {
+
+        if (contentType == null) return false;
+        return contentType.toLowerCase().contains("yaml");
+    }
+
+    private Plan resolve(String ref) {
+
+        var plans = agentican.registry().plans();
+
+        var byExt = plans.getByExternalId(ref);
+        if (byExt != null) return byExt;
+
+        var byId = plans.getById(ref);
+        if (byId != null) return byId;
+
+        return plans.get(ref);
+    }
+
+    private static Plan extractPlan(UpsertPlanRequest request) {
+
+        if (request == null || request.plan() == null)
+            throw new BadRequestException("plan is required");
+
+        var src = request.plan();
+        var id = (src.id() == null || src.id().isBlank()) ? Ids.generate() : src.id();
+
+        return new Plan(id, src.name(), src.description(), src.params(), src.steps(),
+                src.externalId(), src.outputStep());
     }
 }

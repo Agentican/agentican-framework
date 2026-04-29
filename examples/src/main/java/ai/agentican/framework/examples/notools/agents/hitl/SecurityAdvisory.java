@@ -1,11 +1,3 @@
-/**
- * Domain: Security
- * Tools: None
- * HITL: Question via CLI — the vulnerability facts are complete, but the
- *       coordination state (patch availability, legal signoff, send time) is
- *       omitted on purpose, so the agent asks before drafting copy that might
- *       ship prematurely.
- */
 package ai.agentican.framework.examples.notools.agents.hitl;
 
 import ai.agentican.framework.Agentican;

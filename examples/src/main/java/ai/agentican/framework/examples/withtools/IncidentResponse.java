@@ -1,7 +1,3 @@
-/**
- * Domain: Operations / SRE
- * Tools: Slack, Linear, GitHub (all via Composio)
- */
 package ai.agentican.framework.examples.withtools;
 
 import ai.agentican.framework.Agentican;

@@ -1,7 +1,3 @@
-/**
- * Domain: Customer Success
- * Tools: HubSpot, Gmail, Google Calendar, Slack (all via Composio)
- */
 package ai.agentican.framework.examples.withtools;
 
 import ai.agentican.framework.Agentican;

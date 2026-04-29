@@ -1,7 +1,3 @@
-/**
- * Domain: Sales
- * Tools: HubSpot, Gmail (all via Composio)
- */
 package ai.agentican.framework.examples.withtools;
 
 import ai.agentican.framework.Agentican;

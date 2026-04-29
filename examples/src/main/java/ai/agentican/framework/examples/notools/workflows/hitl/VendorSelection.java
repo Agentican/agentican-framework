@@ -1,9 +1,3 @@
-/**
- * Domain: Procurement
- * Tools: None
- * HITL: Step approval on the intermediate `rank` step — the procurement lead's
- *       scoring is signed off before the selection memo names a winner.
- */
 package ai.agentican.framework.examples.notools.workflows.hitl;
 
 import ai.agentican.framework.Agentican;

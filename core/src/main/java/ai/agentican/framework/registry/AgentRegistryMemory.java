@@ -55,4 +55,17 @@ public class AgentRegistryMemory implements AgentRegistry {
 
         return Collections.unmodifiableMap(byId);
     }
+
+    @Override
+    public void delete(String ref) {
+
+        var agent = getByExternalId(ref);
+        if (agent == null) agent = byId.get(ref);
+        if (agent == null) agent = byName.get(ref);
+
+        if (agent == null) return;
+
+        byId.remove(agent.id());
+        byName.remove(agent.name());
+    }
 }
