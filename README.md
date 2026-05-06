@@ -12,11 +12,13 @@ Describe a task in natural language and the built-in Planner breaks it into a st
 
 ```java
 try (var agentican = Agentican.builder()
-        .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+        .configuration().api()
+            .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+            .end()
         .build()) {
 
-    var task = agentican.run("Research the top 5 CDC tools and compare them");
-    System.out.println(task.result().output());
+    var run = agentican.run("Research the top 5 CDC tools and compare them");
+    System.out.println(run.await());
 }
 ```
 
@@ -107,19 +109,19 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 ### Core framework (`agentican-framework-core`)
 
 - **`Agentican`** — main entry point with builder API
-- **`Agentican<P, R>`** — typed invoker bound to a plan: turns typed params (`P`) into a `TaskHandle` with a typed structured result (`R`), enforced on the plan's `outputStep` via native provider JSON-schema modes
+- **`Workflow<P, R>`** — typed handle bound to a `WorkflowDefinition`: turns typed params (`P`) into a `WorkflowRun<R>` with a typed structured result (`R`), enforced on the definition's `outputStep` via native provider JSON-schema modes
 - **`AgenticanRecovery`** — crash-recovery helper for resuming interrupted tasks after a restart
-- **`AgenticanRegistry`** — read-only view over registered plans, agents, toolkits, and skills
-- **`Plan` / `PlanStep`** — declarative workflow model (agent steps, loops, branches, typed code steps)
-- **`PlanConfig`** — fluent builder for plans with `step()`, `loop()`, `branch()`, `codeStep()`, `outputStep()`
-- **`CodeStep<I, O>` / `CodeStepSpec<I, O>`** — register typed Java functions as plan steps (no LLM round-trip)
+- **`AgenticanRegistry`** — read-only view over registered workflows, agents, toolkits, skills, and vector indexes
+- **`WorkflowDefinition` / `WorkflowStep`** — declarative workflow model (agent steps, loops, branches, typed code steps)
+- **`WorkflowConfig`** — fluent builder for workflows with `step()`, `loop()`, `branch()`, `codeStep()`, `outputStep()`
+- **`CodeStep<I, O>` / `CodeStepSpec<I, O>`** — register typed Java functions as workflow steps (no LLM round-trip)
 - **`Agent` / `AgentRunner`** — agent abstraction with pluggable runners
 - **`SmacAgentRunner`** — production agent loop with tool calling, HITL and knowledge
-- **`PlannerAgent`** — LLM planner that creates agents, skills and plans from natural language
+- **`WorkflowPlannerAgent`** — LLM planner that creates agents, skills and workflows from natural language
 - **`Toolkit`** — pluggable tool provider interface
 - **`HitlManager`** — checkpoint-based human-in-the-loop (tool approval, step approval, questions)
 - **`KnowledgeStore`** — persistent facts with LLM-driven extraction and `RECALL_KNOWLEDGE` tool
-- **`TaskStateStore`** — durable execution state (task → step → run → turn → tool call)
+- **`WorkflowRunStore`** — durable execution state (task → step → run → turn → tool call)
 - **LLM providers**: Anthropic Claude, OpenAI (Responses API), Groq, Google Gemini, AWS Bedrock (Converse API — Claude / Llama / Nova / Mistral / Cohere / DeepSeek / AI21), SambaNova, Together, Fireworks, plus an `openai-compatible` escape hatch for Ollama / vLLM / LiteLLM / corporate proxies
 - **Tool integrations**: Composio (100+ SaaS), Model Context Protocol (MCP)
 
@@ -147,13 +149,13 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 
 - [Getting Started](docs/getting-started.md) — install, configure and run your first task
 - [Core Concepts](docs/concepts.md) — architecture, terminology, data flow
-- [Plans & Steps](docs/tasks.md) — workflow modeling with agents, loops, branches, and typed code steps
+- [Workflows & Steps](docs/tasks.md) — workflow modeling with agents, loops, branches, and typed code steps
 - [Agents](docs/agents.md) — defining agents, skills and roles
 - [Tools & Toolkits](docs/tools.md) — built-in toolkits, Composio, MCP, custom tools
 - [Human in the Loop](docs/hitl.md) — approvals, questions and resumption
 - [Knowledge](docs/knowledge.md) — persistent agent knowledge with facts and recall
-- [Execution State](docs/execution.md) — TaskLog hierarchy, TaskStateStore, querying results
-- [Observability](docs/observability.md) — TaskListener events, TaskDecorator, context propagation
+- [Execution State](docs/execution.md) — WorkflowRunLog hierarchy, WorkflowRunStore, querying results
+- [Observability](docs/observability.md) — WorkflowRunListener events, WorkflowRunDecorator, context propagation
 - [Configuration](docs/configuration.md) — runtime config reference
 - [Examples](docs/examples.md) — common patterns and recipes
 

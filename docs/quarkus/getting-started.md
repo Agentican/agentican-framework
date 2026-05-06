@@ -177,9 +177,8 @@ public class MyService {
     @Inject Agentican agentican;
 
     public String research(String topic) {
-        var handle = agentican.run("Research " + topic + " and summarize findings");
-        var result = handle.result(); // blocks until complete
-        return result.lastOutput();
+        var run = agentican.run("Research " + topic + " and summarize findings");
+        return run.await(); // blocks until complete; returns the typed String output
     }
 }
 ```
@@ -193,8 +192,7 @@ public class MyService {
     @Inject ReactiveAgentican agentican;
 
     public Uni<String> research(String topic) {
-        return agentican.runAndAwait("Research " + topic)
-            .onItem().transform(TaskResult::lastOutput);
+        return agentican.runAndAwait("Research " + topic);
     }
 }
 ```

@@ -10,11 +10,11 @@ end-to-end from a single `main()`.
 ```
 examples/src/main/java/ai/agentican/framework/examples/
 ├── notools/
-│   ├── agents/              ← single-agent tasks (agentTask)
+│   ├── agents/              ← single-agent tasks (agentican.task(...))
 │   │   └── hitl/            ← single-agent + human-in-the-loop
-│   └── workflows/           ← multi-step plans (workflowTask)
+│   └── workflows/           ← multi-step workflows (agentican.workflow(...))
 │       └── hitl/            ← multi-step + HITL on an intermediate step
-└── withtools/               ← plans that call external tools via Composio
+└── withtools/               ← workflows that call external tools via Composio
 ```
 
 The layout is a progressive-disclosure path:

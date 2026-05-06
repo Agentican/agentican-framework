@@ -29,7 +29,7 @@ try (var agentican = Agentican.builder()
 }
 ```
 
-No agents, skills, or plans registered — the built-in `PlannerAgent` creates them from the task description. For declarative workflows, use the `PlanConfig` builder (loops, branches, typed code steps, HITL checkpoints, parallel steps).
+No agents, skills, or plans registered — the built-in `PlannerAgent` creates them from the task description. For declarative workflows, use the `WorkflowConfig` builder (loops, branches, typed code steps, HITL checkpoints, parallel steps).
 
 ## What's in the box
 
@@ -37,21 +37,22 @@ Everything is under `ai.agentican.framework.*`.
 
 **Entry point**
 - `Agentican` — orchestrator, `AutoCloseable`; fluent builder for decorators, listeners, registries, and state stores.
-- `invoker.Agentican<P, R>` — typed invoker bound to a plan: turns typed params (`P`) into a `TaskHandle` with a typed result (`R`). Structured output on the plan's designated step is enforced via native provider JSON-schema modes.
-- `invoker.AgenticanRegistry` — read-only view over `plans()`, `agents()`, `toolkits()`, `skills()`.
+- `Workflow<P, R>` — typed handle bound to a `WorkflowDefinition`: turns typed params (`P`) into a `WorkflowRun<R>` with a typed result (`R`). Structured output on the workflow's designated `outputStep` is enforced via native provider JSON-schema modes.
+- `WorkflowBuilder` — three modes: pre-resolved (`agentican.workflow(definition)`), registry-by-name (`agentican.workflow("name")`), inline DSL (`.step()` / `.loop()` / `.branch()` chained off the builder).
+- `TaskBuilder` — single-step ad-hoc workflow construction via `agentican.task("name").agent(...).instructions(...)`.
+- `AgenticanRegistry` — read-only view over `workflows()`, `agents()`, `toolkits()`, `skills()`, `indexes()`.
 - `AgenticanRecovery` — crash-recovery helper: `resumeInterrupted()` / `reapOrphans()` pick up tasks left in flight after a restart.
 
 **Orchestration model** (`orchestration`)
-- `Plan`, `PlanStep`, `PlanStepAgent`, `PlanStepBranch`, `PlanStepLoop`, `PlanStepCode<I>` — the declarative workflow AST.
-- `PlanConfig` — fluent builder with `step()`, `loop()`, `branch()`, `codeStep()` sub-builders.
+- `WorkflowDefinition`, `WorkflowStep`, `WorkflowStepAgent`, `WorkflowStepBranch`, `WorkflowStepLoop`, `WorkflowStepCode<I>` — the declarative workflow AST.
+- `WorkflowConfig` — fluent builder with `step()`, `loop()`, `branch()`, `codeStep()` sub-builders.
 - `CodeStep<I, O>`, `CodeStepSpec<I, O>`, `CodeStepRegistry`, `StepContext` — typed deterministic Java steps registered against the builder; Jackson handles I/O ser/deser at the boundaries.
-- `PlanCodec` — registry-aware Jackson reader for plan deserialization (resolves `codeSlug` → `Class<I>`).
-- `PlannerAgent` — LLM-driven planner that manufactures agents, skills, and plans from natural language.
-- `TaskRunner`, `TaskHandle`, `TaskStatus` — execution primitives.
+- `WorkflowPlannerAgent` — LLM-driven planner that manufactures agents, skills, and workflows from natural language. Returns `WorkflowPlan(WorkflowDefinition, Map<String,String> inputs)`.
+- `WorkflowRunner`, `WorkflowRun`, `WorkflowRunStatus`, `WorkflowRunResult` — execution primitives.
 
 **Agents & skills** (`agent`, `skill`)
 - `Agent`, `AgentRunner`, `SmacAgentRunner` — agent abstraction and the production tool-calling loop.
-- `registry.AgentRegistry`, `registry.SkillRegistry`, `registry.PlanRegistry` — pluggable in-memory implementations included; swap for persistent registries via the builder.
+- `registry.AgentRegistry`, `registry.SkillRegistry`, `registry.WorkflowRegistry` — pluggable in-memory implementations included; swap for persistent registries via the Builder.
 
 **LLM clients** (`llm`)
 - `LlmClient` — single SPI; one `send(LlmRequest)` call per provider.
@@ -72,16 +73,16 @@ Everything is under `ai.agentican.framework.*`.
 - `store.KnowledgeStore`, `store.KnowledgeStoreMemory`, `knowledge.KnowledgeIngestor`, `knowledge.LlmKnowledgeExtractor` — persistent agent facts + `RECALL_KNOWLEDGE` tool.
 
 **State** (`store`, `orchestration.execution`)
-- `store.TaskStateStore`, `store.TaskStateStoreMemory`, `orchestration.execution.TaskStateStoreNotifying` — the durable record of every task → step → run → turn → tool call.
+- `store.WorkflowRunStore`, `store.InMemoryWfRunStore`, `orchestration.execution.NotifyingWfRunStore` — the durable record of every task → step → run → turn → tool call.
 
 **Config** (`config`) — plain records, all builder-based:
-- `RuntimeConfig` · `LlmConfig` · `AgentConfig` · `SkillConfig` · `PlanConfig` · `McpConfig` · `ComposioConfig` · `WorkerConfig`
+- `RuntimeConfig` · `LlmConfig` · `AgentConfig` · `SkillConfig` · `WorkflowConfig` · `McpConfig` · `ComposioConfig` · `WorkerConfig`
 
 ## Runtime characteristics
 
 - **Virtual threads** — task execution defaults to `Executors.newVirtualThreadPerTaskExecutor()`. Parks during HITL without tying up platform threads.
-- **Resumable** — `new AgenticanRecovery(runtime).resumeInterrupted()` / `.reapOrphans()` pick up tasks left in flight after a restart at turn-boundary granularity (pair with a persistent `TaskStateStore`). The Quarkus runtime exposes `AgenticanRecovery` as a CDI bean and runs it on `StartupEvent`.
-- **Observable** — plug in `TaskListener`s and `TaskDecorator`s via the builder; the Quarkus metrics / OTel modules are built on exactly these hooks.
+- **Resumable** — `agentican.recovery().resumeInterrupted()` / `.reapOrphans()` pick up tasks left in flight after a restart at turn-boundary granularity (pair with a persistent `WorkflowRunStore`). The Quarkus runtime exposes `AgenticanRecovery` as a CDI bean and runs it on `StartupEvent`.
+- **Observable** — plug in `WorkflowRunListener`s and `WorkflowRunDecorator`s via the builder; the Quarkus metrics / OTel modules are built on exactly these hooks.
 
 ## When to reach for a peer module instead
 

@@ -13,10 +13,10 @@ executing thread so implementations can maintain thread-local state (e.g. OTel s
 public interface StepListener {
     // Task level
     default void onTaskStarted(String taskId, String taskName) {}
-    default void onTaskCompleted(String taskId, String taskName, TaskStatus status) {}
+    default void onTaskCompleted(String taskId, String taskName, WorkflowRunStatus status) {}
     // Step level
     default void onStepStarted(String taskId, String stepName) {}
-    default void onStepCompleted(String taskId, String stepName, TaskStatus status) {}
+    default void onStepCompleted(String taskId, String stepName, WorkflowRunStatus status) {}
     // HITL
     default void onHitlCheckpoint(String taskId, String stepName, HitlCheckpoint checkpoint) {}
     // Run level

@@ -112,7 +112,7 @@ The agent receives `{"question": "...", "answer": "Pacific Time"}` as the tool r
 Mark a task step with `hitl=true` to require approval after the step completes:
 
 ```java
-PlanStepAgent.builder("draft-email")
+WorkflowStepAgent.builder("draft-email")
     .agent("writer")
     .instructions("Draft a polite follow-up email")
     .hitl(true)  // ← human approval required after this step
@@ -137,7 +137,7 @@ A previous attempt at this step was rejected by the reviewer. Please address the
 </reviewer-feedback>
 ```
 
-After the configured max retries (default 3, configurable via `WorkerConfig.maxStepRetries()`), the step fails. Individual steps can override this with `PlanStepAgent.builder().maxRetries(5)`.
+After the configured max retries (default 3, configurable via `WorkerConfig.maxStepRetries()`), the step fails. Individual steps can override this with `WorkflowStepAgent.builder().maxRetries(5)`.
 
 ## HitlCheckpoint
 

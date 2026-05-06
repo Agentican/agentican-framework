@@ -32,7 +32,7 @@ class MyTest {
     void plansAndRuns() {
         llm.queueEndTurn("done");
         var handle = agentican.run("say hello");
-        assertThat(handle.result().status()).isEqualTo(TaskStatus.COMPLETED);
+        assertThat(handle.result().status()).isEqualTo(WorkflowRunStatus.COMPLETED);
     }
 }
 ```
@@ -47,7 +47,7 @@ If the queue is empty, `send()` returns `"[mock: no queued response]"` with `END
 
 ## `TestTaskBuilder`
 
-Two static helpers for building `Plan` objects in tests without wiring the full `PlanConfig` DSL.
+Two static helpers for building `Plan` objects in tests without wiring the full `WorkflowConfig` DSL.
 
 ```java
 Plan single = TestTaskBuilder.singleStep("t1", "researcher", "find X");

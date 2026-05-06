@@ -6,21 +6,22 @@ This page explains the core abstractions in Agentican and how they fit together.
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                       Agentican                     │
+│                          Agentican                          │
 └───┬──────────────┬──────────────┬────────────┬─────────────┘
     │              │              │            │
     ▼              ▼              ▼            ▼
 ┌──────────┐ ┌────────────┐ ┌────────────┐ ┌────────────────┐
-│ Planner  │ │TaskRunner  │ │ Registries │ │TaskStateStore  │
-│  Agent   │ │            │ │ (Agent /   │ │                │
-│          │ │            │ │  Skill /   │ │                │
-│          │ │            │ │  Plan)     │ │                │
+│Workflow  │ │WorkflowRunner│ │AgenticanRegistry│ │WorkflowRunStore│
+│Planner   │ │              │ │ (Agent /        │ │                │
+│Agent     │ │              │ │  Skill /        │ │                │
+│          │ │              │ │  Workflow)      │ │                │
 └────┬─────┘ └─────┬──────┘ └─────┬──────┘ └────────────────┘
      │             │              │
      │             ▼              │
      │   ┌─────────────────────┐  │
      │   │ StepRunners         │  │
-     │   │  Agent/Loop/Branch  │  │
+     │   │ Agent/Loop/Branch/  │  │
+     │   │ Code                │  │
      │   └──────────┬──────────┘  │
      │              ▼             │
      │   ┌─────────────────────┐  │
@@ -44,76 +45,74 @@ This page explains the core abstractions in Agentican and how they fit together.
 
 ### Agentican
 
-The main entry point. Owns the runtime configuration, registries, planner, and task runner. Build it with `Agentican.builder()` and use it via `run(String)` or `run(Plan)`.
+The main entry point. Owns the runtime configuration, registries, planner, and workflow runner. Build it with `Agentican.builder()` and use it via `run(String description)`, `workflow(...)`, or `task(...)`.
 
 ```java
-try (var runtime = Agentican.builder()
-        .llm(LlmConfig.builder().apiKey(apiKey).build())
+try (var agentican = Agentican.builder()
+        .configuration().api()
+            .llm(LlmConfig.builder().apiKey(apiKey).build())
+            .end()
         .build()) {
 
-    var handle = runtime.run("Do something useful");
+    var run = agentican.run("Do something useful");
 
-    var result = handle.result();
+    var output = run.await();
 }
 ```
 
 `Agentican` is `AutoCloseable` — close it to release the virtual thread executor and any toolkits that hold resources.
 
-At `build()` time, the framework validates that every `AgentConfig`, `SkillConfig`, and `PlanConfig` supplied via the config file or the fluent builder declares an `externalId`. See [External IDs](#external-ids) below.
+### Workflow&lt;P, R&gt;
 
-### Agentican&lt;P, R&gt;
-
-A typed, reusable caller bound to a specific plan. `Agentican<P, R>` is the dev-facing injectable: you hand it a typed params record `P`, it runs the bound plan as a task, and (optionally) deserializes the plan's output into a typed `R`.
+A typed, reusable handle bound to a specific `WorkflowDefinition`. `Workflow<P, R>` is the dev-facing handle: you hand it a typed params record `P`, it runs the bound workflow, and (optionally) deserializes the workflow's `outputStep` output into a typed `R`.
 
 ```java
 record TriageParams(String customerId, String priority) {}
 record TriageOutput(String classification, String reason) {}
 
-// Plain Java — capture a Plan reference
-Agentican<TriageParams, TriageOutput> triage =
-        runtime.agentican(plan)
+// Plain Java — capture a WorkflowDefinition reference
+Workflow<TriageParams, TriageOutput> triage =
+        agentican.workflow(definition)
                 .input(TriageParams.class)
                 .output(TriageOutput.class)
                 .build();
 
-// Or resolve by plan name (picks up runtime-registered plans)
-Agentican<TriageParams, TriageOutput> triage =
-        runtime.agentican("triage")
+// Or resolve by workflow name (must already be registered)
+Workflow<TriageParams, TriageOutput> triage =
+        agentican.workflow("triage")
                 .input(TriageParams.class)
                 .output(TriageOutput.class)
                 .build();
 
 // Run with typed in + typed out
-TriageOutput out = triage.runAndAwait(new TriageParams("cust-42", "HIGH"));
+TriageOutput out = triage.start(new TriageParams("cust-42", "HIGH")).await();
 
-// Or get the raw TaskHandle for taskId / cancellation
-TaskHandle handle = triage.run(new TriageParams("cust-42", "HIGH"));
+// Or get the full execution struct (status, step outputs, token usage)
+WorkflowRunResult result = triage.start(new TriageParams("cust-42", "HIGH")).untypedResult();
 ```
 
 Use `Void` for either type parameter when no inputs or no typed output is needed:
 
-- `Agentican<P, Void>` — typed inputs, untyped output. `awaitTaskResult(params)` returns the raw `TaskResult`.
-- `Agentican<Void, R>` — parameterless plan, typed output. `runAndAwait()` (no args) parses the output.
-- `Agentican<Void, Void>` — both untyped.
+- `Workflow<P, Void>` — typed inputs, untyped output. `start(params).untypedResult()` returns the raw `WorkflowRunResult`.
+- `Workflow<Void, R>` — parameterless workflow, typed output. `start().await()` (no args) parses the output.
+- `Workflow<Void, Void>` — both untyped.
 
-Two factory forms on `Agentican`, each returning the same progressive-typing builder:
+Two factory forms on `Agentican`:
 
-- **`runtime.agentican(Plan)`** — captures the Plan reference. No per-invoke lookup; plan mutations are invisible.
-- **`runtime.agentican(String planName)`** — resolves by name in the `PlanRegistry` on each invocation.
+- **`agentican.workflow(WorkflowDefinition)`** — captures the definition reference directly. No registry lookup.
+- **`agentican.workflow(String name)`** — resolves by name in the `WorkflowRegistry` at `build()` time. Throws if the name isn't registered.
 
-Chain `.input(P.class)` (required), then `.output(R.class)` (optional; defaults to `Void`), then `.build()` to get `Agentican<P, R>`.
-
-The plan name is the runtime lookup key — any plan in the registry qualifies regardless of source (YAML, fluent builder, JPA catalog, planner output, programmatic registration). `externalId` is persistence-dedup metadata and is not used for invoker binding.
+Chain `.input(P.class)` (required), then `.output(R.class)` (optional; defaults to `Void`), then `.build()` to get `Workflow<P, R>`. The output step and structured-output binding are computed once in the `Workflow` constructor — `start()` is just dispatch.
 
 **Params** are converted via Jackson with `SNAKE_CASE` naming, so `TriageParams.customerId` maps to plan param `customer_id`. Nested objects/collections JSON-serialize into strings.
 
 **Typed output** comes from the plan's *output step*. For single-step plans, that step is implicit. For multi-step plans, declare it on the builder:
 
 ```java
-Plan.builder("triage")
+WorkflowDefinition.builder("triage")
     .outputStep("classify")     // ← which step's output IS the plan's output
     .step(...)
-    .step(PlanStepAgent.builder("classify").agent("triage")
+    .step(WorkflowStepAgent.builder("classify").agent("triage")
             .instructions("Respond with JSON: {classification, reason}")
             .build())
     .build();
@@ -121,70 +120,70 @@ Plan.builder("triage")
 
 The output step's text output is parsed via Jackson into `R` at the boundary. The framework generates a JSON Schema from `R` and attaches it to that step's LLM requests via the provider's native structured-output mode — Anthropic `output_config.format`, OpenAI `response_format: json_schema (strict)`, Gemini `responseJsonSchema`, and passthrough `response_format` for OpenAI-compatible endpoints — so the model is constrained to emit conformant JSON, not just steered toward it.
 
-Failure modes:
-- Task didn't complete → `TaskFailedException` (carries the `TaskResult`).
-- Output step produced text that doesn't match `R` → `OutputParseException` (carries the raw output and target class).
+Failure modes from `await()`:
+- Run didn't complete → `WorkflowOutputException` (carries the failed `WorkflowRunResult`).
+- Output step produced text that doesn't match `R` → `WorkflowOutputException` (carries the raw output and target class).
 
-In Quarkus, inject by plan name with both type parameters:
+In Quarkus, inject by workflow name with both type parameters:
 
 ```java
-@Inject @AgenticanPlan("triage")
-Agentican<TriageParams, TriageOutput> triage;
+@Inject @Workflow(name = "triage")
+Workflow<TriageParams, TriageOutput> triage;
 ```
 
 ### AgenticanRecovery
 
-A separate, server-oriented companion to `Agentican` that owns the recovery surface — `resumeInterrupted(...)` and `reapOrphans(...)`. Construct it by composing onto a runtime:
+A server-oriented companion to `Agentican` that owns the recovery surface — `resumeInterrupted(...)` and `reapOrphans(...)`. Obtain one from `agentican.recovery()`:
 
 ```java
-try (var runtime = Agentican.builder()...build();
-     var recovery = new AgenticanRecovery(runtime)) {
+try (var agentican = Agentican.builder()...build();
+     var recovery = agentican.recovery()) {
 
     recovery.resumeInterrupted();   // pick up tasks left in flight after restart
-    // runtime.run(...) calls happen as before
+    // agentican.run(...) calls happen as before
 }
 ```
 
-`AgenticanRecovery` is also `AutoCloseable` — declare it after the `Agentican` in try-with-resources so it closes first (it awaits in-flight knowledge re-ingestion using the shared executor before the executor shuts down).
+`AgenticanRecovery` is `AutoCloseable` — declare it after the `Agentican` in try-with-resources so it closes first (it awaits in-flight knowledge re-ingestion using the shared executor before the executor shuts down). Each call to `agentican.recovery()` returns a fresh instance; in DI (Quarkus) the producer bean caches one per `Agentican`.
 
-In Quarkus, `AgenticanRecovery` is a CDI bean produced from the injected `Agentican`; the framework's `ResumeOnStartObserver` invokes `resumeInterrupted` on `StartupEvent` (toggleable via `agentican.resume-on-start`).
+In Quarkus, `AgenticanRecovery` is produced as a singleton; the framework's `ResumeOnStartObserver` invokes `resumeInterrupted` on `StartupEvent` (toggleable via `agentican.resume-on-start`).
 
-### Plan
+### WorkflowDefinition
 
-A `Plan` is a structured workflow definition: an internal UUID, an optional `externalId` business key, name, description, parameters, and a list of steps.
+A `WorkflowDefinition` is a structured workflow: an id, name, description, parameters, an optional output step, and a list of steps.
 
 ```java
-record Plan(
-    String id,          // internal UUID, auto-generated
-    String name,
+record WorkflowDefinition(
+    String id,          // generated if not supplied
+    String name,        // unique within the WorkflowRegistry
     String description,
-    List<PlanParam> params,
-    List<PlanStep> steps,
-    String externalId   // optional stable key for catalog upserts
+    List<WorkflowParam> params,
+    List<WorkflowStep> steps,
+    String outputStep   // optional — step whose output is the workflow's typed output
 )
 ```
 
 Construction:
 
 ```java
-Plan.builder(name)
+WorkflowDefinition.builder(name)
     .description(description)
-    .externalId(externalId)   // optional — cataloged plans only
     .param(...)
     .step(...)
+    .outputStep("final-step")
     .build();
 ```
 
-You can build a `Plan` manually with the builder, or let the planner create one from a natural language description.
+You can build a `WorkflowDefinition` manually with the builder, or let the planner create one from a natural-language description.
 
-### PlanStep
+### WorkflowStep
 
-A step in a plan. Four variants (sealed interface):
+A step in a workflow. Four variants (sealed interface):
 
-- **`PlanStepAgent`** — runs an agent with given instructions
-- **`PlanStepLoop`** — iterates over an upstream step's output, running a sub-plan per item
-- **`PlanStepBranch`** — picks one of several paths based on an upstream step's output
-- **`PlanStepCode<I>`** — runs a registered Java function (no LLM round-trip), with a typed input and output
+- **`WorkflowStepAgent`** — runs an agent with given instructions
+- **`WorkflowStepLoop`** — iterates over an upstream step's output, running a sub-plan per item
+- **`WorkflowStepBranch`** — picks one of several paths based on an upstream step's output
+- **`WorkflowStepCode<I>`** — runs a registered Java function (no LLM round-trip), with a typed input and output
 
 Steps can depend on each other. The runner builds a dependency graph and executes independent steps in parallel.
 
@@ -217,7 +216,7 @@ var factory = AgentFactory.builder()
         .llms(llms)
         .hitlManager(hitlManager)
         .knowledgeStore(knowledgeStore)
-        .taskStateStore(taskStateStore)
+        .workflowRunStore(taskStateStore)
         .skillRegistry(skillRegistry)
         .taskListener(taskListener)
         .build();
@@ -276,76 +275,53 @@ TaskLog
                     └── toolResults
 ```
 
-A `TaskStateStore` persists execution state. `TaskStateStoreMemory` is provided; you can implement your own for durable storage.
+A `WorkflowRunStore` persists execution state. `InMemoryWfRunStore` is provided; you can implement your own for durable storage.
 
 `TaskLog`, `StepLog`, `TurnLog`, and `KnowledgeEntry` all have constructors that accept full state (timestamps, ids, status) so a persistent store can round-trip an instance without stamping fresh values on rehydrate.
 
 ### Registries
 
-All four registries are bundled on `agentican.registry()` (an `AgenticanRegistry` record):
+All five registries are bundled on `agentican.registry()` (an `AgenticanRegistry` record):
 
-- **`PlanRegistry`** — plans by name and internal id. Pre-built plans from config + planner-generated plans. Access via `agentican.registry().plans()`.
+- **`WorkflowRegistry`** — workflows by name and id. Pre-built workflows from config + planner-generated workflows. Access via `agentican.registry().workflows()`.
 - **`AgentRegistry`** — agents by id and name. Populated from config, the fluent builder, and planner-created agents. Access via `agentican.registry().agents()`.
 - **`SkillRegistry`** — skills by id and name. Populated from config, the fluent builder, and planner-created skills. Access via `agentican.registry().skills()`.
 - **`ToolkitRegistry`** — slug → Toolkit. Populated from MCP, Composio, custom toolkits, and built-ins. Access via `agentican.registry().toolkits()`.
+- **`VectorIndexRegistry`** — name → VectorIndex. Populated from `.vectorIndex(...)` on the Builder. Access via `agentican.registry().indexes()`.
 
-All three of `AgentRegistry`, `SkillRegistry`, and `PlanRegistry` are **interfaces** with an `InMemory*` implementation as the default. A persistent backend (e.g., the JPA-backed registries in `agentican-quarkus`) plugs in via the builder:
+`AgentRegistry`, `SkillRegistry`, and `WorkflowRegistry` are **interfaces** with `InMemory*` implementations as the default. A persistent backend (e.g., the JPA-backed registries in `agentican-quarkus-store-jpa`) plugs in via the Builder:
 
 ```java
 Agentican.builder()
         .agentRegistry(myJpaAgentRegistry)
         .skillRegistry(myJpaSkillRegistry)
-        .planRegistry(myJpaPlanRegistry)
+        .workflowRegistry(myJpaWorkflowRegistry)
         .build();
 ```
 
-Each interface has a `default seed(...)` hook the framework calls once at boot. `AgentRegistry.seed(Function<AgentConfig, Agent>)` receives the `AgentFactory` so a persistent registry can hydrate cataloged agents. `SkillRegistry.seed()` and `PlanRegistry.seed()` take no args.
+Each interface has a `default seed()` hook the framework calls once at boot. `AgentRegistry.agentFactory(Function<AgentConfig, Agent>)` is set by the framework so a persistent registry can hydrate cataloged agents on `seed()`.
 
-### External IDs
+### Identity by name
 
-Every `AgentConfig`, `SkillConfig`, `PlanConfig`, and `Plan` has an optional `externalId` — a stable business key separate from the internal UUID `id`. A persistent catalog upserts on `externalId` so redeploys don't create duplicates.
-
-Anything declared via the config file or the fluent builder **must** set an `externalId`. The framework throws `IllegalStateException` at `Agentican.build()` if it's missing, because without it every boot would auto-generate a fresh UUID and pile up duplicate catalog rows.
-
-Set `externalId(...)` on the builder:
-
-```java
-AgentConfig.builder()
-        .externalId("agent.researcher.v1")
-        .name("researcher").role("Expert researcher").llm("default")
-        .build();
-
-SkillConfig.builder()
-        .externalId("skill.citations.v1")
-        .name("citations").instructions("Always cite sources")
-        .build();
-
-Plan.builder("research")
-        .externalId("plan.research.v1")
-        .description("...")
-        .param(...).step(...)
-        .build();
-```
-
-Planner-created agents, skills, and plans legitimately have no `externalId` — they're ephemeral, scoped to the run that produced them.
+Agents, skills, and workflows are looked up by **name** within their respective registries — names are unique per registry. The internal `id` field on each config record is auto-generated if not supplied; it's an implementation detail used by persistence stores. Plans authored programmatically, in YAML, or by the planner all reference agents and workflows by name.
 
 ## Execution Flow
 
 When you call `agentican.run("description")`:
 
-1. **Plan** — `PlannerAgent.plan(String)` returns `PlanningResult(Plan, Map<String, String> inputs)`:
-   - **Decide**: the planner prompt includes an `<existing-plans>` block listing cataloged plans (id, name, description, param names). The LLM returns either a `ReuseExisting(planRef, inputs)` (when a cataloged plan fits) or a `PlannerOutput` (a brand-new plan).
-   - **Reuse path**: look the plan up by internal id; the `inputs` map flows into the task.
+1. **Plan** — `WorkflowPlannerAgent.plan(String)` returns `WorkflowPlan(WorkflowDefinition definition, Map<String, String> inputs)`:
+   - **Decide**: the planner prompt includes an `<existing-plans>` block listing cataloged workflows (name, description, param names). The LLM returns either a `WorkflowSelected(name, inputs)` (when a cataloged workflow fits) or a `WorkflowPlanned` (a brand-new workflow).
+   - **Reuse path**: look the workflow up by name; the `inputs` map flows into dispatch.
    - **Create path**: a refinement pass then rewrites each step's instructions with the real tool schemas.
-   - **Fallback**: if the planner references a plan id that isn't in the catalog, retry once with an empty `<existing-plans>` block (forces a create).
-2. **Run** — `TaskRunner.run(plan, taskId, inputs, cancelled)`:
+   - **Fallback**: if the planner references a workflow name that isn't in the catalog, retry once with an empty `<existing-plans>` block (forces a create).
+2. **Run** — `WorkflowRunner.run(definition, taskId, inputs, cancelled)`:
    - Build dependency graph from step references
    - Validate no cycles
    - Dispatch ready steps to virtual threads
    - Poll for completion, dispatch dependents
    - Handle HITL suspension by parking on `awaitResponse()`
-   - Save `TaskLog` after each step
-3. **Return** — final `TaskResult` with status and per-step results
+   - Save `WorkflowRunLog` after each step
+3. **Return** — final `WorkflowRunResult` with status and per-step results, wrapped in a `WorkflowRun<String>` whose `await()` yields the workflow's last-step output.
 
 ### Recovery flow
 

@@ -8,30 +8,31 @@ The simplest way to define an agent is via configuration:
 
 ```java
 var researcher = AgentConfig.builder()
-        .externalId("agent.researcher.v1")             // required for catalog agents
         .name("researcher")
         .role("Expert researcher who finds and synthesizes information")
         .llm("default")
         .build();
 
 try (var agentican = Agentican.builder()
-        .llm(LlmConfig.builder().apiKey(apiKey).build())
-        .agent(researcher)
+        .configuration().api()
+            .llm(LlmConfig.builder().apiKey(apiKey).build())
+            .end()
+        .registry().api()
+            .agent(researcher)
+            .end()
         .build()) {
     // use agentican
 }
 ```
 
-Any agent you register at startup — through `RuntimeConfig.agents` or `Agentican.builder().agent(...)` — must declare an `externalId`. Planner-created agents don't need one.
-
-Agents from config are pre-registered in the `AgentRegistry` when Agentican starts. They're available for plan steps to reference by name or id.
+Agents from config are pre-registered in the `AgentRegistry` when Agentican starts. Workflow steps reference them by **name** via `WorkflowStepAgent.agentName`.
 
 ## Agents from Planning
 
 You usually don't need to pre-define agents. The planner creates them on the fly based on the task description:
 
 ```java
-agentican.run("Find the top 3 LLMs and create a report comparing them").result();
+String text = agentican.run("Find the top 3 LLMs and create a report comparing them").await();
 ```
 
 The planner might create:
@@ -70,7 +71,7 @@ var factory = AgentFactory.builder()
         .llms(llms)
         .hitlManager(hitlManager)
         .knowledgeStore(knowledgeStore)
-        .taskStateStore(taskStateStore)
+        .workflowRunStore(taskStateStore)
         .skillRegistry(skillRegistry)
         .taskListener(taskListener)
         .build();
@@ -82,30 +83,34 @@ Agent agent = factory.build(agentConfig);
 
 ## Skills
 
-Skills are reusable instruction blocks. They live in a top-level `SkillRegistry` (seeded from `RuntimeConfig.skills` and the fluent builder) and are referenced by plan steps.
+Skills are reusable instruction blocks. They live in a top-level `SkillRegistry` (seeded from `RuntimeConfig.skills` and the fluent builder) and are referenced by workflow steps.
 
 ```java
 Agentican.builder()
-        .llm(...)
-        .skill(SkillConfig.builder()
-                .externalId("skill.statistical-rigor.v1").name("statistical-rigor")
-                .instructions("Use p-values, confidence intervals, and explain assumptions")
-                .build())
-        .skill(SkillConfig.builder()
-                .externalId("skill.plain-english.v1").name("plain-english")
-                .instructions("Translate findings into non-technical language")
-                .build())
-        .agent(AgentConfig.builder()
-                .externalId("agent.analyst.v1").name("analyst")
-                .role("Data analyst").llm("default")
-                .build())
+        .configuration().api()
+            .llm(...)
+            .end()
+        .registry().api()
+            .skill(SkillConfig.builder()
+                    .name("statistical-rigor")
+                    .instructions("Use p-values, confidence intervals, and explain assumptions")
+                    .build())
+            .skill(SkillConfig.builder()
+                    .name("plain-english")
+                    .instructions("Translate findings into non-technical language")
+                    .build())
+            .agent(AgentConfig.builder()
+                    .name("analyst")
+                    .role("Data analyst").llm("default")
+                    .build())
+            .end()
         .build();
 ```
 
-A plan step activates skills by name or id:
+A workflow step activates skills by name:
 
 ```java
-PlanStepAgent.builder("explain-findings")
+WorkflowStepAgent.builder("explain-findings")
         .agent("analyst")
         .instructions("Explain the results to a general audience")
         .skill("plain-english")  // ← only this skill is activated for this step
@@ -194,7 +199,6 @@ By default, all agents use the `default` LLM client. You can specify a different
 
 ```java
 AgentConfig.builder()
-        .externalId("agent.fast-classifier.v1")
         .name("fast-classifier")
         .role("Quick yes/no classifier")
         .llm("haiku")                 // ← LLM name from RuntimeConfig
@@ -205,8 +209,10 @@ Define the LLMs in config:
 
 ```java
 Agentican.builder()
-        .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
-        .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
+        .configuration().api()
+            .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
+            .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
+            .end()
         .build();
 ```
 

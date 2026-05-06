@@ -42,7 +42,7 @@ A single-page vanilla JS app served from `src/main/resources/META-INF/resources/
 - Turn-level detail opens a modal with the full LLM request and response.
 
 ### Plans (`/#plans`)
-Registered plans from the `PlanRegistry`, sorted by name. Each card expands to reveal the plan DAG with per-step agent, skills, tools, dependencies, and condition metadata. Step cards expand to show full instructions.
+Registered plans from the `WorkflowRegistry`, sorted by name. Each card expands to reveal the plan DAG with per-step agent, skills, tools, dependencies, and condition metadata. Step cards expand to show full instructions.
 
 ### Agents (`/#agents`)
 Registered agents from the `AgentRegistry`, sorted by name. Cards expand to show id and role.

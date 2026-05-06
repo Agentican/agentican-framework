@@ -2,12 +2,12 @@
 
 Agentican emits lifecycle events at every level of execution — from task start/complete down to individual tool calls and LLM tokens. These events power metrics, tracing, dashboards, and custom integrations.
 
-## TaskListener
+## WorkflowRunListener
 
 The primary extension point for observability. Implement any subset of methods — all have no-op defaults:
 
 ```java
-public interface TaskListener {
+public interface WorkflowRunListener {
 
     // Planning
     default void onPlanStarted(String taskId) {}
@@ -15,7 +15,7 @@ public interface TaskListener {
 
     // Task
     default void onTaskStarted(String taskId) {}
-    default void onTaskCompleted(String taskId, TaskStatus status) {}
+    default void onTaskCompleted(String taskId, WorkflowRunStatus status) {}
 
     // Step
     default void onStepStarted(String taskId, String stepId) {}
@@ -48,7 +48,7 @@ public interface TaskListener {
 
 ### Event Signatures
 
-Every event carries `taskId` plus the ID of the object it describes. This keeps signatures lightweight — if you need more detail (agent name, step name, token usage), look it up in the `TaskStateStore`.
+Every event carries `taskId` plus the ID of the object it describes. This keeps signatures lightweight — if you need more detail (agent name, step name, token usage), look it up in the `WorkflowRunStore`.
 
 ```java
 onStepStarted(taskId, stepId)        // which task, which step
@@ -105,15 +105,15 @@ onTaskCompleted(taskId, COMPLETED)
 
 ## How Events Are Emitted
 
-Events are a side effect of `TaskStateStore` mutations. The framework wraps your store with `TaskStateStoreNotifying`, a decorator that:
+Events are a side effect of `WorkflowRunStore` mutations. The framework wraps your store with `NotifyingWfRunStore`, a decorator that:
 
 1. Delegates the mutation to the underlying store (state is persisted first)
-2. Fires the corresponding `TaskListener` event
+2. Fires the corresponding `WorkflowRunListener` event
 
 ```
 TaskRunner calls → taskStateStore.stepStarted(taskId, stepId, stepName)
                        ↓
-              TaskStateStoreNotifying
+              NotifyingWfRunStore
                   ├── delegate.stepStarted(...)   ← state persisted
                   └── listener.onStepStarted(taskId, stepId)  ← event fired
 ```
@@ -125,7 +125,7 @@ This means events are guaranteed to fire after state is committed. If you query 
 ### Simple Logger
 
 ```java
-public class LoggingListener implements TaskListener {
+public class LoggingListener implements WorkflowRunListener {
 
     @Override
     public void onTaskStarted(String taskId) {
@@ -133,7 +133,7 @@ public class LoggingListener implements TaskListener {
     }
 
     @Override
-    public void onTaskCompleted(String taskId, TaskStatus status) {
+    public void onTaskCompleted(String taskId, WorkflowRunStatus status) {
         System.out.println("Task " + taskId + " completed: " + status);
     }
 
@@ -146,12 +146,12 @@ public class LoggingListener implements TaskListener {
 
 ### Enriching Events from the Store
 
-Event signatures are intentionally minimal. To get richer data, query the `TaskStateStore`:
+Event signatures are intentionally minimal. To get richer data, query the `WorkflowRunStore`:
 
 ```java
-public class DetailedListener implements TaskListener {
+public class DetailedListener implements WorkflowRunListener {
 
-    private final TaskStateStore store;
+    private final WorkflowRunStore store;
 
     @Override
     public void onStepCompleted(String taskId, String stepId) {
@@ -171,23 +171,23 @@ Register via the Agentican builder:
 
 ```java
 Agentican.builder()
-        .stepListener(myListener)
+        .workflowRunListener(myListener)
         .build();
 ```
 
-Multiple listeners can be composed in a Quarkus/CDI environment using `Instance<TaskListener>` — the `AgenticanProducer` creates a composite that fans out to all registered beans.
+Multiple listeners can be composed in a Quarkus/CDI environment using `Instance<WorkflowRunListener>` — the `AgenticanProducer` creates a composite that fans out to all registered beans.
 
-## TaskDecorator
+## WorkflowRunDecorator
 
-`TaskDecorator` wraps the `Supplier` submitted to `CompletableFuture.supplyAsync()` for each task execution. Its primary use is propagating context (e.g., OTel trace context) from the caller thread into the task's virtual thread.
+`WorkflowRunDecorator` wraps the `Supplier` submitted to `CompletableFuture.supplyAsync()` for each task execution. Its primary use is propagating context (e.g., OTel trace context) from the caller thread into the task's virtual thread.
 
 ```java
 @FunctionalInterface
-public interface TaskDecorator {
+public interface WorkflowRunDecorator {
 
     <T> Supplier<T> decorate(Supplier<T> task);
 
-    default TaskDecorator snapshot() { return this; }
+    default WorkflowRunDecorator snapshot() { return this; }
 }
 ```
 
@@ -197,7 +197,7 @@ The `snapshot()` method captures the current context at the point it's called, r
 
 ```
 Main thread (has OTel context)
-  └── TaskDecorator.snapshot()  ← captures context
+  └── WorkflowRunDecorator.snapshot()  ← captures context
         └── step virtual thread
               └── decorate(stepWork)  ← restores captured context
 ```
@@ -208,7 +208,7 @@ Register via the builder:
 
 ```java
 Agentican.builder()
-        .taskDecorator(myDecorator)
+        .workflowRunDecorator(myDecorator)
         .build();
 ```
 

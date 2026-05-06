@@ -15,7 +15,7 @@ var result = handle.result();       // blocks until done
 
 ### Async access
 
-`TaskHandle.resultAsync()` returns a `CompletableFuture<TaskResult>`:
+`WorkflowRun.resultAsync()` returns a `CompletableFuture<WorkflowRunResult>`:
 
 ```java
 agentican.run(task).resultAsync()
@@ -35,61 +35,75 @@ agenticanService.reapOrphans();         // mark unrecoverable tasks FAILED
 
 You don't usually need to call these yourself — `ResumeOnStartObserver` runs `resumeInterrupted` automatically on `StartupEvent`. Toggle that behavior with `agentican.resume-on-start=false` and tune fan-out with `agentican.resume-max-concurrent`.
 
-## `@AgenticanPlan` qualifier — typed `Agentican<P, R>`
+## `@Workflow` qualifier — typed `Workflow<P, R>`
 
-Inject a typed, reusable caller bound to a specific plan. Two type parameters: input record `P` and output record `R` (`Void` for either if not needed).
+Inject a typed, reusable handle bound to a specific workflow. Two type parameters: input record `P` and output record `R` (`Void` for either if not needed).
 
 ```java
 record TriageParams(String customerId, String priority) {}
 record TriageOutput(String classification, String reason) {}
 
-@Inject @AgenticanPlan("triage")
-Agentican<TriageParams, TriageOutput> triage;
+@Inject @Workflow(name = "triage")
+Workflow<TriageParams, TriageOutput> triage;
 
-TriageOutput out = triage.runAndAwait(new TriageParams("cust-42", "HIGH"));
+TriageOutput out = triage.start(new TriageParams("cust-42", "HIGH")).await();
 ```
 
-- The qualifier value is the plan **name** (not `externalId`). Any plan in `Agentican.registry().plans()` qualifies — YAML, fluent builder, JPA catalog, programmatic registration, or planner output (if it has a known name).
-- The plan is resolved from the registry on each invocation, so plans added or updated at runtime are honored.
-- `P` is the typed params record. Jackson's `SNAKE_CASE` strategy maps `customerId` → `customer_id`. Use `Void` for parameterless plans; use `Map<String, Object>` as a dynamic-map escape hatch.
-- `R` is the typed output. The framework reads the plan's output step (declared via `Plan.builder(...).outputStep(name)` or implicit when the plan has one step) and Jackson-parses the text into `R`. Use `Void` to skip output parsing.
-- If the plan isn't in the registry at boot, the producer logs a WARN and defers resolution to the first `run()` — at which point a missing plan throws `IllegalStateException`.
+- The qualifier value is the workflow **name**. The workflow must be registered (YAML, fluent builder, JPA catalog, programmatic registration) by the time CDI resolves the bean — otherwise injection fails fast with `IllegalStateException`.
+- The handle captures the resolved `WorkflowDefinition` at injection time. The output step and structured-output binding are computed once.
+- `P` is the typed params record. Jackson's `SNAKE_CASE` strategy maps `customerId` → `customer_id`. Use `Void` for parameterless workflows; use `Map<String, Object>` as a dynamic-map escape hatch.
+- `R` is the typed output. The framework reads the workflow's `outputStep` and Jackson-parses the text into `R`. Use `Void` to skip output parsing.
 
-Failure modes from `runAndAwait`:
-- Task didn't complete → `TaskFailedException` (carries the failed `TaskResult`).
-- Output isn't valid JSON for `R` → `OutputParseException` (carries the raw output + target class).
+Failure modes from `await()`:
+- Run didn't complete → `WorkflowOutputException` (carries the failed `WorkflowRunResult`).
+- Output isn't valid JSON for `R` → `WorkflowOutputException` (carries the raw output + target class).
 
-For dynamic plan lookups, construct in code instead of injecting:
+For programmatic lookups, build from code instead of injecting:
 
 ```java
-@Inject Agentican runtime;
+@Inject Agentican agentican;
 
 // Typed output
-var invoker = runtime.agentican("some-runtime-plan")
+var workflow = agentican.workflow("some-workflow")
         .input(MyParams.class)
         .output(MyOutput.class)
         .build();
 
-// Untyped output (current behavior) — omit .output(...) to default R = Void
-var invoker = runtime.agentican("some-runtime-plan")
+// Untyped output — omit .output(...) to default R = Void
+var workflow = agentican.workflow("some-workflow")
         .input(MyParams.class)
         .build();
 ```
 
-## `@AgenticanAgent` qualifier
+## `@Task` qualifier — single-step ad-hoc workflow
+
+For one-shot agent invocations without a pre-registered workflow definition, use `@Task` to declaratively bind a single agent step:
+
+```java
+@Inject
+@Task(name = "Research Question",
+      agent = "researcher",
+      instructions = "Research {{input}} and summarize the findings.")
+Workflow<String, String> researcher;
+
+String summary = researcher.start("vector databases").await();
+```
+
+The producer constructs a single-step `WorkflowDefinition` from the annotation parameters at injection time.
+
+## `@Agent` qualifier
 
 Inject pre-registered agents by name without going through the registry:
 
 ```java
 @Inject
-@AgenticanAgent("researcher")
-Agent researcher;
+@Agent(name = "researcher")
+ai.agentican.framework.agent.Agent researcher;
 
-// Use the agent's name, role, skills
 log.info("Agent: {} — {}", researcher.name(), researcher.role());
 ```
 
-The agent must be declared in `agentican.agents[*]` configuration.
+The agent must be declared in `agentican.agents[*]` configuration or the catalog.
 
 ## ReactiveAgentican
 
@@ -99,39 +113,29 @@ composition with Vert.x, RESTEasy Reactive, and reactive pipelines.
 ```java
 @Inject ReactiveAgentican agentican;
 
-// Non-blocking: returns Uni<TaskHandle> immediately
+// Non-blocking: returns Uni<WorkflowRun<String>> immediately
 public Uni<Response> submit(String description) {
     return agentican.run(description)
-        .onItem().transform(handle ->
-            Response.created(URI.create("/tasks/" + handle.taskId())).build());
+        .onItem().transform(run ->
+            Response.created(URI.create("/tasks/" + run.id())).build());
 }
 
-// Awaiting: Uni completes when the task finishes
+// Awaiting: Uni completes when the run finishes
 public Uni<String> research(String topic) {
-    return agentican.runAndAwait("Research " + topic)
-        .onItem().transform(TaskResult::lastOutput);
+    return agentican.runAndAwait("Research " + topic);
 }
 ```
 
-| Method | Returns | Blocks? |
-|---|---|---|
-| `run(String)` | `Uni<TaskHandle>` | No — task runs on virtual thread |
-| `run(Task)` | `Uni<TaskHandle>` | No |
-| `run(Task, Map)` | `Uni<TaskHandle>` | No |
-| `runAndAwait(String)` | `Uni<TaskResult>` | No — Uni completes when task finishes |
-| `runAndAwait(Task)` | `Uni<TaskResult>` | No |
-| `runAndAwait(Task, Map)` | `Uni<TaskResult>` | No |
-
-All task execution runs on the framework's virtual thread executor, never on the Vert.x
+All workflow execution runs on the framework's virtual thread executor, never on the Vert.x
 event loop.
 
-## Typed reactive invoker — `ReactiveAgenticanTask<P, R>`
+## Typed reactive workflow — `ReactiveWorkflowAdapter<P, R>`
 
-The reactive counterpart to `@AgenticanPlan("name") Agentican<P, R>`. Same qualifier, same generic params, just returns `Uni<...>` so you can compose without blocking:
+The reactive counterpart to `@Workflow(name = "...") Workflow<P, R>`. Same qualifier, same generic params, just returns `Uni<...>` so you can compose without blocking:
 
 ```java
-@Inject @AgenticanPlan("triage")
-ReactiveAgenticanTask<TriageParams, TriageOutput> triage;
+@Inject @Workflow(name = "triage")
+ReactiveWorkflowAdapter<TriageParams, TriageOutput> triage;
 
 @GET
 @Path("/triage/{customer}")
@@ -141,15 +145,7 @@ public Uni<TriageOutput> triage(@PathParam("customer") String customerId) {
 }
 ```
 
-Same three method shapes as the synchronous variant:
-
-| Method | Returns |
-|---|---|
-| `run(P)` | `Uni<TaskHandle>` — resolves once submission lands |
-| `awaitTaskResult(P)` | `Uni<TaskResult>` — resolves when the task completes |
-| `runAndAwait(P)` | `Uni<R>` — resolves with the typed, schema-validated result |
-
-The `Uni` is lazy — subscription is what actually triggers submission. Task execution stays on virtual threads; the `Uni` simply surfaces completion to reactive pipelines.
+The `Uni` is lazy — subscription is what actually triggers submission. Workflow execution stays on virtual threads; the `Uni` simply surfaces completion to reactive pipelines.
 
 ## Reactive HITL notifier
 
@@ -236,10 +232,10 @@ public HitlManager myHitlManager() {
 |---|---|---|
 | `HitlManager` | Logging notifier | your `@Produces HitlManager` |
 | `KnowledgeStore` | `KnowledgeStoreMemory` | `JpaKnowledgeStore` (store-jpa) or your own |
-| `TaskStateStore` | `TaskStateStoreMemory` | `JpaTaskStateStore` (store-jpa) or your own |
+| `WorkflowRunStore` | `InMemoryWfRunStore` | `JpaWfRunStore` (store-jpa) or your own |
 | `AgentRegistry` | `AgentRegistryMemory` | `JpaAgentRegistry` (store-jpa) or your own |
 | `SkillRegistry` | `SkillRegistryMemory` | `JpaSkillRegistry` (store-jpa) or your own |
-| `PlanRegistry` | `PlanRegistryMemory` | `JpaPlanRegistry` (store-jpa) or your own |
+| `WorkflowRegistry` | `PlanRegistryMemory` | `JpaPlanRegistry` (store-jpa) or your own |
 
 The JPA beans in `agentican-quarkus-store-jpa` are gated with
 `@IfBuildProperty(name = "agentican.store.backend", stringValue = "jpa",

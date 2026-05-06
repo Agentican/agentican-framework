@@ -1,7 +1,7 @@
 # Agentican Quarkus Store (JPA)
 
-JPA-backed implementations of Agentican's framework stores: `TaskStateStore`,
-`KnowledgeStore`, `AgentRegistry`, `SkillRegistry`, `PlanRegistry`. Postgres in
+JPA-backed implementations of Agentican's framework stores: `WorkflowRunStore`,
+`KnowledgeStore`, `AgentRegistry`, `SkillRegistry`, `WorkflowRegistry`. Postgres in
 production, H2 in tests. Flyway ships the schema.
 
 Drop the jar on the classpath and agents, skills, plans, task execution state,
@@ -48,11 +48,11 @@ reference wiring.
 
 | Bean | Implementation | Replaces |
 |---|---|---|
-| `TaskStateStore` | `JpaTaskStateStore` | `TaskStateStoreMemory` |
+| `WorkflowRunStore` | `JpaWfRunStore` | `InMemoryWfRunStore` |
 | `KnowledgeStore` | `JpaKnowledgeStore` | `KnowledgeStoreMemory` |
 | `AgentRegistry` | `JpaAgentRegistry` | `AgentRegistryMemory` |
 | `SkillRegistry` | `JpaSkillRegistry` | `SkillRegistryMemory` |
-| `PlanRegistry` | `JpaPlanRegistry` | `PlanRegistryMemory` |
+| `WorkflowRegistry` | `JpaPlanRegistry` | `PlanRegistryMemory` |
 
 All beans are gated with:
 
@@ -69,36 +69,24 @@ out with:
 agentican.store.backend=memory
 ```
 
-## External IDs (required)
+## Identity by name
 
-Agents and skills declared in `application.properties` **must** carry a stable
-`external-id`. It's the bridge between config-declared entities and their
-persisted rows across deploys.
+Agents, skills, and workflows are identified by **name** within their
+respective registries (names are unique per registry). The persistent store
+upserts rows keyed by name.
 
 ```properties
 agentican.agents[0].name=researcher
 agentican.agents[0].role=Expert at finding information
-agentican.agents[0].external-id=researcher
 
 agentican.skills[0].name=web-search
 agentican.skills[0].instructions=Search the web with the provided tools
-agentican.skills[0].external-id=web-search
 ```
 
-If an agent or skill is declared without `external-id`, Agentican throws an
-`IllegalStateException` at boot:
-
-```
-IllegalStateException: agent 'researcher' is missing an externalId.
-```
-
-On first boot the registry inserts a row with a generated id. On subsequent
-boots the row is located by `external_id` and the config-declared name/role/llm
-is written back — so you can edit config freely without churning primary keys.
-
-Planner-created plans, agents, and skills have a `null` external id: they're
-reused only within the same process via the in-memory index inside each
-registry.
+On first boot the registry inserts a row with a generated `id`. On subsequent
+boots the row is located by `name` and the config-declared role/llm is written
+back — so you can edit config freely without churning primary keys. Planner-
+created entities also live in the catalog, indexed by name.
 
 ## Schema
 

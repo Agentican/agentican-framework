@@ -24,9 +24,11 @@ public class MeetingMinutes {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder()
-        .registry().yaml().path(config()).end()
-        .build()) {
+        var builder = Agentican.builder()
+                .configuration().yaml().path(config()).end()
+                .registry().yaml().path(config()).end();
+
+        try (var agentican = builder.build()) {
 
             var cleaner = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)

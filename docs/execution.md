@@ -1,6 +1,6 @@
 # Execution State
 
-Every task execution is captured in a structured log — from the task itself down to individual LLM requests and tool calls. The `TaskStateStore` is the single source of truth for execution state.
+Every task execution is captured in a structured log — from the task itself down to individual LLM requests and tool calls. The `WorkflowRunStore` is the single source of truth for execution state.
 
 ## Execution Hierarchy
 
@@ -41,22 +41,22 @@ TaskLog  "a3cc1bf2"
               └── TurnLog  "f1a20e5b"
 ```
 
-## TaskStateStore
+## WorkflowRunStore
 
 The store interface uses granular mutation methods mirroring the execution hierarchy:
 
 ```java
-public interface TaskStateStore {
+public interface WorkflowRunStore {
 
     // Task lifecycle
     void taskStarted(String taskId, String taskName, Plan plan, Map<String, String> params);
     void taskStarted(String taskId, String taskName, Plan plan, Map<String, String> params,
                      String parentTaskId, String parentStepId, int iterationIndex);
-    void taskCompleted(String taskId, TaskStatus status);
+    void taskCompleted(String taskId, WorkflowRunStatus status);
 
     // Step lifecycle
     void stepStarted(String taskId, String stepId, String stepName);
-    void stepCompleted(String taskId, String stepId, TaskStatus status, String output);
+    void stepCompleted(String taskId, String stepId, WorkflowRunStatus status, String output);
 
     // Run lifecycle
     void runStarted(String taskId, String stepId, String runId, String agentName);
@@ -103,12 +103,12 @@ new TurnLog(id, index, messageId, request,
             startedAt, completedAt);
 ```
 
-## TaskStateStoreMemory
+## InMemoryWfRunStore
 
 The default in-memory implementation. Stores `TaskLog` objects in a `ConcurrentHashMap` keyed by task ID. Uses ID-based lookup to navigate the hierarchy:
 
 ```java
-var store = new TaskStateStoreMemory();
+var store = new InMemoryWfRunStore();
 
 // After a task runs:
 var taskLog = store.load("a3cc1bf2");
@@ -186,19 +186,19 @@ var duration = Duration.between(stepLog.createdAt(), stepLog.completedAt());
 
 ## Custom Implementations
 
-For durable storage, implement the full `TaskStateStore` interface against your database. The mutation methods are called synchronously on the executing thread — keep them fast. Heavy work (indexing, replication) should be done asynchronously.
+For durable storage, implement the full `WorkflowRunStore` interface against your database. The mutation methods are called synchronously on the executing thread — keep them fast. Heavy work (indexing, replication) should be done asynchronously.
 
 ```java
 Agentican.builder()
-        .taskStateStore(myDatabaseStore)
+        .workflowRunStore(myDatabaseStore)
         .build();
 ```
 
-If no store is provided, Agentican creates a `TaskStateStoreMemory`.
+If no store is provided, Agentican creates a `InMemoryWfRunStore`.
 
 ## Event Emission
 
-The store itself does not emit events. `TaskStateStoreNotifying` is a decorator that wraps any `TaskStateStore` and fires `TaskListener` events after each mutation. Agentican applies this decorator automatically — you don't need to wrap your store manually.
+The store itself does not emit events. `NotifyingWfRunStore` is a decorator that wraps any `WorkflowRunStore` and fires `WorkflowRunListener` events after each mutation. Agentican applies this decorator automatically — you don't need to wrap your store manually.
 
 See [Observability](observability.md) for the event system.
 

@@ -26,11 +26,12 @@ public class OkrDraft {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder()
-        .registry().yaml().path(config()).end()
+        var builder = Agentican.builder()
+                .configuration().yaml().path(config()).end()
+                .registry().yaml().path(config()).end()
+                .hitlManager(new HitlManager(new CliHitlNotifier()));
 
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-        .build()) {
+        try (var agentican = builder.build()) {
 
             var draft = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)

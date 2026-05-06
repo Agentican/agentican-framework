@@ -193,14 +193,14 @@ MCP toolkits are registered by `slug`. The framework supports both Streamable HT
 A step's `tools` field lists the tool **names** the agent is allowed to call for that step. The registry resolves each name to its owning toolkit at dispatch time:
 
 ```java
-PlanStepAgent.builder("create-page")
+WorkflowStepAgent.builder("create-page")
     .agent("documentation-specialist")
     .instructions("Create a Notion page")
     .tools(List.of("create_page", "append_block"))  // ← explicit tool names
     .build();
 ```
 
-Equivalent fluent forms on the `PlanConfig` step builder:
+Equivalent fluent forms on the `WorkflowConfig` step builder:
 
 ```java
 .step("create-page", s -> s.agent("documentation-specialist")

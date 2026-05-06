@@ -28,8 +28,8 @@ quarkus.otel.exporter.otlp.protocol=grpc
 
 That's it. The module auto-registers:
 - A `LlmClientDecorator` that wraps every LLM call with an OTel span
-- A `TaskDecorator` that propagates OTel context to task virtual threads
-- A `TaskListener` that creates per-step / per-run / per-turn spans
+- A `WorkflowRunDecorator` that propagates OTel context to task virtual threads
+- A `WorkflowRunListener` that creates per-step / per-run / per-turn spans
 - An HITL checkpoint observer that tracks human wait time as spans
 - An `InMemorySpanExporter` implementing `SpanStore` so exported spans are
   queryable by `taskId` / `traceId`
@@ -139,12 +139,12 @@ waiting for approval.
 ### Context propagation
 
 Agentican runs tasks on virtual threads. OTel context is thread-local and doesn't
-automatically propagate across `CompletableFuture.supplyAsync()`. The `TracedTaskDecorator`
+automatically propagate across `CompletableFuture.supplyAsync()`. The `TracedWorkflowRunDecorator`
 captures `Context.current()` on the caller's thread and restores it on the virtual thread:
 
 ```
 HTTP thread (has OTel context)
-  -> taskDecorator.decorate(supplier)   // captures Context.current()
+  -> workflowRunDecorator.decorate(supplier)   // captures Context.current()
     -> CompletableFuture.supplyAsync()
       -> virtual thread
         -> Context.makeCurrent()         // restores captured context

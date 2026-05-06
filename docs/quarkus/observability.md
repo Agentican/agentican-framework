@@ -139,7 +139,7 @@ the classpath and it takes over automatically unless you set
 
 ### Context propagation
 
-`TracedTaskDecorator` captures the OTel `Context` from the HTTP thread and restores it
+`TracedWorkflowRunDecorator` captures the OTel `Context` from the HTTP thread and restores it
 on the task's virtual thread. Step spans become children of the HTTP request span. Turn
 spans become children of step spans. LLM and tool call spans nest under turns. All
 automatic — no manual span management.

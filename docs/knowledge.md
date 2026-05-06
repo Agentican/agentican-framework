@@ -107,7 +107,7 @@ Once `INDEXED`, the entry appears in the agent's knowledge index automatically.
 
 ## Automatic Extraction
 
-When a `KnowledgeStore` is configured, the framework wires a `KnowledgeIngestor` as a `TaskListener`. On every completed step, if the step's output contains the marker string `KNOWLEDGE_ACQUIRED`, the ingestor:
+When a `KnowledgeStore` is configured, the framework wires a `KnowledgeIngestor` as a `WorkflowRunListener`. On every completed step, if the step's output contains the marker string `KNOWLEDGE_ACQUIRED`, the ingestor:
 
 1. Strips the marker from the output
 2. Calls a `KnowledgeExtractor` (default: `LlmKnowledgeExtractor`) with `(step input, step output, existing indexed entries)`

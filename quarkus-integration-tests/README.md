@@ -8,7 +8,7 @@ Not a deployable artifact (`maven.deploy.skip=true`). This module pulls every ma
 
 - **Bean discovery across modules** — every module's CDI beans register and wire together.
 - **Jandex indexing** — `quarkus.index-dependency.*` is set correctly so annotated classes in dependency jars are discovered.
-- **Decorator / listener stacking** — `LlmClientDecorator`s and `TaskDecorator`s from multiple modules compose in the right order.
+- **Decorator / listener stacking** — `LlmClientDecorator`s and `WorkflowRunDecorator`s from multiple modules compose in the right order.
 - **End-to-end task lifecycle** — submit via REST, stream events via SSE, assert persistence, metrics, and traces.
 
 `MockLlmClient` (from `quarkus-test`) is injected as the LLM so tests are deterministic.

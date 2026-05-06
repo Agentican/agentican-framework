@@ -118,7 +118,7 @@ curl 'http://localhost:8080/agentican/tasks?limit=20'
 ]
 ```
 
-`?limit=N` (default 100, max 500). Sources the underlying `TaskStateStore` —
+`?limit=N` (default 100, max 500). Sources the underlying `WorkflowRunStore` —
 in-memory by default, Postgres-backed when `agentican-quarkus-store-jpa` is on
 the classpath, or whatever bean you produce yourself.
 
@@ -425,7 +425,7 @@ Quarkus extensions: `quarkus-smallrye-jwt`, `quarkus-oidc`, `quarkus-elytron-sec
 
 The module owns:
 
-- A `TaskService` that tracks in-flight `TaskHandle`s for cancellation
+- A `TaskService` that tracks in-flight `WorkflowRun`s for cancellation
 - A `TaskEventBus` that observes lifecycle events from `agentican-quarkus` and fans them
   out via per-task Mutiny `BroadcastProcessor`s
 

@@ -1,5 +1,6 @@
 package ai.agentican.framework.examples;
 
+import ai.agentican.framework.Agentican;
 import ai.agentican.framework.config.RuntimeConfig;
 
 import org.junit.jupiter.params.ParameterizedTest;
@@ -91,6 +92,32 @@ class ExampleYamlTest {
 
         assertNotNull(agent.name());
         assertNotNull(agent.role());
+    }
+
+    /**
+     * The example mains all wire YAML through both Configuration and Registry.
+     * This test mirrors that wiring so a regression where Configuration is
+     * missing (and the framework throws "At least one LLM is required") gets
+     * caught here instead of at runtime.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "alert-review.yaml",
+            "quick-task.yaml",
+            "vendor-selection.yaml"
+    })
+    void exampleYamlBootsViaBothAxes(String resourceName) throws Exception {
+
+        var path = Path.of(Objects.requireNonNull(
+                ExampleYamlTest.class.getResource("/" + resourceName)).toURI());
+
+        try (var agentican = Agentican.builder()
+                .configuration().yaml().path(path).end()
+                .registry().yaml().path(path).end()
+                .build()) {
+
+            assertNotNull(agentican);
+        }
     }
 
     private static RuntimeConfig loadConfig(String resourceName) throws Exception {

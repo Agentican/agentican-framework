@@ -14,9 +14,11 @@ public class LeadQualification {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder()
-        .registry().yaml().path(config()).end()
-        .build()) {
+        var builder = Agentican.builder()
+                .configuration().yaml().path(config()).end()
+                .registry().yaml().path(config()).end();
+
+        try (var agentican = builder.build()) {
 
             var qualification = agentican.workflow(PLAN_NAME)
                     .input(Lead.class)

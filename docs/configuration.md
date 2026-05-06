@@ -1,40 +1,99 @@
 # Configuration
 
-Configure Agentican via the fluent builder, a `RuntimeConfig` record (for programmatic composition), or a YAML file.
+Configure Agentican via the fluent builder. The builder splits into two orthogonal axes:
 
-## Agentican.builder()
+- **Configuration** — framework wiring (LLMs, MCP, Composio, worker, strict). Source is API or YAML.
+- **Registry** — catalog (agents, skills, workflows). Source is API or YAML.
 
-Three entry points:
+Both can be sourced independently, giving four combinations: api/api, yaml/yaml, api/yaml, yaml/api.
+
+## Builder shape
 
 ```java
-// Fluent-only
-Agentican.builder()...build();
+Agentican.builder()
+    // Java-object-only setters (no YAML equivalent)
+    .toolkit(slug, toolkit)
+    .hitlManager(...)
+    .knowledgeStore(...)
+    .workflowRunStore(...)
+    .agentRegistry(impl) / .skillRegistry(impl) / .workflowRegistry(impl)
+    .llmDecorator(...) / .workflowRunDecorator(...) / .workflowRunListener(...)
+    .taskExecutor(...)
+    .codeStep(slug, In.class, Out.class, executor)
+    .vectorIndex(index)
+    .llm("name", inMemoryLlmClient)
 
-// Pre-seeded from an existing RuntimeConfig
-Agentican.builder(runtimeConfig)....build();
+    // Framework-wiring config (api XOR yaml)
+    .configuration().api()
+        .llm(LlmConfig)
+        .mcp(McpConfig)
+        .composio(ComposioConfig)
+        .worker(WorkerConfig)
+        .strict()
+        .end()
+    .configuration().yaml()
+        .path(Path) | .classpath(String) | .config(RuntimeConfig)
+        .end()
 
-// Load YAML, then optionally add more
-Agentican.builder(Path.of("agentican.yml"))....build();
+    // Catalog (api XOR yaml)
+    .registry().api()
+        .agent(AgentConfig)
+        .skill(SkillConfig)
+        .workflow(WorkflowConfig)
+        .end()
+    .registry().yaml()
+        .path(Path) | .classpath(String) | .config(RuntimeConfig)
+        .end()
+
+    .build();
 ```
 
-Fluent methods mirror the `RuntimeConfig` shape — declare LLMs, MCP servers, agents, skills, plans, Composio, and worker settings directly:
+Each sub-builder exits via `.end()`, returning the outer `Builder`. The `.api()` and `.yaml()` sub-builders are mutually exclusive within a single `.configuration()` (or `.registry()`).
+
+### Common patterns
+
+**Programmatic everything:**
 
 ```java
 try (var agentican = Agentican.builder()
-        .llm(LlmConfig.builder().apiKey(apiKey).build())
-        .worker(WorkerConfig.builder().maxTurns(20).build())
-        .agent(AgentConfig.builder()
-                .externalId("agent.researcher.v1").name("researcher").role("...").llm("default")
-                .build())
-        .skill(SkillConfig.builder()
-                .externalId("skill.citations.v1").name("citations").instructions("Always cite sources")
-                .build())
+        .configuration().api()
+            .llm(LlmConfig.builder().apiKey(apiKey).build())
+            .worker(WorkerConfig.builder().maxTurns(20).build())
+            .end()
+        .registry().api()
+            .agent(AgentConfig.builder().name("researcher").role("...").llm("default").build())
+            .skill(SkillConfig.builder().name("citations").instructions("Always cite sources").build())
+            .end()
         .build()) {
     // use agentican
 }
 ```
 
-`RuntimeConfig` itself is still a record — YAML deserializes into it, and you can build one programmatically if you prefer to separate "config" from "wiring." Its shape:
+**YAML for everything:**
+
+```java
+try (var agentican = Agentican.builder()
+        .configuration().yaml().classpath("agentican.yaml").end()
+        .registry().yaml().classpath("agentican.yaml").end()
+        .build()) {
+    // use agentican
+}
+```
+
+**Mixed — YAML config, programmatic catalog:**
+
+```java
+try (var agentican = Agentican.builder()
+        .configuration().yaml().classpath("infra.yaml").end()
+        .registry().api()
+            .workflow(WorkflowConfig.builder()...build())
+            .end()
+        .build()) {
+    // use agentican
+}
+```
+
+`RuntimeConfig` is the YAML deserialization target, and is also accepted directly via `.configuration().yaml().config(rc)` / `.registry().yaml().config(rc)` if you've already loaded one. Its shape:
 
 ```java
 record RuntimeConfig(
@@ -44,11 +103,12 @@ record RuntimeConfig(
     WorkerConfig agentRunner,
     List<AgentConfig> agents,
     List<SkillConfig> skills,
-    List<PlanConfig> plans
+    List<WorkflowConfig> workflows,
+    boolean strict
 )
 ```
 
-> **External IDs required.** Any `AgentConfig`, `SkillConfig`, or `PlanConfig` registered via the fluent builder must have an `externalId`. See [External IDs](#external-ids).
+When a single YAML file feeds both axes (the common case), point both `.configuration().yaml()` and `.registry().yaml()` at the same path or pre-loaded `RuntimeConfig` — only the relevant fields are consumed by each axis.
 
 ## LlmConfig
 
@@ -129,13 +189,16 @@ You can register multiple LLMs — mixing providers freely — and assign them t
 
 ```java
 Agentican.builder()
-        .llm(LlmConfig.builder().name("default").apiKey(anthropicKey).model("claude-sonnet-4-5").build())
-        .llm(LlmConfig.builder().name("fast").provider("openai").apiKey(openaiKey).model("gpt-4o-mini").build())
-        .llm(LlmConfig.builder().name("grounded").provider("gemini").apiKey(geminiKey).model("gemini-2.5-flash").build())
-        .agent(AgentConfig.builder()
-                .externalId("agent.classifier.v1")
-                .name("classifier").role("...").llm("fast")
-                .build())
+        .configuration().api()
+            .llm(LlmConfig.builder().name("default").apiKey(anthropicKey).model("claude-sonnet-4-5").build())
+            .llm(LlmConfig.builder().name("fast").provider("openai").apiKey(openaiKey).model("gpt-4o-mini").build())
+            .llm(LlmConfig.builder().name("grounded").provider("gemini").apiKey(geminiKey).model("gemini-2.5-flash").build())
+            .end()
+        .registry().api()
+            .agent(AgentConfig.builder()
+                    .name("classifier").role("...").llm("fast")
+                    .build())
+            .end()
         .build();
 ```
 
@@ -184,12 +247,12 @@ default LlmResponse sendStreaming(LlmRequest request, Consumer<String> onToken) 
 }
 ```
 
-LLM client implementations can override this to stream tokens incrementally. The `SmacAgentRunner` calls `sendStreaming()` automatically, passing each token to `TaskListener.onToken()`.
+LLM client implementations can override this to stream tokens incrementally. The `SmacAgentRunner` calls `sendStreaming()` automatically, passing each token to `WorkflowRunListener.onToken()`.
 
 Observe tokens in real time:
 
 ```java
-public class MyListener implements TaskListener {
+public class MyListener implements WorkflowRunListener {
     @Override
     public void onToken(String taskId, String turnId, String token) {
         System.out.print(token);
@@ -201,53 +264,52 @@ public class MyListener implements TaskListener {
 
 ```java
 record AgentConfig(
-    String id,          // internal UUID, auto-generated
-    String name,
+    String id,          // auto-generated if not supplied
+    String name,        // unique within AgentRegistry
     String role,
-    String llm,
-    String externalId   // required for config/builder agents
+    String llm,         // LLM name from LlmConfig
+    String runner,      // optional: "smac" or "react"
+    Integer maxTurns,   // optional override
+    Duration timeout    // optional override
 )
 ```
 
 ```java
 AgentConfig.builder()
-        .externalId("agent.researcher.v1")
         .name("researcher")
         .role("Expert at finding and synthesizing information")
         .llm("default")                // optional; defaults to the "default" LLM
         .build();
 ```
 
-Agents from config are pre-registered when Agentican starts. They can be referenced by name (or id) in plan steps.
+Agents from config are pre-registered when Agentican starts. They can be referenced by name in workflow steps.
 
 ## SkillConfig
 
-Skills are reusable instruction blocks that plan steps can activate by id/name. They live in the top-level `RuntimeConfig.skills` list — they are not nested inside `AgentConfig`.
+Skills are reusable instruction blocks that workflow steps can activate by name. They live in the top-level `RuntimeConfig.skills` list — they are not nested inside `AgentConfig`.
 
 ```java
-record SkillConfig(String id, String name, String instructions, String externalId)
+record SkillConfig(String id, String name, String instructions)
 ```
 
 ```java
 SkillConfig.builder()
-        .externalId("skill.citations.v1")
         .name("citations")
         .instructions("Always include source URLs")
         .build();
 ```
 
-## PlanConfig
+## WorkflowConfig
 
-Pre-built plans you want registered at boot. Each needs an `externalId`.
+Pre-built workflows you want registered at boot.
 
 ```java
-var plan = new PlanConfig(
-        "research-and-summarize",                      // name
-        "Research a topic and summarize it",           // description
-        List.of(new PlanConfig.PlanParamConfig("topic", "Topic to research", "AI", true)),
+var workflow = new WorkflowConfig(
+        "research-and-summarize",                                                       // name
+        "Research a topic and summarize it",                                            // description
+        List.of(new WorkflowConfig.PlanParamConfig("topic", "Topic to research", "AI", true)),
         List.of(/* PlanStepConfig entries */),
-        "plan.research-and-summarize.v1",              // externalId
-        null);                                         // outputStep — set for typed Agentican<P, R>
+        null);                                                                          // outputStep — set for typed Workflow<P, R>
 ```
 
 ## ComposioConfig
@@ -293,20 +355,17 @@ composio:
   userId: user@example.com
 
 agents:
-  - externalId: agent.researcher.v1
-    name: researcher
+  - name: researcher
     role: Expert researcher who finds and synthesizes information
 
-  - externalId: agent.writer.v1
-    name: writer
+  - name: writer
     role: Documentation specialist with clear, concise writing style
 
 skills:
-  - externalId: skill.citations.v1
-    name: citations
+  - name: citations
     instructions: Always include source URLs
 
-plans: []
+workflows: []
 ```
 
 ```java
@@ -315,65 +374,27 @@ var config = RuntimeConfig.load(Path.of("agentican.yml"));
 
 Environment variables in `${VAR}` form are resolved at load time.
 
-## Agentican Builder
-
-The `Agentican.builder()` is the one-stop entry for both declarative config and framework wiring. It can start fresh, pre-seed from a `RuntimeConfig`, or load a YAML file:
-
-```java
-Agentican.builder()                               // fresh
-Agentican.builder(runtimeConfig)                  // pre-seeded
-Agentican.builder(Path.of("agentican.yml"))      // YAML → RuntimeConfig → pre-seeded
-```
-
-All fluent methods:
+To use the YAML for both axes:
 
 ```java
 Agentican.builder()
-        // Declarative config (parity with RuntimeConfig's lists):
-        .llm(LlmConfig.builder()...build())
-        .agent(AgentConfig.builder().externalId(...).name(...).role(...).build())
-        .skill(SkillConfig.builder().externalId(...).name(...).instructions(...).build())
-        .plan(planConfig)
-        .mcp(McpConfig.builder()...build())
-        .composio(ComposioConfig.builder()...build())
-        .worker(WorkerConfig.builder()...build())
-
-        // Pre-built instances (can't live in RuntimeConfig):
-        .llm("name", llmClient)                     // pre-built LLM client (overrides config-built one with same name)
-        .toolkit("slug", toolkit)                   // custom toolkit
-
-        // Registry overrides (default: in-memory):
-        .agentRegistry(myAgentRegistry)
-        .skillRegistry(mySkillRegistry)
-        .planRegistry(myPlanRegistry)
-
-        // Stores + coordination:
-        .hitlManager(hitlManager)                   // default: logging notifier
-        .taskStateStore(taskStateStore)             // default: in-memory
-        .knowledgeStore(knowledgeStore)             // default: in-memory
-
-        // Observability + extension points:
-        .llmDecorator(llmDecorator)
-        .taskDecorator(taskDecorator)
-        .stepListener(listener)
-        .taskExecutor(executor)
+        .configuration().yaml().path(Path.of("agentican.yml")).end()
+        .registry().yaml().path(Path.of("agentican.yml")).end()
         .build();
 ```
-
-> Agents, skills, and plans supplied via both `RuntimeConfig` and the builder are merged. Each still must carry an `externalId` — the validation runs for both sources.
 
 ### Extension Points
 
 | Interface | Purpose |
 |---|---|
-| `TaskListener` | Receives lifecycle events for tasks, steps, runs, turns, messages, responses, tool calls, and HITL. Used by OTel for span creation and metrics for counters. |
+| `WorkflowRunListener` | Receives lifecycle events for workflow runs, steps, runs, turns, messages, responses, tool calls, and HITL. Used by OTel for span creation and metrics for counters. |
 | `LlmClientDecorator` | Wraps every config-built `LlmClient`. Used by metrics (counters/timers) and OTel (LLM call spans). |
-| `TaskDecorator` | Wraps the `Supplier` passed to `CompletableFuture.supplyAsync()` for each task. Used by OTel to propagate trace context to virtual threads. Supports `snapshot()` for step-level context capture. |
-| `AgentRegistry` / `SkillRegistry` / `PlanRegistry` | Registry interfaces; supply a persistent backend via `.agentRegistry(...)` etc. Each exposes a `seed(...)` hook the framework calls once at boot. |
+| `WorkflowRunDecorator` | Wraps the `Supplier` passed to `CompletableFuture.supplyAsync()` for each workflow run. Used by OTel to propagate trace context to virtual threads. Supports `snapshot()` for step-level context capture. |
+| `AgentRegistry` / `SkillRegistry` / `WorkflowRegistry` | Registry interfaces; supply a persistent backend via `.agentRegistry(impl)` etc. on the Builder. Each exposes a `seed()` hook the framework calls once at boot. |
 
 ### Pre-built LLM Clients
 
-If you want to inject your own `LlmClient` (for testing, custom providers, or to wrap with logging/caching), use `.llm(name, llmClient)`. This takes precedence over `LlmConfig` entries with the same name.
+To inject your own `LlmClient` (for testing, custom providers, or to wrap with logging/caching), use `.llm(name, llmClient)` on the Builder. This takes precedence over `LlmConfig` entries with the same name.
 
 ```java
 LlmClient cachedClient = LlmClient.withLogging(myCustomClient);
@@ -393,49 +414,19 @@ Agentican.builder()
         .build();
 ```
 
-### Custom TaskStateStore
+### Custom WorkflowRunStore
 
-If not provided, Agentican creates a `TaskStateStoreMemory`. Implement your own for durable storage — the `TaskStateStore` interface uses granular mutation methods (`taskStarted()`, `stepStarted()`, `runStarted()`, `turnStarted()`, `messageSent()`, etc.) plus query methods `load(taskId)` and `list()`.
+If not provided, Agentican creates an `InMemoryWfRunStore`. Implement your own for durable storage — the `WorkflowRunStore` interface uses granular mutation methods (`taskStarted()`, `stepStarted()`, `runStarted()`, `turnStarted()`, `messageSent()`, etc.) plus query methods `load(taskId)` and `list()`.
 
 ```java
 Agentican.builder()
-        .taskStateStore(new DatabaseTaskStateStore(dataSource))
+        .workflowRunStore(new DatabaseWorkflowRunStore(dataSource))
         .build();
 ```
 
-## External IDs
+## Identity
 
-`AgentConfig`, `SkillConfig`, `PlanConfig`, and `Plan` all carry an optional `externalId` separate from their internal UUID `id`. The `externalId` is a stable business key that a persistent catalog upserts on, so redeploys don't duplicate rows.
-
-Anything registered through `RuntimeConfig` or the Agentican fluent builder **must** set an `externalId`. `Agentican.build()` throws `IllegalStateException` on any missing one:
-
-```
-skill 'citations' is missing an externalId. Config-file and fluent-builder
-skills must declare a stable externalId so the catalog can upsert
-consistently across deploys.
-```
-
-Set `externalId(...)` on the builder:
-
-```java
-AgentConfig.builder()
-        .externalId("agent.researcher.v1").name("researcher")
-        .role("Expert researcher").llm("default")
-        .build();
-
-SkillConfig.builder()
-        .externalId("skill.citations.v1").name("citations")
-        .instructions("Always cite sources")
-        .build();
-
-Plan.builder("research")
-        .externalId("plan.research.v1")
-        .description("...")
-        .param(...).step(...)
-        .build();
-```
-
-Planner-created agents, skills, and plans have no `externalId` — they're ephemeral, scoped to the run that produced them.
+Agents, skills, and workflows are identified by **name** within their respective registries. Names must be unique per registry and are the canonical reference everywhere — YAML files, the planner's reuse output, workflow steps' `agentName` field, the Quarkus `@Workflow(name = "...")` qualifier. The internal `id` field is auto-generated if not supplied; it's an implementation detail used by persistence stores.
 
 ## Environment Variables
 

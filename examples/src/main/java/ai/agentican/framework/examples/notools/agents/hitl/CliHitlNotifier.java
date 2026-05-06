@@ -20,9 +20,9 @@ public class CliHitlNotifier implements HitlNotifier {
 
         var response = switch (checkpoint.type()) {
 
-            case QUESTION       -> promptQuestion(checkpoint);
-            case STEP_OUTPUT    -> promptStepApproval(checkpoint);
-            case TOOL_CALL      -> promptToolApproval(checkpoint);
+            case QUESTION -> promptQuestion(checkpoint);
+            case STEP_OUTPUT -> promptStepApproval(checkpoint);
+            case TOOL_CALL -> promptToolApproval(checkpoint);
         };
 
         manager.respond(checkpoint.id(), response);
@@ -62,15 +62,18 @@ public class CliHitlNotifier implements HitlNotifier {
         printApprovalBanner("HUMAN APPROVAL REQUIRED", checkpoint);
 
         System.out.print("Approve? [y/N] ");
+
         var approved = readYes();
 
         if (approved) {
 
             System.out.println("→ approved\n");
+
             return HitlResponse.approve();
         }
 
         System.out.print("Feedback for the agent to revise: ");
+
         var feedback = readLineOrEmpty();
 
         System.out.println("→ rejected, re-running with feedback\n");
@@ -83,15 +86,18 @@ public class CliHitlNotifier implements HitlNotifier {
         printApprovalBanner("TOOL CALL APPROVAL", checkpoint);
 
         System.out.print("Approve? [y/N] ");
+
         var approved = readYes();
 
         if (approved) {
 
             System.out.println("→ approved\n");
+
             return HitlResponse.approve();
         }
 
         System.out.print("Reason for rejection: ");
+
         var feedback = readLineOrEmpty();
 
         System.out.println("→ rejected\n");
@@ -119,15 +125,18 @@ public class CliHitlNotifier implements HitlNotifier {
     private static boolean readYes() {
 
         var line = readLineOrEmpty().trim().toLowerCase();
+
         return line.equals("y") || line.equals("yes");
     }
 
     private static String readLineOrEmpty() {
 
         try {
+
             return IN.nextLine();
         }
         catch (NoSuchElementException _) {
+
             return "";
         }
     }
@@ -141,9 +150,11 @@ public class CliHitlNotifier implements HitlNotifier {
         if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return content;
 
         try {
+
             return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(JSON.readTree(trimmed));
         }
         catch (Exception _) {
+
             return content;
         }
     }

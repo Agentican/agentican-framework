@@ -22,7 +22,7 @@ try (var agentican = Agentican.builder()
 Skip the planner and run a hand-built plan:
 
 ```java
-var task = Plan.builder("research-and-summarize")
+var task = WorkflowDefinition.builder("research-and-summarize")
         .description("Research a topic and summarize")
         .param("topic", "What to research", "AI")
         .step("research", "researcher", "Research {{param.topic}} using web search")
@@ -205,12 +205,12 @@ The agent's `ASK_QUESTION` tool result will be `{"question": "...", "answer": ".
 Process a list in parallel by composing a producer step with a loop:
 
 ```java
-var task = Plan.builder("create-report-cards")
+var task = WorkflowDefinition.builder("create-report-cards")
         .step("get-students", "data-fetcher",
                 "Fetch all students as a JSON array with name and grades")
         .loop("create-cards", loop -> loop
                 .over("get-students")
-                .step(PlanStepAgent.builder("create-card")
+                .step(WorkflowStepAgent.builder("create-card")
                         .agent("report-writer")
                         .instructions("Create a report card for {{item.name}} with grades {{item.grades}}")
                         .tools(List.of("create_page", "append_block"))
@@ -227,19 +227,19 @@ The loop iterations run in parallel — each on its own virtual thread, with its
 Route work based on a classifier step's output:
 
 ```java
-var task = Plan.builder("triage")
+var task = WorkflowDefinition.builder("triage")
         .step("classify", "classifier",
                 "Classify this email: {{param.email}}. Return one word: 'urgent', 'normal', or 'spam'")
         .branch("route", branch -> branch
                 .from("classify")
                 .path("urgent",
-                        PlanStepAgent.builder("alert").agent("notifier")
+                        WorkflowStepAgent.builder("alert").agent("notifier")
                                 .instructions("Alert the team about an urgent email").build())
                 .path("normal",
-                        PlanStepAgent.builder("queue").agent("queue-manager")
+                        WorkflowStepAgent.builder("queue").agent("queue-manager")
                                 .instructions("Add to normal queue").build())
                 .path("spam",
-                        PlanStepAgent.builder("discard").agent("logger")
+                        WorkflowStepAgent.builder("discard").agent("logger")
                                 .instructions("Log and discard").build())
                 .defaultPath("normal"))
         .build();
@@ -265,24 +265,26 @@ var agentican = Agentican.builder()
                             HttpResponse.BodyHandlers.ofString());
                     return new HttpOutput(response.body(), response.statusCode());
                 })
-        .plan(PlanConfig.builder()
-                .name("payment-enrichment").externalId("payment-enrichment")
-                .param("customer_id", "Customer to enrich", null, true)
-                .step("fetch-customer", s -> s
-                        .code("http-get")
-                        .input(new HttpInput(
-                                "https://api.internal/customers/{{param.customer_id}}",
-                                "GET")))
-                .step("decide", s -> s
-                        .agent("Risk Analyst")
-                        .instructions("Customer record:\n{{step.fetch-customer.output.body}}\n\n"
-                                    + "HTTP status was {{step.fetch-customer.output.status}}.")
-                        .dependencies("fetch-customer"))
-                .build())
+        .registry().api()
+            .workflow(WorkflowConfig.builder()
+                    .name("payment-enrichment")
+                    .param("customer_id", "Customer to enrich", null, true)
+                    .step("fetch-customer", s -> s
+                            .code("http-get")
+                            .input(new HttpInput(
+                                    "https://api.internal/customers/{{param.customer_id}}",
+                                    "GET")))
+                    .step("decide", s -> s
+                            .agent("Risk Analyst")
+                            .instructions("Customer record:\n{{step.fetch-customer.output.body}}\n\n"
+                                        + "HTTP status was {{step.fetch-customer.output.status}}.")
+                            .dependencies("fetch-customer"))
+                    .build())
+            .end()
         .build();
 ```
 
-The agent reads individual fields from the typed JSON output via `{{step.X.output.field}}`, not the raw blob. See [Plans & Steps → PlanStepCode](tasks.md#planstepcodei) for the full contract.
+The agent reads individual fields from the typed JSON output via `{{step.X.output.field}}`, not the raw blob. See [Plans & Steps → WorkflowStepCode](tasks.md#planstepcodei) for the full contract.
 
 ## Multiple LLMs (Cost Optimization)
 
@@ -290,16 +292,20 @@ Use a fast/cheap model for classification and a stronger one for content generat
 
 ```java
 try (var agentican = Agentican.builder()
-        .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
-        .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
-        .agent(AgentConfig.builder()
-                .externalId("agent.classifier.v1").name("classifier")
-                .role("Quick classifier").llm("haiku")
-                .build())
-        .agent(AgentConfig.builder()
-                .externalId("agent.writer.v1").name("writer")
-                .role("High-quality writer").llm("default")
-                .build())
+        .configuration().api()
+            .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
+            .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
+            .end()
+        .registry().api()
+            .agent(AgentConfig.builder()
+                    .name("classifier")
+                    .role("Quick classifier").llm("haiku")
+                    .build())
+            .agent(AgentConfig.builder()
+                    .name("writer")
+                    .role("High-quality writer").llm("default")
+                    .build())
+            .end()
         .build()) {
     // use agentican — classifier uses haiku, writer uses default
 }
@@ -310,10 +316,10 @@ try (var agentican = Agentican.builder()
 After a task runs, the `TaskLog` contains the full execution history:
 
 ```java
-var taskStateStore = new TaskStateStoreMemory();
+var taskStateStore = new InMemoryWfRunStore();
 
 try (var agentican = Agentican.builder()
-        .taskStateStore(taskStateStore)
+        .workflowRunStore(taskStateStore)
         .build()) {
 
     agentican.run("Do some work").result();

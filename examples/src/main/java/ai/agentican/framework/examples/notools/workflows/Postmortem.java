@@ -15,9 +15,11 @@ public class Postmortem {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder()
-        .registry().yaml().path(config()).end()
-        .build()) {
+        var builder = Agentican.builder()
+                .configuration().yaml().path(config()).end()
+                .registry().yaml().path(config()).end();
+
+        try (var agentican = builder.build()) {
 
             var postmortem = agentican.workflow(PLAN_NAME)
                     .input(Incident.class)

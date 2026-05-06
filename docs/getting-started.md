@@ -35,12 +35,14 @@ public class Hello {
     public static void main(String[] args) {
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+                    .end()
                 .build()) {
 
-            var handle = agentican.run("Explain quantum entanglement in 3 sentences.");
+            var run = agentican.run("Explain quantum entanglement in 3 sentences.");
 
-            System.out.println(handle.result().output());
+            System.out.println(run.await());
         }
     }
 }
@@ -64,7 +66,9 @@ var llm = LlmConfig.builder()
         .model("gpt-4o-mini")
         .build();
 
-try (var agentican = Agentican.builder().llm(llm).build()) { /* use agentican */ }
+try (var agentican = Agentican.builder()
+        .configuration().api().llm(llm).end()
+        .build()) { /* use agentican */ }
 ```
 
 ### Using Google Gemini
@@ -78,7 +82,9 @@ var llm = LlmConfig.builder()
         .model("gemini-2.5-flash")
         .build();
 
-try (var agentican = Agentican.builder().llm(llm).build()) { /* use agentican */ }
+try (var agentican = Agentican.builder()
+        .configuration().api().llm(llm).end()
+        .build()) { /* use agentican */ }
 ```
 
 ### Using OSS-hosted providers
@@ -112,7 +118,9 @@ var llm = LlmConfig.builder()
         .model("anthropic.claude-sonnet-4-5-20250929-v1:0")
         .build();
 
-try (var agentican = Agentican.builder().llm(llm).build()) { /* use agentican */ }
+try (var agentican = Agentican.builder()
+        .configuration().api().llm(llm).end()
+        .build()) { /* use agentican */ }
 ```
 
 For static credentials — e.g. in tests — pair `apiKey` and `secretKey`:
@@ -137,7 +145,9 @@ var llm = LlmConfig.builder()
         .model("llama3.3:70b")
         .build();
 
-try (var agentican = Agentican.builder().llm(llm).build()) { /* use agentican */ }
+try (var agentican = Agentican.builder()
+        .configuration().api().llm(llm).end()
+        .build()) { /* use agentican */ }
 ```
 
 See [Configuration → Supported providers](configuration.md#supported-providers) for what's the same and what's not across providers.
@@ -146,36 +156,39 @@ See [Configuration → Supported providers](configuration.md#supported-providers
 
 When you called `agentican.run("Explain quantum entanglement...")`, the framework:
 
-1. **Planned** the task — `PlannerAgent` decided whether to reuse a cataloged `Plan` or create a new one from the description
+1. **Planned** the task — `WorkflowPlannerAgent` decided whether to reuse a cataloged `WorkflowDefinition` or create a new one from the description
 2. **Built** any agents the planner introduced via `AgentFactory`
 3. **Refined** each step's instructions with available tool context (create path only)
-4. **Executed** the workflow on virtual threads, returning a `TaskHandle`
-5. **Returned** the `TaskResult` when you called `handle.result()`
+4. **Executed** the workflow on virtual threads, returning a `WorkflowRun<String>`
+5. **Returned** the typed output when you called `run.await()`
 
 For a simple explanation task, the planner created a single step with an LLM call. For multi-step tasks, it would compose specialized agents that work in parallel where possible.
 
 ## Async Execution
 
-`run()` returns a `TaskHandle` immediately — execution happens on a virtual thread. You can:
+`run()` returns a `WorkflowRun<String>` immediately — execution happens on a virtual thread. You can:
 
 ```java
-var handle = agentican.run("Long running task...");
+var run = agentican.run("Long running task...");
 
 // Don't block — check later
-if (!handle.isDone()) {
+if (!run.isDone()) {
     // Do other work
 }
 
-// Block when ready
-var result = handle.result();
+// Block when ready and get the typed output (String here)
+var output = run.await();
 
-// Or use CompletableFuture
-handle.resultAsync().thenAccept(result -> {
-    System.out.println(result.lastOutput());
+// Or use CompletableFuture for the typed output
+run.future().thenAccept(output -> {
+    System.out.println(output);
 });
 
+// Or get the full execution struct (status, step outputs, token usage)
+var result = run.untypedResult();
+
 // Cancel if needed
-handle.cancel();
+run.cancel();
 ```
 
 ## Adding Tools
@@ -186,11 +199,13 @@ Out of the box, agents can search the web and fetch content (built into Claude).
 var myToolkit = new MyCustomToolkit();
 
 try (var agentican = Agentican.builder()
-        .llm(LlmConfig.builder().apiKey(apiKey).build())
         .toolkit("my-tools", myToolkit)
+        .configuration().api()
+            .llm(LlmConfig.builder().apiKey(apiKey).build())
+            .end()
         .build()) {
 
-    agentican.run("Use my tools to do the thing").result();
+    agentican.run("Use my tools to do the thing").await();
 }
 ```
 
@@ -214,11 +229,13 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
 });
 
 try (var agentican = Agentican.builder()
-        .llm(LlmConfig.builder().apiKey(apiKey).build())
         .hitlManager(hitlManager)
+        .configuration().api()
+            .llm(LlmConfig.builder().apiKey(apiKey).build())
+            .end()
         .build()) {
 
-    agentican.run("Send an email summarizing today's standup").result();
+    agentican.run("Send an email summarizing today's standup").await();
 }
 ```
 

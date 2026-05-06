@@ -15,9 +15,11 @@ public class ChurnRisk {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder()
-        .registry().yaml().path(config()).end()
-        .build()) {
+        var builder = Agentican.builder()
+                .configuration().yaml().path(config()).end()
+                .registry().yaml().path(config()).end();
+
+        try (var agentican = builder.build()) {
 
             var assessment = agentican.workflow(PLAN_NAME)
                     .input(Account.class)

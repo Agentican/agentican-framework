@@ -1,45 +1,43 @@
-# Plans & Steps
+# Workflows & Steps
 
-A `Plan` is a structured workflow definition. You can create one by hand or let Agentican's planner build it from a natural language description.
+A `WorkflowDefinition` is a structured workflow. You can create one by hand or let Agentican's planner build it from a natural-language description.
 
-## Plan Anatomy
+## WorkflowDefinition Anatomy
 
 ```java
-record Plan(
-    String id,              // internal UUID, auto-generated
-    String name,
+record WorkflowDefinition(
+    String id,              // auto-generated if not supplied
+    String name,            // unique within the WorkflowRegistry
     String description,
-    List<PlanParam> params,
-    List<PlanStep> steps,
-    String externalId       // optional stable business key
+    List<WorkflowParam> params,
+    List<WorkflowStep> steps,
+    String outputStep       // step whose output is the workflow's typed output
 )
 ```
 
-A plan has an auto-generated internal UUID, a name, description, optional parameters, and a list of steps. Steps can depend on each other; the runner builds a dependency graph and executes independent steps in parallel.
-
-Plans registered at boot (via `RuntimeConfig.plans` or `Agentican.builder().plan(...)`) must carry an `externalId` so a catalog can upsert on redeploys. Use the builder for all construction — pass `.externalId(...)` for cataloged plans, omit it for ephemeral ones (planner output, tests):
+A workflow has a name, description, optional parameters, and a list of steps. Steps can depend on each other; the runner builds a dependency graph and executes independent steps in parallel.
 
 ```java
-Plan.builder(name)
+WorkflowDefinition.builder(name)
     .description(description)
-    .externalId(externalId)         // optional — cataloged plans only
     .param(...)
     .step(...)
+    .outputStep("final-step")
     .build();
 ```
 
 ## Step Types
 
-`PlanStep` is a sealed interface with four implementations:
+`WorkflowStep` is a sealed interface with four implementations:
 
-### PlanStepAgent
+### WorkflowStepAgent
 
 Runs an agent with the given instructions.
 
 Use the builder — it handles optional fields cleanly and reads naturally:
 
 ```java
-PlanStepAgent.builder("research-llms")
+WorkflowStepAgent.builder("research-llms")
     .agent("AI Research Specialist")
     .instructions("Identify the top 3 LLMs for ...")
     .tool("web_search")
@@ -49,7 +47,7 @@ PlanStepAgent.builder("research-llms")
 The canonical record constructor is still available for cases where you already have every field (e.g., copy-with operations inside the framework):
 
 ```java
-new PlanStepAgent(
+new WorkflowStepAgent(
     "research-llms",                    // step name
     "AI Research Specialist",           // agent name
     "Identify the top 3 LLMs for ...",  // instructions
@@ -60,7 +58,7 @@ new PlanStepAgent(
 );
 
 // Builder with per-step overrides
-PlanStepAgent.builder("classify")
+WorkflowStepAgent.builder("classify")
     .agent("classifier")
     .instructions("Classify the document")
     .timeout(Duration.ofSeconds(30))    // overrides global WorkerConfig.timeout
@@ -68,12 +66,12 @@ PlanStepAgent.builder("classify")
     .build();
 ```
 
-### PlanStepLoop
+### WorkflowStepLoop
 
 Iterates over an upstream step's output, running a sub-plan per item.
 
 ```java
-new PlanStepLoop(
+new WorkflowStepLoop(
     "create-pages",                  // step name
     "research-llms",                 // 'over' — name of step whose output is iterated
     List.of(...bodySteps),           // body — sub-steps run per iteration
@@ -100,17 +98,17 @@ Inside the loop body, items are accessible via placeholders:
 
 The `shared_context` key (and any other top-level keys) gets merged into each item, useful for parent IDs or other shared data.
 
-### PlanStepBranch
+### WorkflowStepBranch
 
 Conditionally executes one of several paths based on an upstream step's output.
 
 ```java
-new PlanStepBranch(
+new WorkflowStepBranch(
     "route",                         // step name
     "classify",                      // 'from' — name of producer step
     List.of(
-        new PlanStepBranch.Path("urgent", urgentBody),
-        new PlanStepBranch.Path("normal", normalBody)
+        new WorkflowStepBranch.Path("urgent", urgentBody),
+        new WorkflowStepBranch.Path("normal", normalBody)
     ),
     "normal",                        // defaultPath (optional)
     List.of(),                       // dependencies
@@ -118,7 +116,7 @@ new PlanStepBranch(
 );
 ```
 
-For plan-level construction the `PlanConfig.builder().branch(...)` sub-builder is typically cleaner (see [Building Plans Manually](#building-plans-manually)).
+For plan-level construction the `WorkflowConfig.builder().branch(...)` sub-builder is typically cleaner (see [Building Plans Manually](#building-plans-manually)).
 
 The producer's output is matched against path names with these strategies (in order):
 1. Exact match (case-insensitive)
@@ -126,7 +124,7 @@ The producer's output is matched against path names with these strategies (in or
 3. JSON array — first element matched
 4. Default path
 
-### PlanStepCode\<I\>
+### WorkflowStepCode\<I\>
 
 Runs a registered Java function (no LLM round-trip). The input and output are typed user records — Jackson handles serialization at the boundaries so the executor works against typed Java values.
 
@@ -157,16 +155,18 @@ Agentican.builder()
                     HttpResponse.BodyHandlers.ofString());
             return new HttpOutput(response.body(), response.statusCode());
         })
-    .plan(myPlan)
+    .registry().api()
+        .workflow(myWorkflowConfig)
+        .end()
     .build();
 ```
 
-`StepContext` carries `taskId`, `stepId`, `AtomicBoolean cancelled`, `TaskStateStore`, and `HitlManager`.
+`StepContext` carries `taskId`, `stepId`, `AtomicBoolean cancelled`, `WorkflowRunStore`, and `HitlManager`.
 
 #### 3. Reference it from a plan
 
 ```java
-PlanConfig.builder()
+WorkflowConfig.builder()
     .step("fetch-customer", s -> s
         .code("http-get")
         .input(new HttpInput(
@@ -209,7 +209,7 @@ For ad-hoc scripts the typed record can be skipped — pass a `Map` or even a `S
 Steps can have conditions that are evaluated before dispatch. If conditions fail, the step is skipped — marked as completed with empty output so dependents can still run.
 
 ```java
-PlanStepAgent.builder("notify")
+WorkflowStepAgent.builder("notify")
     .agent("notifier")
     .instructions("Send notification")
     .dependency("classifier")
@@ -238,30 +238,31 @@ PlanStepAgent.builder("notify")
 
 Condition sources use the same `{{step.X.output}}` and `{{param.name}}` placeholder syntax as step instructions.
 
-## Building Plans Manually
+## Building Workflows Manually
 
-Use `Plan.builder()` for a fluent API:
+Use `WorkflowDefinition.builder()` for a fluent API:
 
 ```java
-var task = Plan.builder("research-task")
+var workflow = WorkflowDefinition.builder("research-task")
         .description("Research and summarize")
         .param("topic", "What to research", "AI")
         .step("research", "researcher", "Research {{param.topic}}")
         .step("summarize", "writer", "Summarize {{step.research.output}}",
                 List.of("research"))
+        .outputStep("summarize")
         .build();
 
-agentican.run(task).result();
+var output = agentican.workflow(workflow).input(Void.class).build().start().await();
 ```
 
 For loops and branches, use the inner builders:
 
 ```java
-var task = Plan.builder("multi-page")
+var workflow = WorkflowDefinition.builder("multi-page")
         .step("plan", "planner", "List 3 topics as JSON array")
         .loop("create-pages", loop -> loop
                 .over("plan")
-                .step(PlanStepAgent.builder("create-page")
+                .step(WorkflowStepAgent.builder("create-page")
                         .agent("writer")
                         .instructions("Create page about {{item}}")
                         .tools(List.of("create_page", "append_block"))
@@ -269,35 +270,35 @@ var task = Plan.builder("multi-page")
         .build();
 ```
 
-## Typed Invocation with `Agentican<P, R>`
+## Typed Invocation with `Workflow<P, R>`
 
-A `Plan` by itself runs as an untyped task — params are a `Map<String, String>` and output is a blob of text. For callers that want typed parameters in and a typed structured result out, bind the plan to an `Agentican<P, R>`:
+A `WorkflowDefinition` by itself can run as an untyped workflow — params are a `Map<String, String>` and output is a blob of text. For callers that want typed parameters in and a typed structured result out, bind the definition to a `Workflow<P, R>`:
 
 ```java
 record TriageParams(String customerId, String priority) {}
 record TriageOutput(String classification, String reason) {}
 
-var triage = runtime.agentican(plan)
+var triage = agentican.workflow(definition)
         .input(TriageParams.class)
         .output(TriageOutput.class)
         .build();
 
-TriageOutput out = triage.runAndAwait(new TriageParams("cust-42", "HIGH"));
+TriageOutput out = triage.start(new TriageParams("cust-42", "HIGH")).await();
 ```
 
-- Params convert via Jackson with `SNAKE_CASE` — `customerId` → plan param `customer_id`.
+- Params convert via Jackson with `SNAKE_CASE` — `customerId` → workflow param `customer_id`.
 - `Void.class` on either slot skips that side (no typed params, no typed output). Omit `.output(...)` to default `R` to `Void`.
-- `runtime.agentican("planName").input(P.class).output(R.class).build()` resolves by name from the registry on each call — picks up late-registered or persisted plans.
+- `agentican.workflow("name").input(P.class).output(R.class).build()` resolves by name from the registry at `build()` time — the workflow must already be registered.
 
 ### Designating the output step
 
 For multi-step plans, declare which step's output the typed result comes from:
 
 ```java
-Plan.builder("triage")
+WorkflowDefinition.builder("triage")
     .param("customer_id", "The customer to triage", null, true)
     .step("gather", ...)
-    .step(PlanStepAgent.builder("classify")
+    .step(WorkflowStepAgent.builder("classify")
             .agent("triage")
             .instructions("Respond with JSON: {classification, reason}")
             .dependency("gather")
@@ -308,16 +309,16 @@ Plan.builder("triage")
 
 The framework attaches a JSON Schema generated from `TriageOutput.class` to `classify`'s LLM request via the provider's native structured-output mode (Anthropic `output_config.format`, OpenAI `response_format: json_schema (strict)`, Gemini `responseJsonSchema`, OpenAI-compatible passthrough). The model is forced to emit conformant JSON, which Jackson then deserializes into `TriageOutput`.
 
-If the task fails, `runAndAwait` throws `TaskFailedException` (carries the `TaskResult`). If the output step emits text that doesn't match `R`, it throws `OutputParseException` (carries the raw output and target class).
+If the workflow fails, `await()` throws `WorkflowOutputException` (carries the `WorkflowRunResult`). If the output step emits text that doesn't match `R`, it also throws `WorkflowOutputException` (carries the raw output and target class).
 
-Under Quarkus, inject the typed invoker directly:
+Under Quarkus, inject the typed handle directly:
 
 ```java
-@Inject @AgenticanPlan("triage")
-Agentican<TriageParams, TriageOutput> triage;
+@Inject @Workflow(name = "triage")
+Workflow<TriageParams, TriageOutput> triage;
 ```
 
-For reactive composition (returns `Uni<R>` instead of blocking), inject `ReactiveAgenticanTask<P, R>` with the same qualifier — see [CDI Integration — typed reactive invoker](quarkus/cdi.md#typed-reactive-invoker--reactiveagenticanp-r).
+For reactive composition (returns `Uni<R>` instead of blocking), inject `ReactiveWorkflowAdapter<P, R>` with the same qualifier — see [CDI Integration → typed reactive workflow](quarkus/cdi.md).
 
 ## Placeholder Resolution
 
@@ -355,67 +356,73 @@ For loops, `over` becomes an implicit dependency. For branches, `from` does too.
 
 Cyclic dependencies are detected at task start and throw `IllegalStateException`.
 
-## Running Plans
+## Running Workflows
 
 ```java
-// Plan from natural language — planner may REUSE a cataloged plan or CREATE a new one.
-// When it reuses, extracted param values ride in PlanningResult.inputs() and flow into the task.
-TaskHandle h1 = agentican.run("Research and summarize quantum computing");
+// Plan from natural language — the planner may REUSE a cataloged workflow or CREATE a new one.
+// On reuse, extracted param values ride in WorkflowPlan.inputs() and flow into dispatch.
+WorkflowRun<String> h1 = agentican.run("Research and summarize quantum computing");
 
-// Run a pre-built plan directly (skips the planner)
-TaskHandle h2 = agentican.run(myPlan);
+// Run a pre-built definition directly (skips the planner). For typed I/O,
+// chain .input(I.class).output(O.class) before .build().
+WorkflowRun<Void> h2 = agentican.workflow(myDefinition).input(Void.class).build().start();
 
-// Run with parameter values
-TaskHandle h3 = agentican.run(myPlan, Map.of("topic", "quantum computing"));
+// Run with parameter values via a typed input record
+WorkflowRun<Void> h3 = agentican.workflow(myDefinition)
+        .input(MyParams.class).build()
+        .start(new MyParams("quantum computing"));
 
-// All return TaskHandle — block on result() or use resultAsync()
-TaskResult result = h1.result();
+// Block on the typed output, or get the full execution struct
+String text = h1.await();
+WorkflowRunResult result = h1.untypedResult();
 ```
 
 ### Planner reuse-or-create
 
-When you pass a natural-language task, `PlannerAgent.plan(String)` returns a `PlanningResult(Plan, Map<String, String> inputs)`. The planner prompt includes an `<existing-plans>` block listing cataloged plans (internal id, name, description, param names), and the LLM returns one of:
+When you pass a natural-language task, `WorkflowPlannerAgent.plan(String)` returns a `WorkflowPlan(WorkflowDefinition definition, Map<String, String> inputs)`. The planner prompt includes an `<existing-plans>` block listing cataloged workflows (name, description, param names), and the LLM returns one of:
 
-- **`ReuseExisting(planRef, inputs)`** — when an existing plan fits. `planRef` is the internal plan id; `inputs` are the param values extracted from the user's description. The framework looks the plan up in the `PlanRegistry` and runs it with those inputs.
-- **`PlannerOutput(...)`** — a brand-new plan (agents, skills, steps). The framework registers any new agents/skills and then runs a refinement pass over each step.
+- **`WorkflowSelected(name, inputs)`** — when an existing workflow fits. `name` is the workflow's name; `inputs` are the param values extracted from the user's description. The framework looks the workflow up in the `WorkflowRegistry` and runs it with those inputs.
+- **`WorkflowPlanned(...)`** — a brand-new workflow (agents, skills, steps). The framework registers any new agents/skills and then runs a refinement pass over each step.
 
-If the planner hallucinates a `planRef` that isn't in the catalog, the framework retries once with an empty `<existing-plans>` block, forcing a create.
+If the planner emits a `name` that isn't in the catalog, the framework retries once with an empty `<existing-plans>` block, forcing a create.
 
-## TaskHandle
+## WorkflowRun
 
-The handle returned by `agentican.run()`. Use it to wait for results, check status, or cancel:
+The handle returned by `agentican.run()` and `Workflow.start()`. Use it to wait for results, check status, or cancel:
 
 ```java
-var handle = agentican.run("Do something");
+var run = agentican.run("Do something");
 
-handle.taskId();       // 8-char hex ID for this execution
-handle.result();       // blocks until complete, returns TaskResult
-handle.resultAsync();  // returns CompletableFuture<TaskResult>
-handle.isDone();       // true if execution finished
-handle.cancel();       // request cancellation (agent checks between turns)
-handle.isCancelled();  // true if cancel() was called
+run.id();              // 8-char hex ID for this execution
+run.await();           // blocks until complete, returns the typed R
+run.future();          // returns CompletableFuture<R>
+run.untypedResult();   // blocks; returns full WorkflowRunResult
+run.untypedFuture();   // returns CompletableFuture<WorkflowRunResult>
+run.isDone();          // true if execution finished
+run.cancel();          // request cancellation (agent checks between turns)
+run.isCancelled();     // true if cancel() was called
 ```
 
-## TaskResult
+## WorkflowRunResult
 
 ```java
-record TaskResult(
+record WorkflowRunResult(
     String name,
-    TaskStatus status,
-    List<TaskStepResult> stepResults
+    WorkflowRunStatus status,
+    List<WorkflowStepResult> stepResults
 )
 ```
 
-- `lastOutput()` — the final step's text output
+- `output()` — the final step's text output
 - `inputTokens()`, `outputTokens()`, `cacheReadTokens()`, `cacheWriteTokens()`, `webSearchRequests()` — aggregate token usage across all steps
 
-## TaskStatus
+## WorkflowRunStatus
 
 | Value | Meaning |
 |-------|---------|
 | `COMPLETED` | All steps finished successfully |
-| `FAILED` | A step failed and halted the task |
-| `CANCELLED` | `TaskHandle.cancel()` was called |
+| `FAILED` | A step failed and halted the workflow |
+| `CANCELLED` | `WorkflowRun.cancel()` was called |
 | `SUSPENDED` | A step is waiting for HITL response |
 
 ## Next Steps
