@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Copywriter
+    id: copywriter
     role: |
       Writes marketing messages that lead with value, not jargon. Adapts voice to the audience
       — technical for engineers, strategic for executives, concrete for practitioners. Keeps
@@ -12,6 +10,7 @@ agents:
 
 skills:
   - name: Tone spectrum
+    id: tone-spectrum
     instructions: |
       Tonal registers to cover when generating variants. Professional: formal, full sentences,
       proper nouns spelled out. Conversational: contractions, rhetorical questions, addresses
@@ -21,6 +20,7 @@ skills:
 
 workflows:
   - name: Message Variants
+    id: message-variants
     params:
       - name: core_message
         description: Core message to rewrite

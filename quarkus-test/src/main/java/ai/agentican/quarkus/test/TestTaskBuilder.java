@@ -14,7 +14,7 @@ public final class TestTaskBuilder {
         var step = new WorkflowStepAgent("step", agentName, instructions,
                 List.of(), false, List.of(), List.of());
 
-        return WorkflowDefinition.builder(taskName).description("test task").step(step).build();
+        return WorkflowDefinition.builder(taskName, taskName).description("test task").step(step).build();
     }
 
     public static WorkflowDefinition twoStepSequential(String taskName, String agentName,
@@ -25,6 +25,6 @@ public final class TestTaskBuilder {
         var step2 = new WorkflowStepAgent("step2", agentName, instructions2,
                 List.of("step1"), false, List.of(), List.of());
 
-        return WorkflowDefinition.builder(taskName).description("test task").steps(List.of(step1, step2)).build();
+        return WorkflowDefinition.builder(taskName, taskName).description("test task").steps(List.of(step1, step2)).build();
     }
 }

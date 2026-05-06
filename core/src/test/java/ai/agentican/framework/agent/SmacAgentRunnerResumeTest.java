@@ -32,7 +32,7 @@ class SmacAgentRunnerResumeTest {
         return m;
     }
 
-    private static Agent agent(SmacAgentRunner r) { return Agent.builder().config(AgentConfig.builder().name("resume-agent").role("Test role").build()).runner(r).build(); }
+    private static Agent agent(SmacAgentRunner r) { return Agent.builder().config(AgentConfig.builder().name("resume-agent").id("resume-agent").role("Test role").build()).runner(r).build(); }
 
     @Test
     void resumeWithNoSavedTurnsBehavesAsFreshRun() {
@@ -87,7 +87,7 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p").description("")
+                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p", "p").description("")
                         .step(new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                                 "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
                         .build());
@@ -149,7 +149,7 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p").description("")
+                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p", "p").description("")
                         .step(new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                                 "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
                         .build());
@@ -213,7 +213,7 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p").description("")
+                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p", "p").description("")
                         .step(new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                                 "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
                         .build());
@@ -259,7 +259,7 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p").description("")
+                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p", "p").description("")
                         .step(new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                                 "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
                         .build());
@@ -309,7 +309,7 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p").description("")
+                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p", "p").description("")
                         .step(new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                                 "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
                         .build());

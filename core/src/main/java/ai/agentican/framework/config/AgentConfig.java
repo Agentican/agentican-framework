@@ -1,7 +1,5 @@
 package ai.agentican.framework.config;
 
-import ai.agentican.framework.util.Ids;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.time.Duration;
@@ -21,14 +19,14 @@ public record AgentConfig(
 
     public AgentConfig {
 
+        if (id == null || id.isBlank())
+            throw new IllegalArgumentException("Agent id is required (name='" + name + "')");
+
         if (name == null || name.isBlank())
             throw new IllegalArgumentException("Agent name is required");
 
         if (role == null || role.isBlank())
             throw new IllegalArgumentException("Agent role is required");
-
-        if (id == null || id.isBlank())
-            id = Ids.generate();
 
         if (llm == null || llm.isBlank())
             llm = LlmConfig.DEFAULT;

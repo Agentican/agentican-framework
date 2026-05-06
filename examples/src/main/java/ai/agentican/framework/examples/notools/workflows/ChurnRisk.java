@@ -16,7 +16,7 @@ public class ChurnRisk {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -37,6 +37,11 @@ public class ChurnRisk {
         return Path.of(Objects.requireNonNull(ChurnRisk.class.getResource("/churn-risk.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(ChurnRisk.class.getResource("/engine.yaml")).toURI());
+    }
     static Account account() {
 
         return new Account("""

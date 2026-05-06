@@ -4,7 +4,6 @@ import ai.agentican.framework.config.WorkerConfig;
 import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.LlmConfig;
-import ai.agentican.framework.config.RuntimeConfig;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.store.KnowledgeStore;
 import ai.agentican.framework.llm.LlmClient;
@@ -15,13 +14,15 @@ import ai.agentican.framework.util.Logs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
 
 public class AgentFactory {
 
     private static final Logger LOG = LoggerFactory.getLogger(AgentFactory.class);
 
-    private final RuntimeConfig config;
+    private final WorkerConfig workerConfig;
+    private final List<LlmConfig> llmConfigs;
     private final HitlManager hitlManager;
     private final SkillRegistry skillRegistry;
     private final KnowledgeStore knowledgeStore;
@@ -30,11 +31,12 @@ public class AgentFactory {
 
     private final Map<String, LlmClient> llms;
 
-    private AgentFactory(RuntimeConfig config, Map<String, LlmClient> llms, HitlManager hitlManager,
-                         SkillRegistry skillRegistry, KnowledgeStore knowledgeStore, WorkflowRunStore workflowRunStore,
-                         WorkflowRunListener workflowRunListener) {
+    private AgentFactory(WorkerConfig workerConfig, List<LlmConfig> llmConfigs, Map<String, LlmClient> llms,
+                         HitlManager hitlManager, SkillRegistry skillRegistry, KnowledgeStore knowledgeStore,
+                         WorkflowRunStore workflowRunStore, WorkflowRunListener workflowRunListener) {
 
-        this.config = config;
+        this.workerConfig = workerConfig;
+        this.llmConfigs = llmConfigs;
         this.llms = llms;
         this.hitlManager = hitlManager;
         this.skillRegistry = skillRegistry;
@@ -54,22 +56,18 @@ public class AgentFactory {
         if (agentLlm == null)
             throw new IllegalStateException("No LLM client found for '" + agentConfig.llm() + "' (agent: " + configAgentName + ")");
 
-        var runnerConfig = config.agentRunner() != null
-                ? config.agentRunner()
-                : new WorkerConfig(0, null);
-
         var maxTurns = agentConfig.maxTurns() != null
                 ? agentConfig.maxTurns()
-                : runnerConfig.maxTurns();
+                : workerConfig.maxTurns();
 
         var timeout = agentConfig.timeout() != null
                 ? agentConfig.timeout()
-                : runnerConfig.timeout();
+                : workerConfig.timeout();
 
-        var llmConfig = config.llm().stream()
+        var llmConfig = llmConfigs.stream()
                 .filter(llm -> llm.name().equals(configLlmName))
                 .findFirst()
-                .orElse(config.llm().isEmpty() ? null : config.llm().getFirst());
+                .orElse(llmConfigs.isEmpty() ? null : llmConfigs.getFirst());
 
         var llm = configLlmName != null ? configLlmName : LlmConfig.DEFAULT;
         var provider = llmConfig != null ? llmConfig.provider() : null;
@@ -115,7 +113,8 @@ public class AgentFactory {
 
     public static class Builder {
 
-        private RuntimeConfig config;
+        private WorkerConfig workerConfig;
+        private List<LlmConfig> llmConfigs = List.of();
         private HitlManager hitlManager;
         private SkillRegistry skillRegistry;
         private KnowledgeStore knowledgeStore;
@@ -126,7 +125,8 @@ public class AgentFactory {
 
         Builder() {}
 
-        public Builder config(RuntimeConfig config) { this.config = config; return this; }
+        public Builder workerConfig(WorkerConfig workerConfig) { this.workerConfig = workerConfig; return this; }
+        public Builder llmConfigs(List<LlmConfig> llmConfigs) { this.llmConfigs = llmConfigs != null ? llmConfigs : List.of(); return this; }
         public Builder hitlManager(HitlManager hitlManager) { this.hitlManager = hitlManager; return this; }
         public Builder skillRegistry(SkillRegistry skillRegistry) { this.skillRegistry = skillRegistry; return this; }
         public Builder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
@@ -137,8 +137,8 @@ public class AgentFactory {
 
         public AgentFactory build() {
 
-            return new AgentFactory(config, llms, hitlManager, skillRegistry, knowledgeStore, workflowRunStore,
-                    workflowRunListener);
+            return new AgentFactory(workerConfig, llmConfigs, llms, hitlManager, skillRegistry, knowledgeStore,
+                    workflowRunStore, workflowRunListener);
         }
     }
 }

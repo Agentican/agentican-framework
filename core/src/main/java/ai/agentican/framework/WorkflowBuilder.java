@@ -154,7 +154,7 @@ public final class WorkflowBuilder {
 
         if (!inlineSteps.isEmpty()) {
 
-            return WorkflowDefinition.builder(workflowName)
+            return WorkflowDefinition.builder(ai.agentican.framework.util.Ids.generate(), workflowName)
                     .description(inlineDescription)
                     .params(inlineParams)
                     .steps(inlineSteps)

@@ -25,7 +25,7 @@ public class MeetingMinutes {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -49,6 +49,11 @@ public class MeetingMinutes {
         return Path.of(Objects.requireNonNull(MeetingMinutes.class.getResource("/meeting-minutes.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(MeetingMinutes.class.getResource("/engine.yaml")).toURI());
+    }
     static RawNotes notes() {
 
         return new RawNotes("Agentican rollout planning", """

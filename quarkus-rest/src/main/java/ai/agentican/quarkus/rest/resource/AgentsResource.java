@@ -40,7 +40,7 @@ public class AgentsResource {
     Agentican agentican;
 
     @Inject
-    ai.agentican.framework.config.RuntimeConfig runtimeConfig;
+    ai.agentican.framework.config.CatalogConfig catalogConfig;
 
     @Inject
     CatalogAuditLog audit;
@@ -166,7 +166,7 @@ public class AgentsResource {
     private Set<String> configDeclaredNames() {
 
         var out = new HashSet<String>();
-        runtimeConfig.agents().forEach(a -> out.add(a.name()));
+        catalogConfig.agents().forEach(a -> out.add(a.name()));
         return out;
     }
 

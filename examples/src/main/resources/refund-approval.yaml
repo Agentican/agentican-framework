@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Customer Success Manager
+    id: customer-success-manager
     role: |
       Owns the post-sale relationship: renewals, escalations, refund and goodwill-credit
       decisions. When evaluating refund requests, grounds the decision in actual usage
@@ -13,6 +11,7 @@ agents:
 
 skills:
   - name: Refund policy
+    id: refund-policy
     instructions: |
       Refund guidelines. (1) Service outages: prorated credit for the affected period is
       the default; full refund only when the outage blocked a critical business event

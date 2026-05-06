@@ -55,7 +55,7 @@ class TracingIntegrationTest {
 
         mockLlm.queueEndTurn("Traced result");
 
-        var task = WorkflowDefinition.builder("otel-test").description("test")
+        var task = WorkflowDefinition.builder("otel-test", "otel-test").description("test")
                 .step(new WorkflowStepAgent("research", "researcher", "do something",
                         List.of(), false, List.of(), List.of()))
                 .build();
@@ -72,7 +72,7 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("Step 1 result");
         mockLlm.queueEndTurn("Step 2 result");
 
-        var task = WorkflowDefinition.builder("multi-step-trace").description("test").steps(List.of(
+        var task = WorkflowDefinition.builder("multi-step-trace", "multi-step-trace").description("test").steps(List.of(
                 new WorkflowStepAgent("step1", "researcher", "do step 1", List.of(), false, List.of(), List.of()),
                 new WorkflowStepAgent("step2", "researcher", "do step 2", List.of("step1"), false, List.of(), List.of())))
                 .build();
@@ -88,7 +88,7 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("Step 1 done");
         mockLlm.queueEndTurn("Step 2 done");
 
-        var task = WorkflowDefinition.builder("trace-id-test").description("test").steps(List.of(
+        var task = WorkflowDefinition.builder("trace-id-test", "trace-id-test").description("test").steps(List.of(
                 new WorkflowStepAgent("alpha", "researcher", "do alpha", List.of(), false, List.of(), List.of()),
                 new WorkflowStepAgent("beta", "researcher", "do beta", List.of("alpha"), false, List.of(), List.of())))
                 .build();
@@ -120,7 +120,7 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("Step A result");
         mockLlm.queueEndTurn("Step B result");
 
-        var task = WorkflowDefinition.builder("full-tree-test").description("test").steps(List.of(
+        var task = WorkflowDefinition.builder("full-tree-test", "full-tree-test").description("test").steps(List.of(
                 new WorkflowStepAgent("step-a", "researcher", "do A", List.of(), false, List.of(), List.of()),
                 new WorkflowStepAgent("step-b", "researcher", "do B", List.of("step-a"), false, List.of(), List.of())))
                 .build();
@@ -167,7 +167,7 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("First done");
         mockLlm.queueEndTurn("Second done");
 
-        var task = WorkflowDefinition.builder("nesting-test").description("test").steps(List.of(
+        var task = WorkflowDefinition.builder("nesting-test", "nesting-test").description("test").steps(List.of(
                 new WorkflowStepAgent("first", "researcher", "do first", List.of(), false, List.of(), List.of()),
                 new WorkflowStepAgent("second", "researcher", "do second", List.of("first"), false, List.of(), List.of())))
                 .build();

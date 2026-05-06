@@ -26,7 +26,7 @@ public class LandingCopy {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end()
                 .hitlManager(new HitlManager(new CliHitlNotifier()));
 
@@ -51,6 +51,11 @@ public class LandingCopy {
         return Path.of(Objects.requireNonNull(LandingCopy.class.getResource("/landing-copy.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(LandingCopy.class.getResource("/engine.yaml")).toURI());
+    }
     static LandingPageBrief brief() {
 
         return new LandingPageBrief(

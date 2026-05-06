@@ -1,14 +1,13 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Procurement Analyst
+    id: procurement-analyst
     role: |
       Normalizes vendor proposals into a common comparison structure. Extracts
       pricing, SLA, security posture, and integration cost into comparable
       fields. Flags omitted answers rather than inferring.
 
   - name: Procurement Lead
+    id: procurement-lead
     role: |
       Owns vendor selection against an evaluation matrix with explicit weights.
       Writes a recommendation memo that names the runner-up and the single
@@ -17,6 +16,7 @@ agents:
 
 skills:
   - name: Proposal parsing
+    id: proposal-parsing
     instructions: |
       For each vendor, pull: annual list price, volume-discount tier, SLA
       uptime + credit mechanics, security certifications (SOC 2, ISO 27001),
@@ -25,6 +25,7 @@ skills:
       infer from marketing copy.
 
   - name: Evaluation matrix
+    id: evaluation-matrix
     instructions: |
       Evaluation weights: price 25%, SLA 25%, security 20%, integration
       lift 15%, support model 15%. Score each vendor 1-5 per dimension with
@@ -34,6 +35,7 @@ skills:
 
 workflows:
   - name: Vendor Selection
+    id: vendor-selection
     outputStep: memo
     params:
       - name: rfp_title

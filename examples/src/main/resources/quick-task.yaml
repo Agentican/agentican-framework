@@ -1,2 +1,4 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
+# Planner-only catalog — agents and workflows are created by the planner at run time.
+agents: []
+skills: []
+workflows: []

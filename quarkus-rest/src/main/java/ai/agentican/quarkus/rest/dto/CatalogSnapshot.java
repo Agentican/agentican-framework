@@ -1,7 +1,5 @@
 package ai.agentican.quarkus.rest.dto;
 
-import ai.agentican.framework.orchestration.model.WorkflowDefinition;
-
 import java.util.List;
 
 public record CatalogSnapshot(
@@ -10,7 +8,7 @@ public record CatalogSnapshot(
 
         List<SkillExport> skills,
 
-        List<WorkflowDefinition> workflows) {
+        List<WorkflowDefinitionInput> workflows) {
 
     public record AgentExport(
 

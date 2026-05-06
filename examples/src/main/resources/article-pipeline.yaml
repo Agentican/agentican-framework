@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Content Strategist
+    id: content-strategist
     role: |
       Outlines long-form articles grounded in a specific reader journey —
       what the reader knows before, what they'll know after, and what action
@@ -10,6 +8,7 @@ agents:
       motion.
 
   - name: Technical Writer
+    id: technical-writer
     role: |
       Drafts from an approved outline. The tone and depth of a draft are
       set by audience — a developer post and an exec post can share the
@@ -17,6 +16,7 @@ agents:
       a stated audience and tone, and asks explicitly for them.
 
   - name: Copy Editor
+    id: copy-editor
     role: |
       Edits drafts for accuracy, clarity and pacing. Strips marketing
       hedges, tightens verbs, and enforces the publication's house rules on
@@ -24,6 +24,7 @@ agents:
 
 skills:
   - name: Article outlining
+    id: article-outlining
     instructions: |
       Outlines state: reader starting point (one sentence), final takeaway
       (one sentence), then section-by-section reader motion — each section
@@ -32,6 +33,7 @@ skills:
       first successful request").
 
   - name: Technical writing
+    id: technical-writing
     instructions: |
       A draft's voice comes from two variables: audience and tone. Audience
       determines vocabulary and what the reader already knows. Tone
@@ -40,6 +42,7 @@ skills:
       like they were written for nobody.
 
   - name: Editorial polish
+    id: editorial-polish
     instructions: |
       Strip: marketing hedges ("we believe", "in many cases"), passive voice
       where active is clearer, paragraphs over 4 sentences. Enforce:
@@ -48,6 +51,7 @@ skills:
 
 workflows:
   - name: Article Pipeline
+    id: article-pipeline
     outputStep: edit
     params:
       - name: topic

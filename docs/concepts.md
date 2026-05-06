@@ -109,7 +109,7 @@ Chain `.input(P.class)` (required), then `.output(R.class)` (optional; defaults 
 **Typed output** comes from the plan's *output step*. For single-step plans, that step is implicit. For multi-step plans, declare it on the builder:
 
 ```java
-WorkflowDefinition.builder("triage")
+WorkflowDefinition.builder("triage", "Triage")
     .outputStep("classify")     // ← which step's output IS the plan's output
     .step(...)
     .step(WorkflowStepAgent.builder("classify").agent("triage")
@@ -154,7 +154,7 @@ A `WorkflowDefinition` is a structured workflow: an id, name, description, param
 
 ```java
 record WorkflowDefinition(
-    String id,          // generated if not supplied
+    String id,          // required — stable identifier; recommend slug-style
     String name,        // unique within the WorkflowRegistry
     String description,
     List<WorkflowParam> params,
@@ -166,13 +166,15 @@ record WorkflowDefinition(
 Construction:
 
 ```java
-WorkflowDefinition.builder(name)
+WorkflowDefinition.builder(id, name)
     .description(description)
     .param(...)
     .step(...)
     .outputStep("final-step")
     .build();
 ```
+
+`id` is required at the call site — pick a stable slug (`triage`, `incident-postmortem`); the framework rejects null/blank ids. The same applies to `AgentConfig`, `SkillConfig`, and `WorkflowConfig`. The planner manufactures slug-style ids automatically when it materialises an agent, skill, or workflow from a natural-language description.
 
 You can build a `WorkflowDefinition` manually with the builder, or let the planner create one from a natural-language description.
 

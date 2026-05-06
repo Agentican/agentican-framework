@@ -16,7 +16,7 @@ public class DailyStandupDigest {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -37,6 +37,11 @@ public class DailyStandupDigest {
         return Path.of(Objects.requireNonNull(DailyStandupDigest.class.getResource("/daily-standup-digest.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(DailyStandupDigest.class.getResource("/engine.yaml")).toURI());
+    }
     static StandupRequest request() {
 
         return new StandupRequest("platform-team", "#platform-standup");

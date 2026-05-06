@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Infrastructure Lead
+    id: infrastructure-lead
     role: |
       Owns platform migrations end-to-end. Drafts plans that maximize forward
       progress while preserving a real rollback. Insists on explicit cutover
@@ -10,6 +8,7 @@ agents:
       customer-facing error is possible. Refuses plans without a named rollback.
 
   - name: Runbook Author
+    id: runbook-author
     role: |
       Converts approved migration plans into operator-ready runbooks. Every step
       names the exact command, the expected output, the failure action, and the
@@ -17,6 +16,7 @@ agents:
 
 skills:
   - name: Migration planning
+    id: migration-planning
     instructions: |
       Plans must name: source, target, data-volume estimate, cutover window with
       timezone, rollback procedure with a measurable trigger, and the specific
@@ -25,6 +25,7 @@ skills:
       rollback-by-time-travel without a named snapshot.
 
   - name: Runbook writing
+    id: runbook-writing
     instructions: |
       Runbook steps are numbered. Each step has: exact command, expected output
       (one line), failure action ("if output does not match, run X and page Y"),
@@ -33,6 +34,7 @@ skills:
 
 workflows:
   - name: Data Migration Plan
+    id: data-migration-plan
     outputStep: runbook
     params:
       - name: current_system

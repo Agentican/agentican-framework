@@ -1,12 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
-composio:
-  apiKey: ${COMPOSIO_API_KEY}
-  userId: user-1
-
 agents:
   - name: Engineering Manager
+    id: engineering-manager
     role: |
       Runs an engineering team: plans roadmaps, grows people, removes blockers and owns
       delivery. Aggregates activity across development tools into standup-ready summaries
@@ -16,6 +10,7 @@ agents:
 
 skills:
   - name: Standup format
+    id: standup-format
     instructions: |
       Digest structure. Three sections: Done (completed in last 24h), In Progress
       (actively moving), Blocked (stalled with reason). Each item prefixed with author
@@ -25,6 +20,7 @@ skills:
 
 workflows:
   - name: Daily Standup Digest
+    id: daily-standup-digest
     params:
       - name: team
         description: Team or repo name

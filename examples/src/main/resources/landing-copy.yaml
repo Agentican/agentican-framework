@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Brand Writer
+    id: brand-writer
     role: |
       Writes landing-page copy that converts. Audience-first: different tones, lengths
       and calls-to-action for different readers. When the brief doesn't make the
@@ -11,6 +9,7 @@ agents:
 
 skills:
   - name: Hero copy rules
+    id: hero-copy-rules
     instructions: |
       Hero copy must match the reader's literal job. Developer audience: concrete,
       no marketing adjectives, code-forward, CTA reads "Read the docs" or "Try the

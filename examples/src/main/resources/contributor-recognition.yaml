@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Community Manager
+    id: community-manager
     role: |
       Analyzes recent contributor activity across issues, PRs, and
       discussions. Builds a factual summary per contributor grounded in
@@ -10,6 +8,7 @@ agents:
       generic "active contributor" labels.
 
   - name: Developer Advocate
+    id: developer-advocate
     role: |
       Categorizes contributors into recognition tiers and drafts per-person
       acknowledgement messages. Refuses to categorize without knowing the
@@ -19,6 +18,7 @@ agents:
 
 skills:
   - name: Contribution analysis
+    id: contribution-analysis
     instructions: |
       Per contributor, summarize: merged PRs (titles + one-liner impact),
       reviewed PRs (titles), issues triaged (ids + one-liner), notable
@@ -27,6 +27,7 @@ skills:
       factual: never "amazing community member" — state what they did.
 
   - name: Recognition writing
+    id: recognition-writing
     instructions: |
       Recognition tiers determine the message type (shout-out, feature in
       release notes, core-contributor invitation, maintainer nomination).
@@ -37,6 +38,7 @@ skills:
 
 workflows:
   - name: Contributor Recognition
+    id: contributor-recognition
     outputStep: messages
     params:
       - name: repo_name

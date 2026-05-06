@@ -9,6 +9,7 @@ import ai.agentican.framework.util.Ids;
 import ai.agentican.quarkus.audit.CatalogAuditLog;
 import ai.agentican.quarkus.rest.dto.CatalogImportSummary;
 import ai.agentican.quarkus.rest.dto.CatalogSnapshot;
+import ai.agentican.quarkus.rest.dto.WorkflowDefinitionInput;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -99,7 +100,10 @@ public class ConfigCatalogResource {
                 .map(s -> new CatalogSnapshot.SkillExport(s.id(), s.name(), s.instructions()))
                 .toList();
 
-        var plans = agentican.registry().workflows().list().stream().toList();
+        var plans = agentican.registry().workflows().list().stream()
+                .map(p -> new WorkflowDefinitionInput(
+                        p.id(), p.name(), p.description(), p.params(), p.steps(), p.outputStep()))
+                .toList();
 
         return new CatalogSnapshot(agents, skills, plans);
     }
@@ -213,23 +217,33 @@ public class ConfigCatalogResource {
                 continue;
             }
 
-            var issues = WorkflowDefinitionValidator.validate(p, agentican.registry().agents(), agentican.registry().skills());
+            var existing = agentican.registry().workflows().byName(p.name());
+            var willCreate = (existing == null);
+
+            var id = (p.id() == null || p.id().isBlank())
+                    ? (existing != null ? existing.id() : Ids.generate())
+                    : p.id();
+
+            WorkflowDefinition aligned;
+            try {
+                aligned = new WorkflowDefinition(id, p.name(), p.description(), p.params(), p.steps(), p.outputStep());
+            }
+            catch (Exception e) {
+                errors.add("WorkflowDefinition '" + p.name() + "': " + e.getMessage());
+                skipped++;
+                continue;
+            }
+
+            var issues = WorkflowDefinitionValidator.validate(aligned, agentican.registry().agents(), agentican.registry().skills());
             if (!issues.isEmpty()) {
                 errors.add("WorkflowDefinition '" + p.name() + "' failed validation: " + String.join("; ", issues));
                 skipped++;
                 continue;
             }
 
-            var existing = agentican.registry().workflows().byName(p.name());
-            var willCreate = (existing == null);
-
             if (!dryRun) {
                 try {
                     var beforeJson = existing != null ? toJson(existing) : null;
-                    var id = (p.id() == null || p.id().isBlank())
-                            ? (existing != null ? existing.id() : Ids.generate())
-                            : p.id();
-                    var aligned = new WorkflowDefinition(id, p.name(), p.description(), p.params(), p.steps(), p.outputStep());
                     agentican.registry().workflows().register(aligned);
                     audit.record(CatalogAuditLog.PLAN, id, CatalogAuditLog.IMPORTED,
                             null, beforeJson, toJson(aligned));

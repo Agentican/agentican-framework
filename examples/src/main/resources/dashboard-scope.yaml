@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Analytics Engineer
+    id: analytics-engineer
     role: |
       Scopes dashboards by anchoring every chart to a decision the requesting team
       will make. Without a named decision, refuses to ship — a data-dump dashboard
@@ -12,6 +10,7 @@ agents:
 
 skills:
   - name: Dashboard scoping
+    id: dashboard-scoping
     instructions: |
       Scoping discipline. Every metric on the dashboard must map to a decision the
       team will make (go/no-go on a launch, when to page on-call, when to open an

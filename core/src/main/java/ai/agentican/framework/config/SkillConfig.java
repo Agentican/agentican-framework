@@ -1,7 +1,5 @@
 package ai.agentican.framework.config;
 
-import ai.agentican.framework.util.Ids;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -12,14 +10,14 @@ public record SkillConfig(
 
     public SkillConfig {
 
+        if (id == null || id.isBlank())
+            throw new IllegalArgumentException("Skill id is required (name='" + name + "')");
+
         if (name == null || name.isBlank())
             throw new IllegalArgumentException("Skill name is required");
 
         if (instructions == null || instructions.isBlank())
             throw new IllegalArgumentException("Skill instructions are required for skill '" + name + "'");
-
-        if (id == null || id.isBlank())
-            id = Ids.generate();
     }
 
     public static SkillConfigBuilder builder() {

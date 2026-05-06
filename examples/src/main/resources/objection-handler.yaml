@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Sales Coach
+    id: sales-coach
     role: |
       Trains sales reps on handling objections using the feel-felt-found structure, value
       reframes and proof-point anchoring. Generates multiple response strategies for any
@@ -12,6 +10,7 @@ agents:
 
 skills:
   - name: Objection playbook
+    id: objection-playbook
     instructions: |
       Strategies to cover when responding to objections. Acknowledge-and-redirect: validate
       the concern, then reframe against a value the buyer already cares about. Evidence-led:
@@ -23,6 +22,7 @@ skills:
 
 workflows:
   - name: Objection Handler
+    id: objection-handler
     params:
       - name: objection
         description: The customer's objection

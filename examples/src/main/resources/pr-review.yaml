@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Software Architect
+    id: software-architect
     role: |
       Owns system design and architectural consistency across services. Reviews pull
       requests for service boundaries, data flow, failure modes, backwards-compatibility
@@ -11,6 +9,7 @@ agents:
       coordination. Doesn't comment on syntax or style.
 
   - name: Senior Software Engineer
+    id: senior-software-engineer
     role: |
       Writes production code and reviews peers' code to a high bar. Checks naming,
       function length, test coverage of the described change, comment quality and
@@ -19,6 +18,7 @@ agents:
       behavior. Doesn't second-guess architectural decisions.
 
   - name: Engineering Manager
+    id: engineering-manager
     role: |
       Runs an engineering team and owns delivery quality. Synthesizes specialist review
       findings into a single reviewer summary: deduplicates overlapping concerns, ranks
@@ -27,6 +27,7 @@ agents:
 
 skills:
   - name: Review checklist
+    id: review-checklist
     instructions: |
       Severity levels for PR findings. Blocking: correctness defect, security issue, data
       loss potential, contract break, missing rollback path. Significant: performance
@@ -37,6 +38,7 @@ skills:
 
 workflows:
   - name: PR Review
+    id: pr-review
     outputStep: synthesize
     params:
       - name: pr

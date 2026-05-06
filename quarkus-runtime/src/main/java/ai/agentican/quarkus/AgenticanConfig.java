@@ -14,22 +14,33 @@ import java.util.Optional;
 public interface AgenticanConfig {
 
     /**
-     * Catalog (agents/skills/plans) load source. Engine config (LLM, MCP, composio,
-     * strict, agentRunner) is independent of this and always read from these properties,
-     * with YAML as a fallback when present.
+     * Catalog (agents/skills/workflows) load source.
      *
      * <ul>
-     *   <li>{@code yaml} — load agents/skills/plans from {@link #config()} (default {@code agentican.yaml})</li>
+     *   <li>{@code yaml} — load from the classpath resource at {@link #catalogConfig()}
+     *       (default {@code agentican.catalog.yaml})</li>
      *   <li>{@code database} — load from the JPA-backed registries; useful with {@code quarkus-store-jpa}</li>
      * </ul>
      */
-    enum Catalog { yaml, database }
+    enum CatalogSource { yaml, database }
 
     @WithDefault("yaml")
-    Catalog catalog();
+    CatalogSource catalogSource();
 
-    @WithDefault("agentican.yaml")
-    String config();
+    /**
+     * Classpath resource for engine config (LLM, MCP, composio, agentRunner, strict).
+     * Optional; if missing, engine config is built from {@code agentican.*} properties only.
+     * If present, properties take precedence over YAML for any field set in both places.
+     */
+    @WithDefault("agentican.engine.yaml")
+    String engineConfig();
+
+    /**
+     * Classpath resource for catalog config (agents, skills, workflows).
+     * Consulted only when {@link #catalogSource()} is {@code yaml}.
+     */
+    @WithDefault("agentican.catalog.yaml")
+    String catalogConfig();
 
     List<LlmConfig> llm();
 

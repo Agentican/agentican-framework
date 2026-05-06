@@ -9,7 +9,8 @@ import ai.agentican.framework.config.ComposioConfig;
 import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.config.McpConfig;
 import ai.agentican.framework.config.WorkflowConfig;
-import ai.agentican.framework.config.RuntimeConfig;
+import ai.agentican.framework.config.CatalogConfig;
+import ai.agentican.framework.config.EngineConfig;
 import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.config.WorkerConfig;
 import ai.agentican.framework.hitl.HitlManager;
@@ -204,9 +205,6 @@ public class Agentican implements AutoCloseable {
             if (llmConfigs.isEmpty() && llms.isEmpty())
                 throw new IllegalStateException("At least one LLM is required (declare an LlmConfig or inject an LlmClient)");
 
-            var config = new RuntimeConfig(llmConfigs, mcpConfigs, composioConfig, workerConfig, agentCfgs, skillCfgs,
-                    workflowCfgs, strict);
-
             var hm = hitlManager != null ? hitlManager : new HitlManager(HitlNotifier.logging());
             var ks = knowledgeStore != null ? knowledgeStore : new KnowledgeStoreMemory();
             var tss = workflowRunStore != null ? workflowRunStore : new WorkflowRunStoreMemory();
@@ -214,13 +212,11 @@ public class Agentican implements AutoCloseable {
             var ownsExecutor = (taskExecutor == null);
             var executor = taskExecutor != null ? taskExecutor : Executors.newVirtualThreadPerTaskExecutor();
 
-            var agentRunnerConfig = config.agentRunner() != null
-                    ? config.agentRunner()
-                    : new WorkerConfig(0, null);
+            var agentRunnerConfig = workerConfig != null ? workerConfig : new WorkerConfig(0, null);
 
             var mutableLlms = new LinkedHashMap<String, LlmClient>();
 
-            config.llm().forEach(llmConfig -> {
+            llmConfigs.forEach(llmConfig -> {
 
                 LlmClient client = switch (llmConfig.provider()) {
 
@@ -265,14 +261,12 @@ public class Agentican implements AutoCloseable {
 
             var toolkitRegistry = new ToolkitRegistry();
 
-            config.mcp().forEach(mcpConfig ->
+            mcpConfigs.forEach(mcpConfig ->
                     toolkitRegistry.register(mcpConfig.slug(), McpToolkit.of(mcpConfig)));
 
-            var composioCfg = config.composio();
+            if (composioConfig != null && composioConfig.apiKey() != null) {
 
-            if (composioCfg != null && composioCfg.apiKey() != null) {
-
-                var composioClient = ComposioClient.of(composioCfg.apiKey(), composioCfg.userId());
+                var composioClient = ComposioClient.of(composioConfig.apiKey(), composioConfig.userId());
 
                 composioClient.availableToolkits().forEach(tk -> toolkitRegistry.register(tk.slug(), tk));
             }
@@ -305,10 +299,11 @@ public class Agentican implements AutoCloseable {
 
             sr.seed();
 
-            config.skills().forEach(sr::register);
+            skillCfgs.forEach(sr::register);
 
             var agentFactory = AgentFactory.builder()
-                    .config(config)
+                    .workerConfig(agentRunnerConfig)
+                    .llmConfigs(llmConfigs)
                     .llms(llmClients)
                     .hitlManager(hm)
                     .knowledgeStore(ks)
@@ -322,13 +317,13 @@ public class Agentican implements AutoCloseable {
             ar.agentFactory(agentFactory::build);
             ar.seed();
 
-            config.agents().forEach(ar::register);
+            agentCfgs.forEach(ar::register);
 
             var pr = workflowRegistry != null ? workflowRegistry : new WorkflowRegistryMemory();
 
             pr.seed();
 
-            config.workflows().forEach(workflowConfig -> {
+            workflowCfgs.forEach(workflowConfig -> {
 
                 var plan = workflowConfig.toDefinition(codeStepRegistry);
 
@@ -390,43 +385,70 @@ public class Agentican implements AutoCloseable {
             return this;
         }
 
-        private static RuntimeConfig loadYaml(RuntimeConfig preloaded, Path path, String classpathResource,
-                                              String missingMessage) {
+        private static EngineConfig loadEngine(EngineConfig preloaded, Path path, String classpathResource) {
 
             if (preloaded != null) return preloaded;
 
-            if (path != null) {
+            try {
 
-                try {
+                if (path != null) return EngineConfig.load(path);
 
-                    return RuntimeConfig.load(path);
-                }
-                catch (java.io.IOException e) {
+                if (classpathResource != null) {
 
-                    throw new java.io.UncheckedIOException(e);
-                }
-            }
+                    var cl = Thread.currentThread().getContextClassLoader();
 
-            if (classpathResource != null) {
+                    if (cl == null) cl = Builder.class.getClassLoader();
 
-                var cl = Thread.currentThread().getContextClassLoader();
+                    try (var in = cl.getResourceAsStream(classpathResource)) {
 
-                if (cl == null) cl = Builder.class.getClassLoader();
+                        if (in == null)
+                            throw new IllegalStateException("YAML classpath resource not found: " + classpathResource);
 
-                try (var in = cl.getResourceAsStream(classpathResource)) {
-
-                    if (in == null)
-                        throw new IllegalStateException("YAML classpath resource not found: " + classpathResource);
-
-                    return RuntimeConfig.load(in);
-                }
-                catch (java.io.IOException e) {
-
-                    throw new java.io.UncheckedIOException(e);
+                        return EngineConfig.load(in);
+                    }
                 }
             }
+            catch (java.io.IOException e) {
 
-            throw new IllegalStateException(missingMessage);
+                throw new java.io.UncheckedIOException(e);
+            }
+
+            throw new IllegalStateException(
+                    "Configuration source set to YAML but no source provided — call .path(Path), "
+                            + ".classpath(String), or .config(EngineConfig).");
+        }
+
+        private static CatalogConfig loadCatalog(CatalogConfig preloaded, Path path, String classpathResource) {
+
+            if (preloaded != null) return preloaded;
+
+            try {
+
+                if (path != null) return CatalogConfig.load(path);
+
+                if (classpathResource != null) {
+
+                    var cl = Thread.currentThread().getContextClassLoader();
+
+                    if (cl == null) cl = Builder.class.getClassLoader();
+
+                    try (var in = cl.getResourceAsStream(classpathResource)) {
+
+                        if (in == null)
+                            throw new IllegalStateException("YAML classpath resource not found: " + classpathResource);
+
+                        return CatalogConfig.load(in);
+                    }
+                }
+            }
+            catch (java.io.IOException e) {
+
+                throw new java.io.UncheckedIOException(e);
+            }
+
+            throw new IllegalStateException(
+                    "Registry source set to YAML but no source provided — call .path(Path), "
+                            + ".classpath(String), or .config(CatalogConfig).");
         }
 
         private enum ConfigurationMode { API, YAML }
@@ -491,20 +513,19 @@ public class Agentican implements AutoCloseable {
 
                 private Path path;
                 private String classpathResource;
-                private RuntimeConfig preloaded;
+                private EngineConfig preloaded;
 
                 Yaml() {}
 
                 public Yaml path(Path path) { this.path = path; return this; }
                 public Yaml classpath(String resource) { this.classpathResource = resource; return this; }
-                public Yaml config(RuntimeConfig config) { this.preloaded = config; return this; }
+                public Yaml config(EngineConfig config) { this.preloaded = config; return this; }
 
                 public Builder end() { return Builder.this; }
 
-                RuntimeConfig load() {
-                    return loadYaml(preloaded, path, classpathResource,
-                            "Configuration source set to YAML but no source provided — call .path(Path), "
-                                    + ".classpath(String), or .config(RuntimeConfig).");
+                EngineConfig load() {
+
+                    return loadEngine(preloaded, path, classpathResource);
                 }
             }
         }
@@ -562,20 +583,19 @@ public class Agentican implements AutoCloseable {
 
                 private Path path;
                 private String classpathResource;
-                private RuntimeConfig preloaded;
+                private CatalogConfig preloaded;
 
                 Yaml() {}
 
                 public Yaml path(Path path) { this.path = path; return this; }
                 public Yaml classpath(String resource) { this.classpathResource = resource; return this; }
-                public Yaml config(RuntimeConfig config) { this.preloaded = config; return this; }
+                public Yaml config(CatalogConfig config) { this.preloaded = config; return this; }
 
                 public Builder end() { return Builder.this; }
 
-                RuntimeConfig load() {
-                    return loadYaml(preloaded, path, classpathResource,
-                            "Registry source set to YAML but no source provided — call .path(Path), "
-                                    + ".classpath(String), or .config(RuntimeConfig).");
+                CatalogConfig load() {
+
+                    return loadCatalog(preloaded, path, classpathResource);
                 }
             }
         }

@@ -32,12 +32,12 @@ class AgenticanTypedTest {
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("triage")
+                        .name("triage").id("triage")
                         .role("Triage agent").llm("default").build())
                     .end()
                 .build()) {
 
-            var plan = WorkflowDefinition.builder("triage")
+            var plan = WorkflowDefinition.builder("triage", "triage")
                     .param(new WorkflowParam("customer_id", "Customer ID", null, true))
                     .param(new WorkflowParam("priority", "Priority", "NORMAL", false))
                     .step(WorkflowStepAgent.builder("classify")
@@ -68,12 +68,12 @@ class AgenticanTypedTest {
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("triage")
+                        .name("triage").id("triage")
                         .role("Triage agent").llm("default").build())
                     .end()
                 .build()) {
 
-            var plan = WorkflowDefinition.builder("triage-by-name")
+            var plan = WorkflowDefinition.builder("triage-by-name", "triage-by-name")
                     .param(new WorkflowParam("customer_id", "Customer ID", null, true))
                     .param(new WorkflowParam("priority", "Priority", "NORMAL", false))
                     .step(WorkflowStepAgent.builder("classify")
@@ -121,12 +121,12 @@ class AgenticanTypedTest {
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("triage")
+                        .name("triage").id("triage")
                         .role("Triage agent").llm("default").build())
                     .end()
                 .build()) {
 
-            var plan = WorkflowDefinition.builder("late-definition")
+            var plan = WorkflowDefinition.builder("late-definition", "late-definition")
                     .param(new WorkflowParam("customer_id", "Customer ID", null, true))
                     .param(new WorkflowParam("priority", "Priority", "NORMAL", false))
                     .step(WorkflowStepAgent.builder("classify")
@@ -157,12 +157,12 @@ class AgenticanTypedTest {
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("noparam")
+                        .name("noparam").id("noparam")
                         .role("Agent").llm("default").build())
                     .end()
                 .build()) {
 
-            var plan = WorkflowDefinition.builder("no-params")
+            var plan = WorkflowDefinition.builder("no-params", "no-params")
                     .step(WorkflowStepAgent.builder("do")
                             .agent("noparam")
                             .instructions("Run without params")
@@ -189,12 +189,12 @@ class AgenticanTypedTest {
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("triage")
+                        .name("triage").id("triage")
                         .role("Agent").llm("default").build())
                     .end()
                 .build()) {
 
-            var plan = WorkflowDefinition.builder("map-definition")
+            var plan = WorkflowDefinition.builder("map-definition", "map-definition")
                     .param(new WorkflowParam("customer_id", "Customer ID", null, true))
                     .step(WorkflowStepAgent.builder("do")
                             .agent("triage")
@@ -223,14 +223,14 @@ class AgenticanTypedTest {
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("acct")
+                        .name("acct").id("acct")
                         .role("Agent").llm("default").build())
                     .end()
                 .build()) {
 
             record AccountParams(String accountId) {}
 
-            var plan = WorkflowDefinition.builder("acct-definition")
+            var plan = WorkflowDefinition.builder("acct-definition", "acct-definition")
                     .param(new WorkflowParam("account_id", "Account ID", null, true))
                     .step(WorkflowStepAgent.builder("do")
                             .agent("acct")
@@ -262,12 +262,12 @@ class AgenticanTypedTest {
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("triage")
+                        .name("triage").id("triage")
                         .role("Triage agent").llm("default").build())
                     .end()
                 .build()) {
 
-            var plan = WorkflowDefinition.builder("typed-triage")
+            var plan = WorkflowDefinition.builder("typed-triage", "typed-triage")
                     .param(new WorkflowParam("customer_id", "Customer ID", null, true))
                     .step(WorkflowStepAgent.builder("classify")
                             .agent("triage")
@@ -299,12 +299,12 @@ class AgenticanTypedTest {
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("triage")
+                        .name("triage").id("triage")
                         .role("Agent").llm("default").build())
                     .end()
                 .build()) {
 
-            var plan = WorkflowDefinition.builder("bad-output")
+            var plan = WorkflowDefinition.builder("bad-output", "bad-output")
                     .step(WorkflowStepAgent.builder("classify")
                             .agent("triage")
                             .instructions("respond")
@@ -329,12 +329,12 @@ class AgenticanTypedTest {
                 .llm("default", request -> endTurn("ok"))
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("triage")
+                        .name("triage").id("triage")
                         .role("Agent").llm("default").build())
                     .end()
                 .build()) {
 
-            var plan = WorkflowDefinition.builder("multi")
+            var plan = WorkflowDefinition.builder("multi", "multi")
                     .step(WorkflowStepAgent.builder("a").agent("triage").instructions("a").build())
                     .step(WorkflowStepAgent.builder("b").agent("triage").instructions("b")
                             .dependencies(java.util.List.of("a")).build())
@@ -363,12 +363,12 @@ class AgenticanTypedTest {
                 .llm("default", llmClient)
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("triage")
+                        .name("triage").id("triage")
                         .role("Triage agent").llm("default").build())
                     .end()
                 .build()) {
 
-            var plan = WorkflowDefinition.builder("schema-injection")
+            var plan = WorkflowDefinition.builder("schema-injection", "schema-injection")
                     .step(WorkflowStepAgent.builder("classify")
                             .agent("triage")
                             .instructions("Classify this")
@@ -407,12 +407,12 @@ class AgenticanTypedTest {
                 .llm("default", llmClient)
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("triage")
+                        .name("triage").id("triage")
                         .role("Agent").llm("default").build())
                     .end()
                 .build()) {
 
-            var plan = WorkflowDefinition.builder("no-schema")
+            var plan = WorkflowDefinition.builder("no-schema", "no-schema")
                     .step(WorkflowStepAgent.builder("do").agent("triage").instructions("go").build())
                     .build();
 
@@ -445,12 +445,12 @@ class AgenticanTypedTest {
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("triage")
+                        .name("triage").id("triage")
                         .role("Agent").llm("default").build())
                     .end()
                 .build()) {
 
-            var plan = WorkflowDefinition.builder("multi")
+            var plan = WorkflowDefinition.builder("multi", "multi")
                     .outputStep("b")
                     .step(WorkflowStepAgent.builder("a").agent("triage").instructions("a").build())
                     .step(WorkflowStepAgent.builder("b").agent("triage").instructions("b")

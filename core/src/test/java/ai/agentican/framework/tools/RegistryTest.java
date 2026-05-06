@@ -22,7 +22,7 @@ class RegistryTest {
 
         AgentRunner runner = (agent, task, taskId, stepId, stepName, timeout, skills, toolkits, outputSchema) -> null;
 
-        return Agent.builder().config(AgentConfig.builder().name(name).role("Role for " + name).build()).runner(runner).build();
+        return Agent.builder().config(AgentConfig.builder().id(name).name(name).role("Role for " + name).build()).runner(runner).build();
     }
 
     @Test

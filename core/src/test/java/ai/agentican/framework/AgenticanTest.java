@@ -73,7 +73,7 @@ class AgenticanTest {
                 .llm("default", mockLlm.toLlmClient())
                 .build()) {
 
-            var task = WorkflowDefinition.builder("test-task").description("")
+            var task = WorkflowDefinition.builder("test-task", "test-task").description("")
                     .step(new WorkflowStepAgent("step-a", "test-agent", "Do the thing", List.of(), false, List.of(), List.of()))
                     .build();
 
@@ -507,7 +507,7 @@ class AgenticanTest {
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .registry().api()
-                    .agent(new AgentConfig(null, "FluentAgent", "a fluent test role", null, null, null, null))
+                    .agent(new AgentConfig("FluentAgent", "FluentAgent", "a fluent test role", null, null, null, null))
                     .end()
                 .build()) {
 
@@ -526,7 +526,7 @@ class AgenticanTest {
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .registry().api()
-                    .skill(new SkillConfig(null, "FluentSkill", "do the thing"))
+                    .skill(new SkillConfig("FluentSkill", "FluentSkill", "do the thing"))
                     .end()
                 .build()) {
 
@@ -540,7 +540,7 @@ class AgenticanTest {
         var step = new WorkflowConfig.PlanStepConfig("s1", "agent", "noop", "do nothing",
                 List.of(), false, List.of(), List.of(), null, null, List.of(), null, List.of(), null, null);
 
-        var planConfig = new WorkflowConfig("fluent-plan", "desc", List.of(), List.of(step), null);
+        var planConfig = new WorkflowConfig("fluent-plan", "fluent-plan", "desc", List.of(), List.of(step), null);
 
         try (var agentican = Agentican.builder()
 
@@ -567,8 +567,8 @@ class AgenticanTest {
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .registry().api()
-                    .agent(new AgentConfig(null, "FromConfig", "config role", null, null, null, null))
-                    .agent(new AgentConfig(null, "FromFluent", "fluent role", null, null, null, null))
+                    .agent(new AgentConfig("FromConfig", "FromConfig", "config role", null, null, null, null))
+                    .agent(new AgentConfig("FromFluent", "FromFluent", "fluent role", null, null, null, null))
                     .end()
                 .build()) {
 
@@ -658,7 +658,7 @@ class AgenticanTest {
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(new AgentConfig(null, "worker", "Worker role", null, null, null, null))
+                    .agent(new AgentConfig("worker", "worker", "Worker role", null, null, null, null))
                     .end()
 
                 .workflowRunStore(store)
@@ -673,7 +673,7 @@ class AgenticanTest {
             var step = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "do-work", "worker", "Run to completion after resume",
                     List.of(), false, List.of(), List.of());
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Resume Task")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Resume Task", "Resume Task")
                     .description("test").step(step).build();
 
             agentican.registry().workflows().register(plan);
@@ -772,7 +772,7 @@ class AgenticanTest {
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .registry().api()
-                    .agent(new AgentConfig(null, "worker", "Worker", null, null, null, null))
+                    .agent(new AgentConfig("worker", "worker", "Worker", null, null, null, null))
                     .end()
 
                 .workflowRunStore(store)
@@ -781,7 +781,7 @@ class AgenticanTest {
 
             var step = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "do", "worker", "do it", List.of(), false, List.of(), List.of());
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Bounded Resume")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Bounded Resume", "Bounded Resume")
                     .description("test").step(step).build();
             agentican.registry().workflows().register(plan);
 
@@ -825,7 +825,7 @@ class AgenticanTest {
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(new AgentConfig(null, "worker", "Worker", null, null, null, null))
+                    .agent(new AgentConfig("worker", "worker", "Worker", null, null, null, null))
                     .end()
 
                 .workflowRunStore(store)
@@ -842,7 +842,7 @@ class AgenticanTest {
                     "synthesize", "worker", "synthesize",
                     List.of("sibling-a", "sibling-b", "sibling-c"), false, List.of(), List.of());
 
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Parallel Resume")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Parallel Resume", "Parallel Resume")
                     .description("test")
                     .steps(List.of(siblingA, siblingB, siblingC, synth))
                     .build();
@@ -964,7 +964,7 @@ class AgenticanTest {
                     return mockLlm.toLlmClient().send(request);
                 })
                 .registry().api()
-                    .agent(new AgentConfig(null, "worker", "Worker", null, null, null, null))
+                    .agent(new AgentConfig("worker", "worker", "Worker", null, null, null, null))
                     .end()
 
                 .workflowRunStore(store)
@@ -981,7 +981,7 @@ class AgenticanTest {
                             "A", List.of(pathBodyStep))),
                     "A", List.of(), false);
 
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Branch Resume")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Branch Resume", "Branch Resume")
                     .description("test")
                     .steps(List.of(sourceForBranch, branch))
                     .build();
@@ -1002,7 +1002,7 @@ class AgenticanTest {
             store.stepStarted(taskId, stepId, "choose");
             store.branchPathChosen(taskId, stepId, "A");
 
-            var childPlan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("choose-A")
+            var childPlan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("choose-A", "choose-A")
                     .description("").step(pathBodyStep).build();
             store.taskStarted(childId, "choose-A", childPlan, Map.of(), taskId, stepId, 0);
             store.stepStarted(childId, childStepId, "path-body");
@@ -1049,7 +1049,7 @@ class AgenticanTest {
                     return mockLlm.toLlmClient().send(request);
                 })
                 .registry().api()
-                    .agent(new AgentConfig(null, "worker", "Worker", null, null, null, null))
+                    .agent(new AgentConfig("worker", "worker", "Worker", null, null, null, null))
                     .end()
 
                 .workflowRunStore(store)
@@ -1065,7 +1065,7 @@ class AgenticanTest {
             var loop = new ai.agentican.framework.orchestration.model.WorkflowStepLoop(
                     "each", "source", List.of(bodyStep), List.of(), false);
 
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Loop Resume")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Loop Resume", "Loop Resume")
                     .description("test")
                     .steps(List.of(source, loop))
                     .build();
@@ -1086,7 +1086,7 @@ class AgenticanTest {
 
             store.stepStarted(taskId, loopStepId, "each");
 
-            var iterPlan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("each-iter-1")
+            var iterPlan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("each-iter-1", "each-iter-1")
                     .description("").step(bodyStep).build();
             store.taskStarted(iter0Id, "each-iter-1", iterPlan, Map.of(), taskId, loopStepId, 0);
             store.stepStarted(iter0Id, iter0StepId, "iter-body");
@@ -1133,7 +1133,7 @@ class AgenticanTest {
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(new AgentConfig(null, "worker", "Worker", null, null, null, null))
+                    .agent(new AgentConfig("worker", "worker", "Worker", null, null, null, null))
                     .end()
 
                 .workflowRunStore(store)
@@ -1142,7 +1142,7 @@ class AgenticanTest {
 
             var step = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "review", "worker", "review draft", List.of(), true, List.of(), List.of());
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Rejected-Output Resume")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Rejected-Output Resume", "Rejected-Output Resume")
                     .description("test").step(step).build();
 
             agentican.registry().workflows().register(plan);

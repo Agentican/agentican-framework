@@ -75,7 +75,7 @@ public class TasksResource {
                 ? taskService.submit(request.description())
                 : request.isPlanMode()
                         ? taskService.submitByPlan(request.planId(), inputs)
-                        : taskService.submit(request.task(), inputs);
+                        : taskService.submit(request.task().toDefinition(), inputs);
 
         var location = uriInfo.getAbsolutePathBuilder()
                 .path(handle.id())

@@ -19,20 +19,20 @@ class RecordValidationTest {
     @Test
     void agentRequiresName() {
 
-        assertThrows(IllegalArgumentException.class, () -> Agent.builder().config(AgentConfig.builder().name(null).role("role").build()).runner(dummyRunner).build());
+        assertThrows(IllegalArgumentException.class, () -> Agent.builder().config(AgentConfig.builder().name(null).id(null).role("role").build()).runner(dummyRunner).build());
     }
 
     @Test
     void agentRequiresRole() {
 
-        assertThrows(IllegalArgumentException.class, () -> Agent.builder().config(AgentConfig.builder().name("name").role(null).build()).runner(dummyRunner).build());
+        assertThrows(IllegalArgumentException.class, () -> Agent.builder().config(AgentConfig.builder().name("name").id("name").role(null).build()).runner(dummyRunner).build());
     }
 
     @Test
     void taskRequiresSteps() {
 
         assertThrows(IllegalArgumentException.class, () ->
-                WorkflowDefinition.builder("name").description("desc").build());
+                WorkflowDefinition.builder("name", "name").description("desc").build());
     }
 
     @Test

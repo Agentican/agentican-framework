@@ -26,7 +26,7 @@ public class IncidentPostmortem {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end()
                 .hitlManager(new HitlManager(new CliHitlNotifier()));
 
@@ -52,6 +52,11 @@ public class IncidentPostmortem {
         return Path.of(Objects.requireNonNull(IncidentPostmortem.class.getResource("/incident-postmortem.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(IncidentPostmortem.class.getResource("/engine.yaml")).toURI());
+    }
     static IncidentBrief incident() {
 
         return new IncidentBrief(

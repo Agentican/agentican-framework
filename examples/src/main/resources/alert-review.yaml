@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Site Reliability Engineer
+    id: site-reliability-engineer
     role: |
       Keeps production services healthy. Reviews and tunes alerts for signal quality,
       writes runbooks that tell the next on-call exactly what to do, and investigates
@@ -13,6 +11,7 @@ agents:
 
 skills:
   - name: Alert quality checklist
+    id: alert-quality-checklist
     instructions: |
       Alert quality criteria. (1) Actionable: the condition must correspond to something
       a human can fix — no alerts on "interesting" patterns. (2) Defensible threshold: the

@@ -8,6 +8,7 @@ The simplest way to define an agent is via configuration:
 
 ```java
 var researcher = AgentConfig.builder()
+        .id("researcher")
         .name("researcher")
         .role("Expert researcher who finds and synthesizes information")
         .llm("default")
@@ -50,7 +51,7 @@ record Agent(
 )
 ```
 
-- **`config`** — the `AgentConfig` carrying id, name, role, and LLM choice. Required.
+- **`config`** — the `AgentConfig` carrying id (required), name, role, and LLM choice. The id is the stable identifier the registry uses; the planner picks slug-style ids for agents it manufactures.
 - **`runner`** — the execution strategy (almost always `SmacAgentRunner`). Required.
 
 `Agent` exposes `id()`, `name()`, and `role()` as delegating accessors that read from `config`.
@@ -83,7 +84,7 @@ Agent agent = factory.build(agentConfig);
 
 ## Skills
 
-Skills are reusable instruction blocks. They live in a top-level `SkillRegistry` (seeded from `RuntimeConfig.skills` and the fluent builder) and are referenced by workflow steps.
+Skills are reusable instruction blocks. They live in a top-level `SkillRegistry` (seeded from `CatalogConfig.skills` and the fluent builder) and are referenced by workflow steps.
 
 ```java
 Agentican.builder()
@@ -92,14 +93,17 @@ Agentican.builder()
             .end()
         .registry().api()
             .skill(SkillConfig.builder()
+                    .id("statistical-rigor")
                     .name("statistical-rigor")
                     .instructions("Use p-values, confidence intervals, and explain assumptions")
                     .build())
             .skill(SkillConfig.builder()
+                    .id("plain-english")
                     .name("plain-english")
                     .instructions("Translate findings into non-technical language")
                     .build())
             .agent(AgentConfig.builder()
+                    .id("analyst")
                     .name("analyst")
                     .role("Data analyst").llm("default")
                     .build())
@@ -199,9 +203,10 @@ By default, all agents use the `default` LLM client. You can specify a different
 
 ```java
 AgentConfig.builder()
+        .id("fast-classifier")
         .name("fast-classifier")
         .role("Quick yes/no classifier")
-        .llm("haiku")                 // ← LLM name from RuntimeConfig
+        .llm("haiku")                 // ← LLM name from EngineConfig
         .build()
 ```
 

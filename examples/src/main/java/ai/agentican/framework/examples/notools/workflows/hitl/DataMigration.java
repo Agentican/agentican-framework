@@ -18,7 +18,7 @@ public class DataMigration {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end()
                 .hitlManager(new HitlManager(new CliHitlNotifier()));
 
@@ -40,6 +40,11 @@ public class DataMigration {
         return Path.of(Objects.requireNonNull(DataMigration.class.getResource("/data-migration.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(DataMigration.class.getResource("/engine.yaml")).toURI());
+    }
     static MigrationScenario scenario() {
 
         return new MigrationScenario(

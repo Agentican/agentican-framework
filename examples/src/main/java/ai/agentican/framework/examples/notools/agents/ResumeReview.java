@@ -25,7 +25,7 @@ public class ResumeReview {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -49,6 +49,11 @@ public class ResumeReview {
         return Path.of(Objects.requireNonNull(ResumeReview.class.getResource("/resume-review.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(ResumeReview.class.getResource("/engine.yaml")).toURI());
+    }
     static Submission input() {
 
         return new Submission("Senior Backend Engineer", """

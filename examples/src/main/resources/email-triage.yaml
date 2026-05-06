@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Executive Assistant
+    id: executive-assistant
     role: |
       Supports a specific executive's operating cadence end-to-end: calendar, inbox,
       travel, meeting prep. When triaging inbound, reads sender, subject and preview,
@@ -12,6 +10,7 @@ agents:
       quietly dropping a request.
 
   - name: Operations Manager
+    id: operations-manager
     role: |
       Runs cross-functional operations for a team or function. Summarizes triage output
       for quick scanning: groups by category, highlights urgent items at the top, and
@@ -21,6 +20,7 @@ agents:
 
 skills:
   - name: Triage rules
+    id: triage-rules
     instructions: |
       Category definitions. Action-required: contains a specific request to the user with
       a deadline, or a question that blocks someone else's work. Reply-needed: expects a
@@ -32,6 +32,7 @@ skills:
 
 workflows:
   - name: Email Triage
+    id: email-triage
     outputStep: summarize
     params:
       - name: emails

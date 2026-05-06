@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.rest.ws;
 
-import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.quarkus.rest.dto.WorkflowDefinitionInput;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.Map;
@@ -9,7 +9,7 @@ import java.util.Map;
 public record WsMessage(
         String action,
         String description,
-        WorkflowDefinition task,
+        WorkflowDefinitionInput task,
         Map<String, String> inputs,
         String taskId,
         String checkpointId,

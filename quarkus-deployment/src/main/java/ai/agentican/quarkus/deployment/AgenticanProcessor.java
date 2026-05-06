@@ -4,7 +4,8 @@ import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.ComposioConfig;
 import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.config.McpConfig;
-import ai.agentican.framework.config.RuntimeConfig;
+import ai.agentican.framework.config.CatalogConfig;
+import ai.agentican.framework.config.EngineConfig;
 import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.config.WorkflowConfig;
 import ai.agentican.framework.config.WorkerConfig;
@@ -116,7 +117,8 @@ class AgenticanProcessor {
     ReflectiveClassBuildItem registerFrameworkForReflection() {
 
         return ReflectiveClassBuildItem.builder(
-                RuntimeConfig.class,
+                EngineConfig.class,
+                CatalogConfig.class,
                 LlmConfig.class,
                 AgentConfig.class,
                 McpConfig.class,

@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Sales Director
+    id: sales-director
     role: |
       Owns deal desk for the commercial segment. Reviews discount requests from AEs
       against margin thresholds, competitive context and deal-structure quality.
@@ -13,6 +11,7 @@ agents:
 
 skills:
   - name: Discount approval matrix
+    id: discount-approval-matrix
     instructions: |
       Discount approval rules. (1) Floor for commercial segment is 20% off list — below
       that, require a multi-year term or a reference-customer commitment. (2) 20-30%

@@ -1,12 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
-composio:
-  apiKey: ${COMPOSIO_API_KEY}
-  userId: user-1
-
 agents:
   - name: Site Reliability Engineer
+    id: site-reliability-engineer
     role: |
       Keeps production services healthy. Reviews and tunes alerts, writes runbooks,
       investigates incidents with blameless postmortem discipline, and owns the
@@ -16,6 +10,7 @@ agents:
       estimate, likely contributing factors.
 
   - name: Software Engineer
+    id: software-engineer
     role: |
       Writes and operates production code for a specific service. When their service has
       an incident, executes response procedures calibrated to severity: creates structured
@@ -26,6 +21,7 @@ agents:
 
 skills:
   - name: Incident runbook
+    id: incident-runbook
     instructions: |
       Severity definitions — P1: customer-facing outage affecting >5% of users or any
       revenue-critical path (payments, auth, core API). P2: degraded service with elevated
@@ -38,6 +34,7 @@ skills:
 
 workflows:
   - name: Incident Response
+    id: incident-response
     outputStep: triage
     params:
       - name: alert

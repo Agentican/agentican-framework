@@ -26,7 +26,7 @@ class AgentInvokerBuilderTest {
                 .llm("default", llm.toLlmClient())
                 .registry().api()
                     .agent(AgentConfig.builder()
-                            .name("Analyst")
+                            .name("Analyst").id("Analyst")
                             .role("Competitive research analyst").llm("default").build())
                     .end();
     }
@@ -195,7 +195,7 @@ class AgentInvokerBuilderTest {
                 .llm("default", llm)
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("Analyst")
+                        .name("Analyst").id("Analyst")
                         .role("Analyst").llm("default").build())
                     .end()
                 .build()) {
@@ -249,10 +249,10 @@ class AgentInvokerBuilderTest {
                 .llm("default", llm.toLlmClient())
                 .registry().api()
                     .agent(AgentConfig.builder()
-                        .name("Analyst")
+                        .name("Analyst").id("Analyst")
                         .role("Analyst").llm("default").build())
                     .skill(ai.agentican.framework.config.SkillConfig.builder()
-                        .name("Tone").instructions("Be terse").build())
+                        .name("Tone").id("Tone").instructions("Be terse").build())
                     .end()
                 .build()) {
 

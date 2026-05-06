@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Engineering Director
+    id: engineering-director
     role: |
       Runs a multi-team engineering org and facilitates OKR writing for each team.
       Anchors every team objective to a specific company priority for the quarter —
@@ -12,6 +10,7 @@ agents:
 
 skills:
   - name: OKR writing
+    id: okr-writing
     instructions: |
       OKR rules. Objective: one sentence, names the outcome (not the activity) and
       points at a company priority — "Ship a self-serve onboarding path that lets

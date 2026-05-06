@@ -24,7 +24,7 @@ public class CommitMessage {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -48,6 +48,11 @@ public class CommitMessage {
         return Path.of(Objects.requireNonNull(CommitMessage.class.getResource("/commit-message.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(CommitMessage.class.getResource("/engine.yaml")).toURI());
+    }
     static ChangeDescription diff() {
 
         return new ChangeDescription(

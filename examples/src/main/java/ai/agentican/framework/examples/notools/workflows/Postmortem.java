@@ -16,7 +16,7 @@ public class Postmortem {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -37,6 +37,11 @@ public class Postmortem {
         return Path.of(Objects.requireNonNull(Postmortem.class.getResource("/postmortem.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(Postmortem.class.getResource("/engine.yaml")).toURI());
+    }
     static Incident incident() {
 
         return new Incident("""

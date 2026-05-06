@@ -37,7 +37,7 @@ class JpaWorkflowRegistryTest {
         var step = new WorkflowStepAgent("research", "agent-x", "do research",
                 List.of(), false, List.of("skill-1"), List.of("tool-a"));
 
-        var plan = WorkflowDefinition.builder("Research").id("p-" + Ids.generate()).description("desc")
+        var plan = WorkflowDefinition.builder("p-" + Ids.generate(), "Research").description("desc")
                 .param(new WorkflowParam("topic", null, null, true)).step(step).build();
         registry.register(plan);
 
@@ -82,7 +82,7 @@ class JpaWorkflowRegistryTest {
                         new WorkflowStepBranch.Path("no", List.of(noBody))),
                 "no", List.of(), false);
 
-        var plan = WorkflowDefinition.builder("LoopAndBranch").id("p-" + Ids.generate()).description("shape test")
+        var plan = WorkflowDefinition.builder("p-" + Ids.generate(), "LoopAndBranch").description("shape test")
                 .steps(List.of(produce, loop, branch))
                 .build();
 
@@ -111,7 +111,7 @@ class JpaWorkflowRegistryTest {
     void registerIfAbsentDoesNotOverwrite() {
 
         var first = makePlan("RaceCondition", "first-" + Ids.generate(), "first");
-        var second = WorkflowDefinition.builder("RaceCondition").id(first.id()).description("second")
+        var second = WorkflowDefinition.builder(first.id(), "RaceCondition").description("second")
                 .steps(first.steps())
                 .build();
 
@@ -125,6 +125,6 @@ class JpaWorkflowRegistryTest {
         var step = new WorkflowStepAgent("s1", "a1", "do work",
                 List.of(), false, List.of(), List.of());
 
-        return WorkflowDefinition.builder(name).id(id).description(description).step(step).build();
+        return WorkflowDefinition.builder(id, name).description(description).step(step).build();
     }
 }

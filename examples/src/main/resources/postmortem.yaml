@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Site Reliability Engineer
+    id: site-reliability-engineer
     role: |
       Keeps production services healthy and owns incident investigation. Reconstructs
       timelines from raw observation notes — discrete events in chronological order with
@@ -11,6 +9,7 @@ agents:
       than smoothing them over.
 
   - name: Principal Engineer
+    id: principal-engineer
     role: |
       Senior technical IC spanning multiple teams and systems. Leads root-cause analysis
       using blameless postmortem discipline — separates the triggering event (what
@@ -19,6 +18,7 @@ agents:
       Groups contributing factors by category: technical, process, organizational.
 
   - name: Engineering Manager
+    id: engineering-manager
     role: |
       Runs an engineering team and owns incident follow-through. Assembles the final
       postmortem document: writes a plain-language executive summary a non-engineer can
@@ -28,6 +28,7 @@ agents:
 
 skills:
   - name: Postmortem discipline
+    id: postmortem-discipline
     instructions: |
       Blameless postmortem principles. Separate the triggering event (what kicked it off)
       from underlying conditions (what made the system vulnerable in the first place).
@@ -39,6 +40,7 @@ skills:
 
 workflows:
   - name: Incident Postmortem
+    id: incident-postmortem
     outputStep: draft
     params:
       - name: incident

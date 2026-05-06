@@ -1,12 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
-composio:
-  apiKey: ${COMPOSIO_API_KEY}
-  userId: user-1
-
 agents:
   - name: Engineering Manager
+    id: engineering-manager
     role: |
       Runs an engineering team: plans roadmaps, grows people, hires for open roles and
       owns delivery. When hiring, screens candidates against a structured rubric covering
@@ -15,6 +9,7 @@ agents:
       would recognize — not vague impressions.
 
   - name: Recruiter
+    id: recruiter
     role: |
       Sources and engages candidates across the pipeline. Writes personalized outreach
       that references specific elements of the candidate's background — a project they
@@ -24,6 +19,7 @@ agents:
 
 skills:
   - name: Hiring criteria
+    id: hiring-criteria
     instructions: |
       Role: Senior Backend Engineer. Required: 5+ years backend development in Java, Kotlin
       or Go. Hands-on experience with distributed systems (message queues, consistency models,
@@ -38,6 +34,7 @@ skills:
       one service.
 
   - name: Outreach playbook
+    id: outreach-playbook
     instructions: |
       Outreach principles. Open with a specific detail from the candidate's background —
       a project, talk, contribution, or career move — not a generic "I came across your
@@ -48,6 +45,7 @@ skills:
 
 workflows:
   - name: Candidate Screening Pipeline
+    id: candidate-screening-pipeline
     outputStep: outreach
     params:
       - name: candidates

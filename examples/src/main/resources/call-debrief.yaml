@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Customer Success Manager
+    id: customer-success-manager
     role: |
       Manages customer accounts post-sale. Conducts business reviews, synthesizes call
       transcripts into structured takeaways, tracks usage signals and flags renewal risks
@@ -12,6 +10,7 @@ agents:
 
 skills:
   - name: Account health signals
+    id: account-health-signals
     instructions: |
       Signal categories when reading a customer call. Sentiment: positive (specific
       praise, expansion asks), neutral (procedural), frustrated (repeated issues, tone

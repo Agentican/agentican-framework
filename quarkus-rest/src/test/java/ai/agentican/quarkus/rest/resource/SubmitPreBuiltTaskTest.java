@@ -24,7 +24,7 @@ class SubmitPreBuiltTaskTest {
         var step = new WorkflowStepAgent("research", "researcher", "do something",
                 List.of(), false, List.of(), List.of());
 
-        var task = WorkflowDefinition.builder("rest-prebuilt-task").description("test description").step(step).build();
+        var task = WorkflowDefinition.builder("rest-prebuilt-task", "rest-prebuilt-task").description("test description").step(step).build();
 
         var taskJson = objectMapper.writeValueAsString(task);
 

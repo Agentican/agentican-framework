@@ -5,7 +5,7 @@
 [![Quarkus](https://img.shields.io/badge/Quarkus-3.31-blue.svg)](https://quarkus.io/)
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
 
-The runtime half of the Agentican Quarkus extension. Exposes `Agentican` as a CDI singleton, maps `RuntimeConfig` onto typed `application.properties`, validates config at boot, wires lifecycle events, and serves liveness/readiness health checks. This is the foundation every other `quarkus-*` module composes on top of.
+The runtime half of the Agentican Quarkus extension. Exposes `Agentican` as a CDI singleton, produces `EngineConfig` and `CatalogConfig` from typed `application.properties` and optional YAML, validates config at boot, wires lifecycle events, and serves liveness/readiness health checks. This is the foundation every other `quarkus-*` module composes on top of.
 
 ## Quick Start
 
@@ -44,7 +44,7 @@ That's it. The framework plans, executes, and returns — with CDI lifecycle, he
 - **`@Workflow(name = "...")`** — qualifier for injecting typed `Workflow<P, R>` handles bound to registered workflows.
 - **`@Task(name, agent, instructions, ...)`** — qualifier for one-shot single-step `Workflow<P, R>` injections without a pre-registered definition.
 - **`ReactiveAgentican`** — Mutiny `Uni`-based API for reactive / Vert.x callers.
-- **Config binding** — `RuntimeConfig` → `application.properties` via SmallRye `@ConfigMapping`, validated at boot.
+- **Config binding** — `EngineConfig` (engine wiring) and `CatalogConfig` (catalog seeds) produced as CDI beans. Engine config merges typed `agentican.*` properties with an optional `agentican.engine.yaml` (YAML wins). Catalog config loads from `agentican.catalog.yaml` or the JPA registries depending on `agentican.catalog-source`.
 - **Lifecycle events** — `StartupEvent` / `ShutdownEvent` observers drive `Agentican` construction and `AutoCloseable` teardown.
 - **Resume on start** — `ResumeOnStartObserver` invokes `AgenticanRecovery.resumeInterrupted` on `StartupEvent` to pick up tasks left in flight after a restart (toggleable via `agentican.resume-on-start`).
 - **Health checks** — liveness + readiness at `/q/health`.

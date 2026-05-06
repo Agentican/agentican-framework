@@ -16,7 +16,7 @@ public class InterviewLoopDesign {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -37,6 +37,11 @@ public class InterviewLoopDesign {
         return Path.of(Objects.requireNonNull(InterviewLoopDesign.class.getResource("/interview-loop-design.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(InterviewLoopDesign.class.getResource("/engine.yaml")).toURI());
+    }
     static Role role() {
 
         return new Role("Senior Backend Engineer", "L5",

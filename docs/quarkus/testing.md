@@ -88,7 +88,7 @@ class EndToEndTest {
 
         var step = new WorkflowStepAgent("s", "researcher", "do it",
             List.of(), false, List.of(), List.of());
-        var task = WorkflowDefinition.builder("test").description("d").step(step).build();
+        var task = WorkflowDefinition.builder("test", "test").description("d").step(step).build();
 
         var taskId = given()
             .contentType("application/json")

@@ -1,7 +1,8 @@
 package ai.agentican.framework.examples;
 
 import ai.agentican.framework.Agentican;
-import ai.agentican.framework.config.RuntimeConfig;
+import ai.agentican.framework.config.CatalogConfig;
+import ai.agentican.framework.config.EngineConfig;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -42,11 +43,11 @@ class ExampleYamlTest {
     })
     void workflowYamlLoadsAndBuildsPlan(String resourceName) throws Exception {
 
-        var config = loadConfig(resourceName);
+        var catalog = loadCatalog(resourceName);
 
-        assertFalse(config.workflows().isEmpty(), resourceName + ": expected at least one definition");
+        assertFalse(catalog.workflows().isEmpty(), resourceName + ": expected at least one definition");
 
-        var plan = config.workflows().getFirst().toDefinition();
+        var plan = catalog.workflows().getFirst().toDefinition();
 
         assertNotNull(plan.id());
         assertNotNull(plan.name());
@@ -54,13 +55,20 @@ class ExampleYamlTest {
     }
 
     @org.junit.jupiter.api.Test
-    void quickTaskYamlHasLlmOnly() throws Exception {
+    void engineYamlHasLlm() throws Exception {
 
-        var config = loadConfig("quick-task.yaml");
+        var engine = EngineConfig.load(resourcePath("engine.yaml"));
 
-        assertFalse(config.llm().isEmpty(), "quick-task.yaml: expected at least one llm entry");
-        assertTrue(config.agents().isEmpty(), "quick-task.yaml: planner-only, no agents expected");
-        assertTrue(config.workflows().isEmpty(), "quick-task.yaml: planner-only, no plans expected");
+        assertFalse(engine.llm().isEmpty(), "engine.yaml: expected at least one llm entry");
+    }
+
+    @org.junit.jupiter.api.Test
+    void quickTaskCatalogIsPlannerOnly() throws Exception {
+
+        var catalog = loadCatalog("quick-task.yaml");
+
+        assertTrue(catalog.agents().isEmpty(), "quick-task.yaml: planner-only, no agents expected");
+        assertTrue(catalog.workflows().isEmpty(), "quick-task.yaml: planner-only, no workflows expected");
     }
 
     @ParameterizedTest
@@ -84,21 +92,19 @@ class ExampleYamlTest {
     })
     void agentYamlDefinesAnAgent(String resourceName) throws Exception {
 
-        var config = loadConfig(resourceName);
+        var catalog = loadCatalog(resourceName);
 
-        assertFalse(config.agents().isEmpty(), resourceName + ": expected at least one agent");
+        assertFalse(catalog.agents().isEmpty(), resourceName + ": expected at least one agent");
 
-        var agent = config.agents().getFirst();
+        var agent = catalog.agents().getFirst();
 
         assertNotNull(agent.name());
         assertNotNull(agent.role());
     }
 
     /**
-     * The example mains all wire YAML through both Configuration and Registry.
-     * This test mirrors that wiring so a regression where Configuration is
-     * missing (and the framework throws "At least one LLM is required") gets
-     * caught here instead of at runtime.
+     * Smoke test: build a real {@link Agentican} from the shared engine YAML +
+     * a per-example catalog YAML to confirm the example wiring path works.
      */
     @ParameterizedTest
     @ValueSource(strings = {
@@ -108,23 +114,26 @@ class ExampleYamlTest {
     })
     void exampleYamlBootsViaBothAxes(String resourceName) throws Exception {
 
-        var path = Path.of(Objects.requireNonNull(
-                ExampleYamlTest.class.getResource("/" + resourceName)).toURI());
+        var enginePath = resourcePath("engine.yaml");
+        var catalogPath = resourcePath(resourceName);
 
         try (var agentican = Agentican.builder()
-                .configuration().yaml().path(path).end()
-                .registry().yaml().path(path).end()
+                .configuration().yaml().path(enginePath).end()
+                .registry().yaml().path(catalogPath).end()
                 .build()) {
 
             assertNotNull(agentican);
         }
     }
 
-    private static RuntimeConfig loadConfig(String resourceName) throws Exception {
+    private static CatalogConfig loadCatalog(String resourceName) throws Exception {
 
-        var path = Path.of(Objects.requireNonNull(
+        return CatalogConfig.load(resourcePath(resourceName));
+    }
+
+    private static Path resourcePath(String resourceName) throws Exception {
+
+        return Path.of(Objects.requireNonNull(
                 ExampleYamlTest.class.getResource("/" + resourceName)).toURI());
-
-        return RuntimeConfig.load(path);
     }
 }

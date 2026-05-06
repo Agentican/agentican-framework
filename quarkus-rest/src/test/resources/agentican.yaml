@@ -9,4 +9,5 @@ agentRunner:
 
 agents:
   - name: researcher
+    id: researcher
     role: Expert at finding information

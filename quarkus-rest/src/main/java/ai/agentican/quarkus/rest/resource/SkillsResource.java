@@ -39,7 +39,7 @@ public class SkillsResource {
     Agentican agentican;
 
     @Inject
-    ai.agentican.framework.config.RuntimeConfig runtimeConfig;
+    ai.agentican.framework.config.CatalogConfig catalogConfig;
 
     @Inject
     CatalogAuditLog audit;
@@ -157,7 +157,7 @@ public class SkillsResource {
     private Set<String> configDeclaredNames() {
 
         var out = new HashSet<String>();
-        runtimeConfig.skills().forEach(s -> out.add(s.name()));
+        catalogConfig.skills().forEach(s -> out.add(s.name()));
         return out;
     }
 

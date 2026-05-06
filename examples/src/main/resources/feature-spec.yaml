@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Product Manager
+    id: product-manager
     role: |
       Owns feature specs end-to-end. Converts fuzzy tickets into crisp
       requirements, names the in-scope and out-of-scope items, and forces
@@ -11,6 +9,7 @@ agents:
       the scope boundary.
 
   - name: Tech Lead
+    id: tech-lead
     role: |
       Breaks approved specs into engineering tasks. Each task is sized in
       days, names the owning team, and lists dependencies on other tasks.
@@ -19,6 +18,7 @@ agents:
 
 skills:
   - name: Spec rubric
+    id: spec-rubric
     instructions: |
       A feature spec names: user story, acceptance criteria (bullet list,
       testable), explicit in-scope items, explicit out-of-scope items, success
@@ -27,6 +27,7 @@ skills:
       questions" so the reviewer can force a decision — do not paper over them.
 
   - name: Task breakdown
+    id: task-breakdown
     instructions: |
       Task list is flat. Each task: title, description (one sentence),
       estimated days, owning team, and explicit dependencies on other tasks.
@@ -36,6 +37,7 @@ skills:
 
 workflows:
   - name: Feature Spec Review
+    id: feature-spec-review
     outputStep: tasks
     params:
       - name: title

@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Sales Development Representative
+    id: sales-development-representative
     role: |
       Prospects and qualifies inbound and outbound leads. Builds prospect profiles from
       public signals, runs initial discovery calls, and hands off qualified opportunities
@@ -13,6 +11,7 @@ agents:
 
 skills:
   - name: BANT framework
+    id: bant-framework
     instructions: |
       Four discovery pillars. Budget: has money allocated for this category, or authority
       to reallocate. Authority: the contact can sign or directly influence the decision

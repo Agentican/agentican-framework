@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Chief of Staff
+    id: chief-of-staff
     role: |
       Keeps the executive's operating cadence running. Cleans meeting notes into
       structured outputs — decisions, action items, open questions — drafts follow-up
@@ -13,6 +11,7 @@ agents:
 
 skills:
   - name: Notes structure
+    id: notes-structure
     instructions: |
       Three-bucket structure. Decisions: what the group concluded, preserved in the
       original phrasing — "we're going to pilot with two customers" stays that way, not

@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Software Engineer
+    id: software-engineer
     role: |
       Writes production code and the artifacts that support it. Crafts commit messages in
       the Conventional Commits style — imperative subject under 72 characters with no
@@ -12,6 +10,7 @@ agents:
 
 skills:
   - name: Commit style
+    id: commit-style
     instructions: |
       Conventional Commits format. Type prefix: feat (new feature), fix (bug fix), refactor
       (no behavior change), perf, test, docs, chore, revert. Subject: imperative mood

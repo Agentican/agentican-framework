@@ -31,7 +31,7 @@ class TaskRunnerBranchTest {
                 .maxIterations(5)
                 .build();
 
-        return Agent.builder().config(AgentConfig.builder().name(name).role("Test agent for " + name).build()).runner(runner).build();
+        return Agent.builder().config(AgentConfig.builder().name(name).id(name).role("Test agent for " + name).build()).runner(runner).build();
     }
 
     @Test
@@ -53,7 +53,7 @@ class TaskRunnerBranchTest {
 
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = WorkflowDefinition.builder("branch-task")
+        var task = WorkflowDefinition.builder("branch-task", "branch-task")
                 .step("decide", "producer-agent", "Pick a path")
                 .branch("branch-step", branch -> branch
                         .from("decide")
@@ -88,7 +88,7 @@ class TaskRunnerBranchTest {
 
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = WorkflowDefinition.builder("default-branch-task")
+        var task = WorkflowDefinition.builder("default-branch-task", "default-branch-task")
                 .step("decide", "producer-agent", "Pick a path")
                 .branch("branch-step", branch -> branch
                         .from("decide")
@@ -124,7 +124,7 @@ class TaskRunnerBranchTest {
 
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = WorkflowDefinition.builder("no-match-branch-task")
+        var task = WorkflowDefinition.builder("no-match-branch-task", "no-match-branch-task")
                 .step("decide", "producer-agent", "Pick a path")
                 .branch("branch-step", branch -> branch
                         .from("decide")
@@ -158,7 +158,7 @@ class TaskRunnerBranchTest {
 
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = WorkflowDefinition.builder("json-array-branch-task")
+        var task = WorkflowDefinition.builder("json-array-branch-task", "json-array-branch-task")
                 .step("decide", "producer-agent", "Pick a path")
                 .branch("branch-step", branch -> branch
                         .from("decide")
@@ -193,7 +193,7 @@ class TaskRunnerBranchTest {
 
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = WorkflowDefinition.builder("contains-branch-task")
+        var task = WorkflowDefinition.builder("contains-branch-task", "contains-branch-task")
                 .step("decide", "producer-agent", "Pick a path")
                 .branch("branch-step", branch -> branch
                         .from("decide")

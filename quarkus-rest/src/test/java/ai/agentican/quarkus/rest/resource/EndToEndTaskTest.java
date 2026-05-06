@@ -39,7 +39,7 @@ class EndToEndTaskTest {
 
         var step = new WorkflowStepAgent("research", "researcher", "Find papers on agents",
                 List.of(), false, List.of(), List.of());
-        var task = WorkflowDefinition.builder("e2e-prebuilt").description("E2E test task").step(step).build();
+        var task = WorkflowDefinition.builder("e2e-prebuilt", "e2e-prebuilt").description("E2E test task").step(step).build();
         var taskJson = objectMapper.writeValueAsString(task);
 
         var taskId = given()
@@ -76,7 +76,7 @@ class EndToEndTaskTest {
 
         var step = new WorkflowStepAgent("work", "researcher", "Do something",
                 List.of(), false, List.of(), List.of());
-        var task = WorkflowDefinition.builder("e2e-list").description("List test").step(step).build();
+        var task = WorkflowDefinition.builder("e2e-list", "e2e-list").description("List test").step(step).build();
         var taskJson = objectMapper.writeValueAsString(task);
 
         var taskId = given()

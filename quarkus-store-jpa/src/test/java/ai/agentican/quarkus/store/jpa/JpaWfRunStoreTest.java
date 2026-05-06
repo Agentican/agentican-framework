@@ -213,7 +213,7 @@ class JpaWfRunStoreTest {
 
         var step = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                 "work", "worker-agent", "do it", List.of(), false, List.of(), List.of());
-        var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Snapshot WorkflowDefinition")
+        var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Snapshot WorkflowDefinition", "Snapshot WorkflowDefinition")
                 .description("test").step(step).build();
 
         var taskId = "t-" + Ids.generate();

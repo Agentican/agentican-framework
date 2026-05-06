@@ -1,12 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
-composio:
-  apiKey: ${COMPOSIO_API_KEY}
-  userId: user-1
-
 agents:
   - name: Compliance Officer
+    id: compliance-officer
     role: |
       Runs KYC verification: confirms beneficial ownership structure, checks all principals
       against sanctions and PEP lists, validates incorporation documents and business
@@ -16,6 +10,7 @@ agents:
       (with the specific disqualifying factor).
 
   - name: Credit Analyst
+    id: credit-analyst
     role: |
       Evaluates financial health using available signals: credit bureau data, funding history,
       revenue trajectory, payment history with other vendors, and public financial filings
@@ -24,6 +19,7 @@ agents:
       data was available. Explicitly notes when data is insufficient to form a strong opinion.
 
   - name: Account Executive
+    id: account-executive
     role: |
       Matches customer needs to product offerings based on company size, stated use case,
       technical maturity and budget signals. Recommends a specific package — not a menu of
@@ -32,6 +28,7 @@ agents:
       risks (technical complexity, integration requirements, timeline constraints).
 
   - name: Risk Manager
+    id: risk-manager
     role: |
       Synthesizes compliance, credit and business fit assessments into a composite risk score.
       Weights each input based on the risk framework — compliance flags carry the most weight
@@ -40,6 +37,7 @@ agents:
       a plain-language summary a non-specialist can understand.
 
   - name: Onboarding Manager
+    id: onboarding-manager
     role: |
       Coordinates the welcome sequence after approval. Sends a personalized onboarding email
       with product access details, relevant documentation links and the assigned account
@@ -49,6 +47,7 @@ agents:
 
 skills:
   - name: Compliance policy
+    id: compliance-policy
     instructions: |
       Verification requirements: confirm legal entity name matches official registration,
       verify at least one beneficial owner with >25% ownership, check all principals and
@@ -63,6 +62,7 @@ skills:
       a FATF black-list jurisdiction, or evidence of fraudulent documentation.
 
   - name: Credit evaluation
+    id: credit-evaluation
     instructions: |
       Signals to evaluate: credit bureau score (if available), funding history (rounds,
       recency, investor quality), revenue trajectory (YoY growth, retention), vendor
@@ -72,6 +72,7 @@ skills:
       rather than inflating confidence.
 
   - name: Product fit matrix
+    id: product-fit-matrix
     instructions: |
       Matching criteria. Starter package: <50 employees, first-time buyer, basic use case,
       integrations via out-of-box connectors. Business package: 50-500 employees, defined
@@ -80,6 +81,7 @@ skills:
       obligations, dedicated CSM. Always recommend one package with rationale, not a menu.
 
   - name: Risk framework
+    id: risk-framework
     instructions: |
       Composite score 1-100. Lower is better.
 
@@ -93,6 +95,7 @@ skills:
       Thresholds: approve (0-30), manual review (31-60), escalate to leadership (61-100).
 
   - name: Onboarding playbook
+    id: onboarding-playbook
     instructions: |
       Welcome sequence components. Email: personalized greeting with customer name and
       company, product access instructions with magic-link or temporary credentials,
@@ -104,6 +107,7 @@ skills:
 
 workflows:
   - name: Customer Onboarding
+    id: customer-onboarding
     outputStep: risk-score
     params:
       - name: customer_id

@@ -15,7 +15,7 @@ public class InvoiceProcessing {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -36,6 +36,11 @@ public class InvoiceProcessing {
         return Path.of(Objects.requireNonNull(InvoiceProcessing.class.getResource("/invoice-processing.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(InvoiceProcessing.class.getResource("/engine.yaml")).toURI());
+    }
     static InvoiceRequest request() {
 
         return new InvoiceRequest("msg-abc-123");

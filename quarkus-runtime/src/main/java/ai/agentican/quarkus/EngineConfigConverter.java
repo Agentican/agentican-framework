@@ -1,19 +1,19 @@
 package ai.agentican.quarkus;
 
 import ai.agentican.framework.config.ComposioConfig;
+import ai.agentican.framework.config.EngineConfig;
 import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.config.McpConfig;
-import ai.agentican.framework.config.RuntimeConfig;
 import ai.agentican.framework.config.WorkerConfig;
 
 import java.util.ArrayList;
-import java.util.List;
 
-final class RuntimeConfigConverter {
+final class EngineConfigConverter {
 
-    private RuntimeConfigConverter() {}
+    private EngineConfigConverter() {}
 
-    static RuntimeConfig fromProperties(AgenticanConfig source) {
+    /** Build an {@link EngineConfig} from the {@code agentican.*} property surface. */
+    static EngineConfig fromProperties(AgenticanConfig source) {
 
         var llms = new ArrayList<LlmConfig>();
         var mcps = new ArrayList<McpConfig>();
@@ -21,10 +21,26 @@ final class RuntimeConfigConverter {
         source.llm().forEach(llm -> llms.add(toLlmConfig(llm)));
         source.mcp().forEach(mcp -> mcps.add(toMcpConfig(mcp)));
 
-        var worker = source.agentRunner().map(RuntimeConfigConverter::toWorkerConfig).orElse(null);
-        var composio = source.composio().map(RuntimeConfigConverter::toComposioConfig).orElse(null);
+        var worker = source.agentRunner().map(EngineConfigConverter::toWorkerConfig).orElse(null);
+        var composio = source.composio().map(EngineConfigConverter::toComposioConfig).orElse(null);
 
-        return new RuntimeConfig(llms, mcps, composio, worker, List.of(), List.of(), List.of(), source.strict());
+        return new EngineConfig(llms, mcps, composio, worker, source.strict());
+    }
+
+    /**
+     * Merge a YAML-loaded {@link EngineConfig} with one built from properties. YAML wins
+     * for any field set in both: lists come from YAML when non-empty, scalar fields from
+     * YAML when present, {@code strict} is OR'd. (Properties surface defaults from
+     * {@code @WithDefault} annotations, so a real YAML override should beat them.)
+     */
+    static EngineConfig merge(EngineConfig fromYaml, EngineConfig fromProps) {
+
+        return new EngineConfig(
+                !fromYaml.llm().isEmpty()      ? fromYaml.llm()         : fromProps.llm(),
+                !fromYaml.mcp().isEmpty()      ? fromYaml.mcp()         : fromProps.mcp(),
+                fromYaml.composio() != null    ? fromYaml.composio()    : fromProps.composio(),
+                fromYaml.agentRunner() != null ? fromYaml.agentRunner() : fromProps.agentRunner(),
+                fromYaml.strict() || fromProps.strict());
     }
 
     private static LlmConfig toLlmConfig(AgenticanConfig.LlmConfig source) {

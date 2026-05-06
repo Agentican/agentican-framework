@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Engineering Manager
+    id: engineering-manager
     role: |
       Runs an engineering team: plans roadmaps, grows people, hires for open roles and
       owns delivery. When designing interview loops, grounds questions in the role's
@@ -12,6 +10,7 @@ agents:
       consistently. Avoids brain-teasers and trivia.
 
   - name: Recruiter
+    id: recruiter
     role: |
       Sources candidates and runs the hiring process end-to-end. Reviews interview loops
       for bias, leveling accuracy and role alignment — flags questions that favor a
@@ -21,6 +20,7 @@ agents:
 
 skills:
   - name: Leveling rubric
+    id: leveling-rubric
     instructions: |
       Seniority calibration for engineering roles. L3 (early): guided execution, well-scoped
       tasks, mentorship required. L4 (mid): independent execution, code review participation,
@@ -31,6 +31,7 @@ skills:
 
 workflows:
   - name: Interview Loop Design
+    id: interview-loop-design
     outputStep: refine
     params:
       - name: role

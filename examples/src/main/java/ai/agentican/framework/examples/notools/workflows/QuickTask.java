@@ -10,7 +10,7 @@ public class QuickTask {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -26,6 +26,11 @@ public class QuickTask {
         return Path.of(Objects.requireNonNull(QuickTask.class.getResource("/quick-task.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(QuickTask.class.getResource("/engine.yaml")).toURI());
+    }
     static String task() {
 
         return "Compare the pros and cons of event sourcing vs. traditional CRUD "

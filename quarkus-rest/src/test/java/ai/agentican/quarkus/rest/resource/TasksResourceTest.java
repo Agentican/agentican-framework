@@ -130,7 +130,7 @@ class TasksResourceTest {
     @Test
     void getLogReturnsStepRunsList() {
 
-        var task = WorkflowDefinition.builder("demo").description("d").step("s", "a", "i").build();
+        var task = WorkflowDefinition.builder("demo", "demo").description("d").step("s", "a", "i").build();
         workflowRunStore.taskStarted("rest-runs-1", "demo", task, Map.of());
         var stepId = Ids.generate();
         workflowRunStore.stepStarted("rest-runs-1", stepId, "s");
@@ -146,7 +146,7 @@ class TasksResourceTest {
 
     private void seedTask(String taskId, WorkflowRunStatus status) {
 
-        var task = WorkflowDefinition.builder("demo").description("d").step("s", "a", "i").build();
+        var task = WorkflowDefinition.builder("demo", "demo").description("d").step("s", "a", "i").build();
         workflowRunStore.taskStarted(taskId, "demo", task, Map.of());
         workflowRunStore.taskCompleted(taskId, status);
     }

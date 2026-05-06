@@ -1,12 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
-composio:
-  apiKey: ${COMPOSIO_API_KEY}
-  userId: user-1
-
 agents:
   - name: Accounts Payable Specialist
+    id: accounts-payable-specialist
     role: |
       Handles day-to-day AP operations. Extracts structured data from incoming invoices
       (vendor, number, amount, currency, line items, terms, due date, PO reference),
@@ -15,6 +9,7 @@ agents:
       vendors, and duplicates. Escalates ambiguous cases rather than guessing.
 
   - name: Finance Controller
+    id: finance-controller
     role: |
       Reviews invoices against budget allocation, contract terms and spending authority limits.
       Evaluates whether the charges align with the PO scope, the amounts are within expected
@@ -23,6 +18,7 @@ agents:
       criteria that drove the decision. Never approves ambiguous cases — escalates them.
 
   - name: Treasury Analyst
+    id: treasury-analyst
     role: |
       Executes approved payments through the configured payment system. Generates
       confirmation records with transaction ID, amount, vendor and timestamp. Notifies
@@ -32,6 +28,7 @@ agents:
 
 skills:
   - name: AP policy
+    id: ap-policy
     instructions: |
       Auto-approve criteria (all must be true): invoice total under $5,000, vendor has 3+
       prior approved invoices in the system, valid PO number that matches an open purchase
@@ -47,6 +44,7 @@ skills:
 
 workflows:
   - name: Invoice Processing
+    id: invoice-processing
     outputStep: validate
     params:
       - name: email_id

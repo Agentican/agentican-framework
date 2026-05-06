@@ -34,7 +34,18 @@ The layout is a progressive-disclosure path:
 
 ## Running
 
-Every example reads its config from classpath YAML. Required env vars:
+Every example reads two YAML files from the classpath:
+
+- **`engine.yaml`** — shared across every example. Just declares the LLM API
+  key. Wired via `.configuration().yaml().path(engine()).end()`.
+- **`<example>.yaml`** — per-example catalog. Declares the agent(s), skills,
+  and (for workflow examples) the `WorkflowDefinition` itself. Wired via
+  `.registry().yaml().path(config()).end()`.
+
+This mirrors the engine/catalog separation in the framework: `EngineConfig`
+is what boots the runtime, `CatalogConfig` is what seeds the registries.
+
+Required env vars:
 
 - `ANTHROPIC_API_KEY` — required by every example.
 - `COMPOSIO_API_KEY`, `COMPOSIO_USER_ID` — required by `withtools/` examples

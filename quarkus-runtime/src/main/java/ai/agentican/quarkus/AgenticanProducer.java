@@ -66,73 +66,79 @@ public class AgenticanProducer {
 
     @Produces
     @jakarta.inject.Singleton
-    public ai.agentican.framework.config.RuntimeConfig runtimeConfig() {
+    public ai.agentican.framework.config.EngineConfig engineConfig() {
 
-        var fromProps = RuntimeConfigConverter.fromProperties(config);
+        var fromProps = EngineConfigConverter.fromProperties(config);
+        var fromYaml = loadEngineYaml(config.engineConfig());
 
-        return switch (config.catalog()) {
-            case yaml -> {
-                var fromYaml = loadYamlFromClasspath(config.config());
-                yield new ai.agentican.framework.config.RuntimeConfig(
-                        !fromYaml.llm().isEmpty()      ? fromYaml.llm()         : fromProps.llm(),
-                        !fromYaml.mcp().isEmpty()      ? fromYaml.mcp()         : fromProps.mcp(),
-                        fromYaml.composio() != null    ? fromYaml.composio()    : fromProps.composio(),
-                        fromYaml.agentRunner() != null ? fromYaml.agentRunner() : fromProps.agentRunner(),
-                        fromYaml.agents(),
-                        fromYaml.skills(),
-                        fromYaml.workflows(),
-                        fromYaml.strict() || fromProps.strict());
-            }
-            case database -> fromProps;
+        return fromYaml != null ? EngineConfigConverter.merge(fromYaml, fromProps) : fromProps;
+    }
+
+    @Produces
+    @jakarta.inject.Singleton
+    public ai.agentican.framework.config.CatalogConfig catalogConfig() {
+
+        return switch (config.catalogSource()) {
+            case yaml -> loadCatalogYaml(config.catalogConfig());
+            case database -> new ai.agentican.framework.config.CatalogConfig(
+                    java.util.List.of(), java.util.List.of(), java.util.List.of());
         };
     }
 
-    private static ai.agentican.framework.config.RuntimeConfig loadYamlFromClasspath(String resourcePath) {
+    private static ai.agentican.framework.config.EngineConfig loadEngineYaml(String resourcePath) {
 
-        var classloader = Thread.currentThread().getContextClassLoader();
-        if (classloader == null) classloader = AgenticanProducer.class.getClassLoader();
+        try (var in = openClasspath(resourcePath)) {
 
-        try (var in = classloader.getResourceAsStream(resourcePath)) {
+            if (in == null) return null; // engine YAML is optional
+            return ai.agentican.framework.config.EngineConfig.load(in);
+        }
+        catch (java.io.IOException e) {
+            throw new IllegalStateException("Failed to load engine config from " + resourcePath, e);
+        }
+    }
+
+    private static ai.agentican.framework.config.CatalogConfig loadCatalogYaml(String resourcePath) {
+
+        try (var in = openClasspath(resourcePath)) {
 
             if (in == null)
                 throw new IllegalStateException(
-                        "agentican.config not found on classpath: " + resourcePath
-                                + ". Place a RuntimeConfig YAML at src/main/resources/" + resourcePath);
+                        "agentican.catalog-config not found on classpath: " + resourcePath
+                                + ". Place a CatalogConfig YAML at src/main/resources/" + resourcePath
+                                + ", or set agentican.catalog-source=database.");
 
-            return ai.agentican.framework.config.RuntimeConfig.load(in);
+            return ai.agentican.framework.config.CatalogConfig.load(in);
         }
         catch (java.io.IOException e) {
-            throw new IllegalStateException("Failed to load agentican config from " + resourcePath, e);
+            throw new IllegalStateException("Failed to load catalog config from " + resourcePath, e);
         }
+    }
+
+    private static java.io.InputStream openClasspath(String resourcePath) {
+
+        var classloader = Thread.currentThread().getContextClassLoader();
+        if (classloader == null) classloader = AgenticanProducer.class.getClassLoader();
+        return classloader.getResourceAsStream(resourcePath);
     }
 
     @Produces
     @ApplicationScoped
     @io.quarkus.runtime.Startup
-    public Agentican agentican(ai.agentican.framework.config.RuntimeConfig runtimeConfig) {
+    public Agentican agentican(ai.agentican.framework.config.EngineConfig engineConfig,
+                               ai.agentican.framework.config.CatalogConfig catalogConfig) {
 
-        Agentican.Builder builder = Agentican.builder();
+        Agentican.Builder builder = Agentican.builder()
+                .configuration().yaml().config(engineConfig).end();
 
-        switch (config.catalog()) {
-            case yaml -> {
-                builder.configuration().yaml().config(runtimeConfig);
-                builder.registry().yaml().config(runtimeConfig);
-            }
-            case database -> {
-                var configurationApi = builder.configuration().api();
-                runtimeConfig.llm().forEach(configurationApi::llm);
-                runtimeConfig.mcp().forEach(configurationApi::mcp);
-                if (runtimeConfig.composio() != null) configurationApi.composio(runtimeConfig.composio());
-                if (runtimeConfig.agentRunner() != null) configurationApi.worker(runtimeConfig.agentRunner());
-                if (runtimeConfig.strict()) configurationApi.strict();
-            }
+        if (config.catalogSource() == AgenticanConfig.CatalogSource.yaml) {
+            builder.registry().yaml().config(catalogConfig).end();
         }
 
         builder.hitlManager(hitlManager);
         builder.knowledgeStore(knowledgeStore);
         builder.workflowRunStore(workflowRunStore);
 
-        if (config.catalog() == AgenticanConfig.Catalog.database) {
+        if (config.catalogSource() == AgenticanConfig.CatalogSource.database) {
             builder.agentRegistry(agentRegistry);
             builder.skillRegistry(skillRegistry);
             builder.workflowRegistry(workflowRegistry);
@@ -237,7 +243,7 @@ public class AgenticanProducer {
                 var client = handle.get();
 
                 if (!llmDecoratorList.isEmpty()) {
-                    var matchingConfig = findLlmConfigByName(runtimeConfig, name);
+                    var matchingConfig = findLlmConfigByName(engineConfig, name);
                     if (matchingConfig != null) {
                         for (var d : llmDecoratorList) client = d.decorate(matchingConfig, client);
                     }
@@ -285,9 +291,9 @@ public class AgenticanProducer {
     }
 
     private static ai.agentican.framework.config.LlmConfig findLlmConfigByName(
-            ai.agentican.framework.config.RuntimeConfig config, String name) {
+            ai.agentican.framework.config.EngineConfig engine, String name) {
 
-        return config.llm().stream()
+        return engine.llm().stream()
                 .filter(c -> c.name().equals(name))
                 .findFirst()
                 .orElse(null);

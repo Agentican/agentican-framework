@@ -16,7 +16,7 @@ public class ExpenseAudit {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -37,6 +37,11 @@ public class ExpenseAudit {
         return Path.of(Objects.requireNonNull(ExpenseAudit.class.getResource("/expense-audit.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(ExpenseAudit.class.getResource("/engine.yaml")).toURI());
+    }
     static ExpenseReport report() {
 
         return new ExpenseReport("jane.chen@example.com", List.of(

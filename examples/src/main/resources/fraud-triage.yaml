@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Fraud Analyst
+    id: fraud-analyst
     role: |
       Scores flagged transactions against known risk signals — velocity,
       geographic mismatch, device reputation, amount anomaly, merchant
@@ -10,6 +8,7 @@ agents:
       never uses a generic "high risk" without naming the signals.
 
   - name: Risk Lead
+    id: risk-lead
     role: |
       Applies current policy thresholds to scored transactions and produces
       an action list (auto-reverse, hold for manual review, release).
@@ -18,6 +17,7 @@ agents:
 
 skills:
   - name: Fraud scoring
+    id: fraud-scoring
     instructions: |
       Score 0-100. Signals (weighted): velocity (same card 3+ charges in
       10min: +25), geo mismatch (card country != IP country: +15), device
@@ -27,6 +27,7 @@ skills:
       citing the triggering signals.
 
   - name: Risk policy
+    id: risk-policy
     instructions: |
       Thresholds change weekly based on loss appetite. Do not assume the
       previous week's thresholds — ask. Once thresholds are known, classify
@@ -36,6 +37,7 @@ skills:
 
 workflows:
   - name: Fraud Triage
+    id: fraud-triage
     outputStep: actions
     params:
       - name: batch_id

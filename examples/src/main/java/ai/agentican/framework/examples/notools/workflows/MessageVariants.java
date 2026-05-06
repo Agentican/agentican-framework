@@ -16,7 +16,7 @@ public class MessageVariants {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -37,6 +37,11 @@ public class MessageVariants {
         return Path.of(Objects.requireNonNull(MessageVariants.class.getResource("/message-variants.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(MessageVariants.class.getResource("/engine.yaml")).toURI());
+    }
     static MessageBrief brief() {
 
         return new MessageBrief(

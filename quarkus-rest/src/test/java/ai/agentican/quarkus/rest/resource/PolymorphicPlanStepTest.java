@@ -83,7 +83,7 @@ class PolymorphicPlanStepTest {
         var loopBody = new WorkflowStepAgent("process", "worker", "handle item", List.of(), false, List.of(), List.of());
         var loop = new WorkflowStepLoop("loop", "produce", List.of(loopBody), List.of(), false);
 
-        var task = WorkflowDefinition.builder("mixed-task").description("test").steps(List.of(producer, loop)).build();
+        var task = WorkflowDefinition.builder("mixed-task", "mixed-task").description("test").steps(List.of(producer, loop)).build();
 
         var json = objectMapper.writeValueAsString(task);
         var deserialized = objectMapper.readValue(json, WorkflowDefinition.class);
@@ -101,7 +101,7 @@ class PolymorphicPlanStepTest {
         var loopBody = new WorkflowStepAgent("process", "researcher", "handle item", List.of(), false, List.of(), List.of());
         var loop = new WorkflowStepLoop("loop", "produce", List.of(loopBody), List.of(), false);
 
-        var task = WorkflowDefinition.builder("rest-loop-task").description("test with loop").steps(List.of(producer, loop)).build();
+        var task = WorkflowDefinition.builder("rest-loop-task", "rest-loop-task").description("test with loop").steps(List.of(producer, loop)).build();
 
         var taskJson = objectMapper.writeValueAsString(task);
 

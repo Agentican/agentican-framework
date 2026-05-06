@@ -26,7 +26,7 @@ public class AlertReview {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -50,6 +50,11 @@ public class AlertReview {
         return Path.of(Objects.requireNonNull(AlertReview.class.getResource("/alert-review.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(AlertReview.class.getResource("/engine.yaml")).toURI());
+    }
     static AlertDefinition alert() {
 
         return new AlertDefinition(

@@ -22,7 +22,7 @@ public class BrandTaglines {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -46,6 +46,11 @@ public class BrandTaglines {
         return Path.of(Objects.requireNonNull(BrandTaglines.class.getResource("/brand-taglines.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(BrandTaglines.class.getResource("/engine.yaml")).toURI());
+    }
     static Brief brief() {
 
         return new Brief(

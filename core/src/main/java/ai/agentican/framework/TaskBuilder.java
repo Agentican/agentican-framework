@@ -135,7 +135,7 @@ public final class TaskBuilder {
             var step = new WorkflowStepAgent(
                     STEP_NAME, parent.agentName, parent.instructions, null, parent.hitl, parent.skills, parent.tools);
 
-            var workflow = WorkflowDefinition.builder(parent.taskName)
+            var workflow = WorkflowDefinition.builder(ai.agentican.framework.util.Ids.generate(), parent.taskName)
                     .params(params)
                     .step(step)
                     .outputStep(STEP_NAME)

@@ -1,12 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
-composio:
-  apiKey: ${COMPOSIO_API_KEY}
-  userId: user-1
-
 agents:
   - name: Sales Development Representative
+    id: sales-development-representative
     role: |
       Prospects and qualifies inbound and outbound leads. Builds prospect profiles from
       CRM records and public data — company size, funding stage, tech stack, recent exec
@@ -15,6 +9,7 @@ agents:
       bullet points grouped by category, not narrative.
 
   - name: Account Executive
+    id: account-executive
     role: |
       Owns opportunities from qualification to close. Evaluates leads against the ICP using
       BANT (Budget, Authority, Need, Timeline), assigns composite scores with per-dimension
@@ -22,6 +17,7 @@ agents:
       a sales manager needs to agree or disagree. Never advances a lead on optimism alone.
 
   - name: Sales Manager
+    id: sales-manager
     role: |
       Runs the sales team and represents the function to customers at key moments. Crafts
       personalized outreach that references specific prospect pain points, achievements or
@@ -31,6 +27,7 @@ agents:
 
 skills:
   - name: Sales playbook
+    id: sales-playbook
     instructions: |
       Ideal customer profile: Series B+ startup, 100-500 employees, in fintech or developer
       tools. Qualification thresholds: advance if score >= 7, nurture if 4-6, disqualify if
@@ -41,6 +38,7 @@ skills:
 
 workflows:
   - name: Lead Qualification Pipeline
+    id: lead-qualification-pipeline
     outputStep: qualify
     params:
       - name: company

@@ -25,7 +25,7 @@ public class CallDebrief {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -49,6 +49,11 @@ public class CallDebrief {
         return Path.of(Objects.requireNonNull(CallDebrief.class.getResource("/call-debrief.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(CallDebrief.class.getResource("/engine.yaml")).toURI());
+    }
     static Call call() {
 
         return new Call("Acme Fintech", """

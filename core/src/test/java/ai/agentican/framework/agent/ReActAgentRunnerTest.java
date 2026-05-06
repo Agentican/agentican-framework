@@ -105,7 +105,7 @@ class ReActAgentRunnerTest {
     private static AgentResult runRunner(AgentRunner runner, String task, Map<String, Toolkit> toolkits) {
 
         var agent = Agent.builder()
-                .config(new AgentConfig(null, "TestAgent", "An agent for tests", null, null, null, null))
+                .config(new AgentConfig("TestAgent", "TestAgent", "An agent for tests", null, null, null, null))
                 .runner(runner)
                 .build();
 

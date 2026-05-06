@@ -4,6 +4,21 @@ Complete list of all `agentican.*` configuration properties across all Quarkus m
 
 ## Core (`agentican-quarkus`)
 
+### Config sources
+
+The Quarkus runtime produces two CDI beans from your config:
+
+- **`EngineConfig`** — engine wiring (LLMs, MCP, Composio, agent runner, strict). Built by merging typed `agentican.*` properties below with an optional YAML at `agentican.engine-config` (default: `agentican.engine.yaml`). YAML wins when both are set; if no YAML is present, properties alone are used.
+- **`CatalogConfig`** — catalog data (agents, skills, workflows). Loaded from the YAML at `agentican.catalog-config` (default: `agentican.catalog.yaml`) when `agentican.catalog-source=yaml`, or supplied by JPA-backed registries when `agentican.catalog-source=database`.
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `agentican.catalog-source` | enum | `yaml` | `yaml` or `database` |
+| `agentican.engine-config` | string | `agentican.engine.yaml` | Classpath resource for the engine YAML (optional file) |
+| `agentican.catalog-config` | string | `agentican.catalog.yaml` | Classpath resource for the catalog YAML (consulted when `catalog-source=yaml`) |
+
+A single YAML can feed both axes — point both `engine-config` and `catalog-config` at the same path. `EngineConfig` and `CatalogConfig` ignore each other's top-level keys.
+
 ### LLM Clients
 
 | Property | Type | Default | Description |
@@ -46,28 +61,32 @@ Complete list of all `agentican.*` configuration properties across all Quarkus m
 | `agentican.mcp[*].query-params.<key>` | string | — | Query parameters |
 | `agentican.mcp[*].headers.<key>` | string | — | HTTP headers |
 
-### Pre-registered Agents
+### Pre-registered Agents, Skills, Workflows
 
-| Property | Type | Default | Description |
-|---|---|---|---|
-| `agentican.agents[*].id` | string | auto | Auto-generated if omitted |
-| `agentican.agents[*].name` | string | **required** | Agent name (unique within `AgentRegistry`) |
-| `agentican.agents[*].role` | string | **required** | Agent role description |
-| `agentican.agents[*].llm` | string | `default` | LLM client name to use |
-| `agentican.agents[*].runner` | string | `smac` | `smac` or `react` |
-| `agentican.agents[*].max-turns` | int | — | Override `WorkerConfig.maxTurns` for this agent |
-| `agentican.agents[*].timeout` | duration | — | Override `WorkerConfig.timeout` for this agent |
+Catalog data does not have a property surface — it lives entirely in
+`agentican.catalog.yaml` (when `agentican.catalog-source=yaml`) or in the JPA
+catalog tables (when `agentican.catalog-source=database`).
 
-### Pre-registered Skills
+```yaml
+# agentican.catalog.yaml
+agents:
+  - id: researcher
+    name: researcher
+    role: Expert at finding and synthesizing information
+    llm: default              # LLM name from agentican.llm[*].name
+    runner: smac              # smac | react
+    maxTurns: 15              # optional, overrides agent-runner.max-turns
+    timeout: PT10M            # optional, overrides agent-runner.timeout
 
-| Property | Type | Default | Description |
-|---|---|---|---|
-| `agentican.skills[*].id` | string | auto | Auto-generated if omitted |
-| `agentican.skills[*].name` | string | **required** | Skill name (unique within `SkillRegistry`) |
-| `agentican.skills[*].instructions` | string | **required** | Skill instructions |
+skills:
+  - id: citations
+    name: citations
+    instructions: Always include source URLs
 
-> Agents, skills, and workflows are identified by **name**. Persistent stores
-> upsert rows keyed by name across redeploys.
+workflows: []
+```
+
+Every entry under `agents:`, `skills:`, and `workflows:` requires a stable `id` (slug-style, e.g. `researcher`, `incident-postmortem`). The framework rejects null/blank ids at load time. Persistent stores upsert rows keyed by id across redeploys.
 
 ### Store backend selection
 

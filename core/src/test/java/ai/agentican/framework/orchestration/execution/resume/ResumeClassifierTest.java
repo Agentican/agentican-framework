@@ -179,7 +179,7 @@ class ResumeClassifierTest {
     @Test
     void completedStepsAreCollectedInOrder() {
 
-        var plan = WorkflowDefinition.builder("t").description("").steps(List.of(
+        var plan = WorkflowDefinition.builder("t", "t").description("").steps(List.of(
                 new WorkflowStepAgent("a", "x", "do a", List.of(), false, List.of(), List.of()),
                 new WorkflowStepAgent("b", "x", "do b", List.of("a"), false, List.of(), List.of()),
                 new WorkflowStepAgent("c", "x", "do c", List.of("b"), false, List.of(), List.of())))
@@ -205,7 +205,7 @@ class ResumeClassifierTest {
 
     private static WorkflowDefinition fakePlan() {
 
-        return WorkflowDefinition.builder("t").description("")
+        return WorkflowDefinition.builder("t", "t").description("")
                 .step(new WorkflowStepAgent("research", "researcher", "do it",
                         List.of(), false, List.of(), List.of()))
                 .build();

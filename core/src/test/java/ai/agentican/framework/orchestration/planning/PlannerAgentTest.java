@@ -200,8 +200,7 @@ class PlannerAgentTest {
     @Test
     void planReusesExistingPlanWhenLlmReturnsReuseDecision() {
 
-        var existing = WorkflowDefinition.builder("Research WorkflowDefinition")
-                .id("definition-cataloged-id")
+        var existing = WorkflowDefinition.builder("definition-cataloged-id", "Research WorkflowDefinition")
                 .description("Research any topic")
                 .param(new WorkflowParam("topic", null, null, true))
                 .step(new WorkflowStepAgent("research", "researcher", "research {{param.topic}}",

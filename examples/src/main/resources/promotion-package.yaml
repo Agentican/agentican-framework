@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Engineering Manager
+    id: engineering-manager
     role: |
       Runs an engineering team and owns promotion nominations for its members. Builds
       promotion packets grounded in specific impact evidence — projects delivered,
@@ -13,6 +11,7 @@ agents:
 
 skills:
   - name: Promotion rubric
+    id: promotion-rubric
     instructions: |
       Level definitions. L3 (early): executes well-scoped tasks with mentorship. L4
       (mid): independent execution and code review, light design on their own service.

@@ -28,7 +28,7 @@ class WfStepCodeDeserializerTest {
         var step = new WorkflowStepCode<>("fetch", "http",
                 new HttpInput("https://example.com", "GET"), List.of("upstream"));
 
-        var plan = WorkflowDefinition.builder("test-definition").description("desc").step(step).build();
+        var plan = WorkflowDefinition.builder("test-definition", "test-definition").description("desc").step(step).build();
 
         var json = Json.writeValueAsString(plan);
         var roundTripped = codec.fromJson(json, WorkflowDefinition.class);
@@ -50,7 +50,7 @@ class WfStepCodeDeserializerTest {
         var step = new WorkflowStepCode<>("fetch", "http",
                 new HttpInput("https://example.com", "GET"), List.of());
 
-        var plan = WorkflowDefinition.builder("test-definition").description("desc").step(step).build();
+        var plan = WorkflowDefinition.builder("test-definition", "test-definition").description("desc").step(step).build();
 
         var json = Json.writeValueAsString(plan);
         var roundTripped = Json.readValue(json, WorkflowDefinition.class);
@@ -88,7 +88,7 @@ class WfStepCodeDeserializerTest {
         var codec = new WorkflowDefinitionCodec(registry);
 
         var step = new WorkflowStepCode<>("n", "noop", null, List.of());
-        var plan = WorkflowDefinition.builder("p").description("d").step(step).build();
+        var plan = WorkflowDefinition.builder("p", "p").description("d").step(step).build();
 
         var json = Json.writeValueAsString(plan);
         var back = codec.fromJson(json, WorkflowDefinition.class);

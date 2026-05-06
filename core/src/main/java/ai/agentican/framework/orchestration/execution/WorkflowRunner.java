@@ -402,7 +402,7 @@ public class WorkflowRunner {
             else {
 
                 var resolvedBody = stepLoopRunner.resolveLoopBody(loopStep.body(), items.get(i), taskParams);
-                var subPlan = WorkflowDefinition.builder(loopStep.name() + "-iter-" + (i + 1))
+                var subPlan = WorkflowDefinition.builder(Ids.generate(), loopStep.name() + "-iter-" + (i + 1))
                         .description("").steps(resolvedBody).build();
 
                 LOG.info("Loop step '{}': dispatching fresh iteration {}", loopStep.name(), i);
@@ -479,7 +479,7 @@ public class WorkflowRunner {
                     List.of());
         }
 
-        var subPlan = WorkflowDefinition.builder(branchStep.name() + "-" + chosenPath)
+        var subPlan = WorkflowDefinition.builder(Ids.generate(), branchStep.name() + "-" + chosenPath)
                 .description("").steps(path.body()).build();
         var subResult = run(subPlan, newTaskId(), taskId, stepLog.id(), 0,
                 taskParams, cancelled, parentOutputs);

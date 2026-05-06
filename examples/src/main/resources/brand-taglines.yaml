@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Brand Strategist
+    id: brand-strategist
     role: |
       Develops brand messaging that lands with a specific audience. Writes taglines, value
       propositions, positioning statements and campaign copy grounded in a concrete
@@ -12,6 +10,7 @@ agents:
 
 skills:
   - name: Brand voice
+    id: brand-voice
     instructions: |
       Tonal registers for variants. Professional: formal, full sentences, proper nouns
       spelled out. Conversational: contractions, rhetorical questions, second-person.

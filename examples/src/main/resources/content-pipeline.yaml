@@ -1,12 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
-composio:
-  apiKey: ${COMPOSIO_API_KEY}
-  userId: user-1
-
 agents:
   - name: Research Analyst
+    id: research-analyst
     role: |
       Investigates topics by gathering recent data, expert quotes and statistical evidence.
       Prioritizes primary sources — company blogs, research papers, official documentation —
@@ -15,6 +9,7 @@ agents:
       12 months or when conflicting sources exist.
 
   - name: Content Writer
+    id: content-writer
     role: |
       Writes long-form articles that balance technical depth with accessibility. Structures
       content with clear headers, progressive disclosure and concrete examples. Opens with
@@ -23,6 +18,7 @@ agents:
       executives. Avoids jargon unless the audience expects it.
 
   - name: Copy Editor
+    id: copy-editor
     role: |
       Reviews content for grammatical precision, logical flow and brand voice consistency.
       Tightens prose by removing redundant qualifiers, passive constructions and hedging
@@ -32,6 +28,7 @@ agents:
 
 skills:
   - name: Research standards
+    id: research-standards
     instructions: |
       Source quality rules. Prefer primary sources (company blog posts, research papers,
       official documentation) over aggregators and recaps. Cite methodology, sample sizes,
@@ -40,6 +37,7 @@ skills:
       one. Every claim needs a citeable origin — no "it is widely believed" padding.
 
   - name: Editorial style
+    id: editorial-style
     instructions: |
       Long-form writing style. Open with a hook that names why the reader should care.
       Use progressive disclosure — concrete example before abstraction. Short paragraphs
@@ -49,6 +47,7 @@ skills:
       unless the audience expects it.
 
   - name: SEO optimization
+    id: seo-optimization
     instructions: |
       Optimize content for search visibility. Write meta descriptions under 160 characters
       that include the primary keyword. Use H2/H3 headers that mirror how the target audience
@@ -58,6 +57,7 @@ skills:
 
 workflows:
   - name: Content Pipeline
+    id: content-pipeline
     outputStep: publish
     params:
       - name: topic

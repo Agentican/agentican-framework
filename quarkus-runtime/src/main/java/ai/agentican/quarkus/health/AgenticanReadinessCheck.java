@@ -16,7 +16,10 @@ public class AgenticanReadinessCheck implements HealthCheck {
     Agentican agentican;
 
     @Inject
-    ai.agentican.framework.config.RuntimeConfig runtimeConfig;
+    ai.agentican.framework.config.EngineConfig engineConfig;
+
+    @Inject
+    ai.agentican.framework.config.CatalogConfig catalogConfig;
 
     @Override
     public HealthCheckResponse call() {
@@ -26,11 +29,11 @@ public class AgenticanReadinessCheck implements HealthCheck {
         if (agentican == null)
             return builder.down().withData("reason", "Agentican bean not initialized").build();
 
-        if (runtimeConfig.llm().isEmpty())
+        if (engineConfig.llm().isEmpty())
             return builder.down().withData("reason", "No LLMs configured").build();
 
         var registered = agentican.registry().agents().asMap().size();
-        var declared = runtimeConfig.agents().size();
+        var declared = catalogConfig.agents().size();
 
         if (registered < declared) {
 
@@ -42,7 +45,7 @@ public class AgenticanReadinessCheck implements HealthCheck {
         }
 
         return builder.up()
-                .withData("llms", runtimeConfig.llm().size())
+                .withData("llms", engineConfig.llm().size())
                 .withData("agents", registered)
                 .build();
     }

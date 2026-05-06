@@ -2,6 +2,7 @@ package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.agent.AgentResult;
 import ai.agentican.framework.orchestration.model.*;
+import ai.agentican.framework.util.Ids;
 import ai.agentican.framework.util.Json;
 import ai.agentican.framework.util.Logs;
 import ai.agentican.framework.util.Parallel;
@@ -72,7 +73,8 @@ class StepLoopRunner {
 
             var resolvedBody = resolveLoopBody(step.body(), indexed.item(), params);
 
-            var subPlan = WorkflowDefinition.builder(step.name() + "-iter-" + (indexed.index() + 1))
+            var subPlan = WorkflowDefinition.builder(Ids.generate(),
+                            step.name() + "-iter-" + (indexed.index() + 1))
                     .description("")
                     .steps(resolvedBody)
                     .build();

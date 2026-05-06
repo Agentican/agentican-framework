@@ -76,7 +76,7 @@ class SseWireTest {
 
     private static WorkflowRunLog newTaskLog(String taskId) {
 
-        var task = WorkflowDefinition.builder("demo").description("d").step("s", "a", "i").build();
+        var task = WorkflowDefinition.builder("demo", "demo").description("d").step("s", "a", "i").build();
         return new WorkflowRunLog(taskId, "demo", task, Map.of());
     }
 }

@@ -18,6 +18,7 @@ import java.util.function.Consumer;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record  WorkflowConfig(
+        String id,
         String name,
         String description,
         List<PlanParamConfig> params,
@@ -25,6 +26,9 @@ public record  WorkflowConfig(
         String outputStep) {
 
     public WorkflowConfig {
+
+        if (id == null || id.isBlank())
+            throw new IllegalArgumentException("Workflow id is required (name='" + name + "')");
 
         if (name == null || name.isBlank())
             throw new IllegalArgumentException("Task name is required");
@@ -46,7 +50,7 @@ public record  WorkflowConfig(
 
     public WorkflowDefinition toDefinition(CodeStepRegistry codeStepRegistry) {
 
-        var builder = WorkflowDefinition.builder(name)
+        var builder = WorkflowDefinition.builder(id, name)
                 .description(description)
                 .outputStep(outputStep);
 
@@ -64,6 +68,7 @@ public record  WorkflowConfig(
 
     public static class WorkflowConfigBuilder {
 
+        private String id;
         private String name;
         private String description;
 
@@ -72,6 +77,7 @@ public record  WorkflowConfig(
 
         private String outputStep;
 
+        public WorkflowConfigBuilder id(String id) { this.id = id; return this; }
         public WorkflowConfigBuilder name(String name) { this.name = name; return this; }
         public WorkflowConfigBuilder description(String description) { this.description = description; return this; }
         public WorkflowConfigBuilder outputStep(String stepName) { this.outputStep = stepName; return this; }
@@ -121,7 +127,7 @@ public record  WorkflowConfig(
 
         public WorkflowConfig build() {
 
-            return new WorkflowConfig(name, description, params, steps, outputStep);
+            return new WorkflowConfig(id, name, description, params, steps, outputStep);
         }
     }
 

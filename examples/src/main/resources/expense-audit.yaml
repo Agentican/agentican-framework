@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Internal Auditor
+    id: internal-auditor
     role: |
       Audits financial transactions against policy. Evaluates individual expenses
       against category limits, checks vendor legitimacy (recognizable merchant, plausible
@@ -11,6 +9,7 @@ agents:
       the specific policy clause that drove it — never a generic "looks fine."
 
   - name: Finance Manager
+    id: finance-manager
     role: |
       Runs finance operations for an organization. Aggregates audit findings into
       department-level summaries, counts by severity, highlights the top significant
@@ -20,6 +19,7 @@ agents:
 
 skills:
   - name: Expense policy
+    id: expense-policy
     instructions: |
       Category limits per expense. Meals: $75 per person, receipt required over $25, no
       alcohol for solo meals. Travel: economy class, 14-day advance booking for flights
@@ -30,6 +30,7 @@ skills:
 
 workflows:
   - name: Expense Audit
+    id: expense-audit
     outputStep: summarize
     params:
       - name: expenses

@@ -32,7 +32,7 @@ Agentican.builder()
         .strict()
         .end()
     .configuration().yaml()
-        .path(Path) | .classpath(String) | .config(RuntimeConfig)
+        .path(Path) | .classpath(String) | .config(EngineConfig)
         .end()
 
     // Catalog (api XOR yaml)
@@ -42,7 +42,7 @@ Agentican.builder()
         .workflow(WorkflowConfig)
         .end()
     .registry().yaml()
-        .path(Path) | .classpath(String) | .config(RuntimeConfig)
+        .path(Path) | .classpath(String) | .config(CatalogConfig)
         .end()
 
     .build();
@@ -61,15 +61,28 @@ try (var agentican = Agentican.builder()
             .worker(WorkerConfig.builder().maxTurns(20).build())
             .end()
         .registry().api()
-            .agent(AgentConfig.builder().name("researcher").role("...").llm("default").build())
-            .skill(SkillConfig.builder().name("citations").instructions("Always cite sources").build())
+            .agent(AgentConfig.builder().id("researcher").name("researcher").role("...").llm("default").build())
+            .skill(SkillConfig.builder().id("citations").name("citations").instructions("Always cite sources").build())
             .end()
         .build()) {
     // use agentican
 }
 ```
 
-**YAML for everything:**
+**Two YAML files (recommended):**
+
+```java
+try (var agentican = Agentican.builder()
+        .configuration().yaml().classpath("engine.yaml").end()
+        .registry().yaml().classpath("catalog.yaml").end()
+        .build()) {
+    // use agentican
+}
+```
+
+`engine.yaml` carries `llm:`, `mcp:`, `composio:`, `agentRunner:`, `strict:`. `catalog.yaml` carries `agents:`, `skills:`, `workflows:`. Each file deserializes into its own typed record (`EngineConfig` and `CatalogConfig`); engine YAML and catalog YAML have disjoint top-level keys.
+
+**One YAML file for both axes:** point both at the same path. `EngineConfig` and `CatalogConfig` ignore each other's top-level keys, so a mixed file works:
 
 ```java
 try (var agentican = Agentican.builder()
@@ -80,11 +93,11 @@ try (var agentican = Agentican.builder()
 }
 ```
 
-**Mixed — YAML config, programmatic catalog:**
+**Mixed — YAML for engine, programmatic catalog:**
 
 ```java
 try (var agentican = Agentican.builder()
-        .configuration().yaml().classpath("infra.yaml").end()
+        .configuration().yaml().classpath("engine.yaml").end()
         .registry().api()
             .workflow(WorkflowConfig.builder()...build())
             .end()
@@ -93,22 +106,37 @@ try (var agentican = Agentican.builder()
 }
 ```
 
-`RuntimeConfig` is the YAML deserialization target, and is also accepted directly via `.configuration().yaml().config(rc)` / `.registry().yaml().config(rc)` if you've already loaded one. Its shape:
+### EngineConfig
+
+Framework wiring — what's needed to boot the runtime:
 
 ```java
-record RuntimeConfig(
+record EngineConfig(
     List<LlmConfig> llm,
     List<McpConfig> mcp,
     ComposioConfig composio,
     WorkerConfig agentRunner,
-    List<AgentConfig> agents,
-    List<SkillConfig> skills,
-    List<WorkflowConfig> workflows,
     boolean strict
 )
+
+// Load from YAML programmatically:
+var engine = EngineConfig.load(Path.of("engine.yaml"));
 ```
 
-When a single YAML file feeds both axes (the common case), point both `.configuration().yaml()` and `.registry().yaml()` at the same path or pre-loaded `RuntimeConfig` — only the relevant fields are consumed by each axis.
+### CatalogConfig
+
+Catalog data — what gets seeded into the registries:
+
+```java
+record CatalogConfig(
+    List<AgentConfig> agents,
+    List<SkillConfig> skills,
+    List<WorkflowConfig> workflows
+)
+
+// Load from YAML programmatically:
+var catalog = CatalogConfig.load(Path.of("catalog.yaml"));
+```
 
 ## LlmConfig
 
@@ -196,7 +224,7 @@ Agentican.builder()
             .end()
         .registry().api()
             .agent(AgentConfig.builder()
-                    .name("classifier").role("...").llm("fast")
+                    .id("classifier").name("classifier").role("...").llm("fast")
                     .build())
             .end()
         .build();
@@ -264,7 +292,7 @@ public class MyListener implements WorkflowRunListener {
 
 ```java
 record AgentConfig(
-    String id,          // auto-generated if not supplied
+    String id,          // required — stable identifier; recommend slug-style (e.g. "researcher")
     String name,        // unique within AgentRegistry
     String role,
     String llm,         // LLM name from LlmConfig
@@ -276,24 +304,26 @@ record AgentConfig(
 
 ```java
 AgentConfig.builder()
+        .id("researcher")
         .name("researcher")
         .role("Expert at finding and synthesizing information")
         .llm("default")                // optional; defaults to the "default" LLM
         .build();
 ```
 
-Agents from config are pre-registered when Agentican starts. They can be referenced by name in workflow steps.
+Agents from config are pre-registered when Agentican starts. They can be referenced by name in workflow steps. `id` is required — pick a stable slug (`researcher`, `senior-writer`); the framework throws `IllegalArgumentException` on null/blank ids.
 
 ## SkillConfig
 
-Skills are reusable instruction blocks that workflow steps can activate by name. They live in the top-level `RuntimeConfig.skills` list — they are not nested inside `AgentConfig`.
+Skills are reusable instruction blocks that workflow steps can activate by name. They live in the top-level `CatalogConfig.skills` list — they are not nested inside `AgentConfig`.
 
 ```java
-record SkillConfig(String id, String name, String instructions)
+record SkillConfig(String id, String name, String instructions)  // id is required
 ```
 
 ```java
 SkillConfig.builder()
+        .id("citations")
         .name("citations")
         .instructions("Always include source URLs")
         .build();
@@ -305,12 +335,15 @@ Pre-built workflows you want registered at boot.
 
 ```java
 var workflow = new WorkflowConfig(
-        "research-and-summarize",                                                       // name
+        "research-and-summarize",                                                       // id (required)
+        "Research and summarize",                                                       // name
         "Research a topic and summarize it",                                            // description
         List.of(new WorkflowConfig.PlanParamConfig("topic", "Topic to research", "AI", true)),
         List.of(/* PlanStepConfig entries */),
         null);                                                                          // outputStep — set for typed Workflow<P, R>
 ```
+
+`WorkflowDefinition.builder(id, name)` similarly takes both arguments at the call site.
 
 ## ComposioConfig
 
@@ -341,6 +374,8 @@ Multiple MCP servers can be registered. Each is accessed via its `slug`. The fra
 
 For applications that need external configuration, load from YAML:
 
+**Engine YAML** — `engine.yaml`:
+
 ```yaml
 llm:
   - apiKey: ${ANTHROPIC_API_KEY}
@@ -353,33 +388,43 @@ agentRunner:
 composio:
   apiKey: ${COMPOSIO_API_KEY}
   userId: user@example.com
+```
 
+**Catalog YAML** — `catalog.yaml`:
+
+```yaml
 agents:
-  - name: researcher
+  - id: researcher
+    name: researcher
     role: Expert researcher who finds and synthesizes information
 
-  - name: writer
+  - id: writer
+    name: writer
     role: Documentation specialist with clear, concise writing style
 
 skills:
-  - name: citations
+  - id: citations
+    name: citations
     instructions: Always include source URLs
 
 workflows: []
 ```
 
+Every agent, skill, and workflow entry must declare an `id`. Use stable, slug-style ids (lowercase alphanumeric + dashes); they're how the registry, audit log, and persistent state stores reference catalog entries across runs. The framework rejects entries with missing or blank ids at load time.
+
 ```java
-var config = RuntimeConfig.load(Path.of("agentican.yml"));
+var engine = EngineConfig.load(Path.of("engine.yaml"));
+var catalog = CatalogConfig.load(Path.of("catalog.yaml"));
 ```
 
 Environment variables in `${VAR}` form are resolved at load time.
 
-To use the YAML for both axes:
+To wire both files into a Builder:
 
 ```java
 Agentican.builder()
-        .configuration().yaml().path(Path.of("agentican.yml")).end()
-        .registry().yaml().path(Path.of("agentican.yml")).end()
+        .configuration().yaml().path(Path.of("engine.yaml")).end()
+        .registry().yaml().path(Path.of("catalog.yaml")).end()
         .build();
 ```
 

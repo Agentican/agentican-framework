@@ -16,7 +16,7 @@ public class IncidentResponse {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -37,6 +37,11 @@ public class IncidentResponse {
         return Path.of(Objects.requireNonNull(IncidentResponse.class.getResource("/incident-response.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(IncidentResponse.class.getResource("/engine.yaml")).toURI());
+    }
     static Alert alert() {
 
         return new Alert("Error rate 15% on payment-service, p99 > 5s", "payment-service");

@@ -1,14 +1,13 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: UX Researcher
+    id: ux-researcher
     role: |
       Clusters raw interview and usability-test notes into themes grounded in
       verbatim quotes. Never smooths a participant's language into corporate
       register. Refuses to cluster by what seems convenient.
 
   - name: Insights Lead
+    id: insights-lead
     role: |
       Frames research themes against a specific product decision. Without a
       named decision the synthesis becomes a book report — always asks which
@@ -17,6 +16,7 @@ agents:
 
 skills:
   - name: Theme clustering
+    id: theme-clustering
     instructions: |
       Clusters are named using the participant's own register ("the whole
       thing froze for like, two minutes"), not an abstracted label. Include
@@ -25,6 +25,7 @@ skills:
       at unless the hint is strong and the detail is vivid.
 
   - name: Decision framing
+    id: decision-framing
     instructions: |
       A framed finding states: the observed behavior (one sentence), the
       implication for the decision at hand, and the confidence level tied to
@@ -35,6 +36,7 @@ skills:
 
 workflows:
   - name: Research Synthesis
+    id: research-synthesis
     outputStep: brief
     params:
       - name: study_name

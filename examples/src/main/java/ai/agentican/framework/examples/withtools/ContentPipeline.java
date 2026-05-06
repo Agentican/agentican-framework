@@ -15,7 +15,7 @@ public class ContentPipeline {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -36,6 +36,11 @@ public class ContentPipeline {
         return Path.of(Objects.requireNonNull(ContentPipeline.class.getResource("/content-pipeline.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(ContentPipeline.class.getResource("/engine.yaml")).toURI());
+    }
     static ArticleBrief brief() {
 
         return new ArticleBrief(

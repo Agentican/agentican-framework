@@ -25,7 +25,7 @@ public class DealDiscount {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end()
                 .hitlManager(new HitlManager(new CliHitlNotifier()));
 
@@ -51,6 +51,11 @@ public class DealDiscount {
         return Path.of(Objects.requireNonNull(DealDiscount.class.getResource("/deal-discount.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(DealDiscount.class.getResource("/engine.yaml")).toURI());
+    }
     static DealContext deal() {
 
         return new DealContext(

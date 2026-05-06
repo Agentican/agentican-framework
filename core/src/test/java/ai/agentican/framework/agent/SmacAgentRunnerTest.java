@@ -45,7 +45,7 @@ class SmacAgentRunnerTest {
 
     private Agent agent(SmacAgentRunner runner) {
 
-        return Agent.builder().config(AgentConfig.builder().name("test-agent").role("Test role").build()).runner(runner).build();
+        return Agent.builder().config(AgentConfig.builder().name("test-agent").id("test-agent").role("Test role").build()).runner(runner).build();
     }
 
     private Map<String, Toolkit> toolkitMap(MockToolkit toolkit) {

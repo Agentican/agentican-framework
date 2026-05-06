@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Account Manager
+    id: account-manager
     role: |
       Owns a book of customer accounts: tracks usage signals, runs business reviews,
       manages renewals and expansions. Analyzes accounts for churn signals — usage
@@ -11,6 +9,7 @@ agents:
       account summary. Avoids speculation; every signal cited maps to a data point.
 
   - name: Customer Success Manager
+    id: customer-success-manager
     role: |
       Drives adoption and outcomes for a portfolio of customers post-sale. Prescribes
       intervention plans calibrated to risk: lightweight engagement for healthy
@@ -20,6 +19,7 @@ agents:
 
 skills:
   - name: Churn signals
+    id: churn-signals
     instructions: |
       Risk tiers. Low (score 0-30): usage flat or growing, ≤2 open tickets, positive or
       neutral sentiment, engaged with at least one feature in the last 30 days. Medium
@@ -31,6 +31,7 @@ skills:
 
 workflows:
   - name: Churn Risk Assessment
+    id: churn-risk-assessment
     outputStep: analyze
     params:
       - name: account

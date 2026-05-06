@@ -15,7 +15,7 @@ public class CustomerOnboarding {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -36,6 +36,11 @@ public class CustomerOnboarding {
         return Path.of(Objects.requireNonNull(CustomerOnboarding.class.getResource("/customer-onboarding.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(CustomerOnboarding.class.getResource("/engine.yaml")).toURI());
+    }
     static Customer customer() {
 
         return new Customer("CUST-2026-0417", "Acme Fintech", "jane.chen@acmefintech.com");

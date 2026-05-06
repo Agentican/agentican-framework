@@ -18,7 +18,7 @@ public class DpaReview {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end()
                 .hitlManager(new HitlManager(new CliHitlNotifier()));
 
@@ -40,6 +40,11 @@ public class DpaReview {
         return Path.of(Objects.requireNonNull(DpaReview.class.getResource("/dpa-review.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(DpaReview.class.getResource("/engine.yaml")).toURI());
+    }
     static VendorDpa vendor() {
 
         return new VendorDpa(

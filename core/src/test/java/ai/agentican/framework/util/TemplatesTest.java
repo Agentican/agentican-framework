@@ -24,7 +24,7 @@ class TemplatesTest {
     @Test
     void renderSystemPromptWithSkills() {
 
-        var skills = List.of(new SkillConfig(null, "summarize", "Summarize long text"));
+        var skills = List.of(new SkillConfig("summarize", "summarize", "Summarize long text"));
 
         var result = templates.renderSystemPrompt("TestBot", "A helper", skills);
 

@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Security Engineer
+    id: security-engineer
     role: |
       Writes customer-facing security advisories. Refuses to publish when coordination
       state is unclear — an advisory that goes out before the patch lands or before
@@ -12,6 +10,7 @@ agents:
 
 skills:
   - name: Advisory writing
+    id: advisory-writing
     instructions: |
       Advisory format. Subject: names the affected service and severity tier
       ("Critical security update for X"). Body: (1) what the vulnerability is in

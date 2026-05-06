@@ -26,7 +26,7 @@ public class SecurityAdvisory {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end()
                 .hitlManager(new HitlManager(new CliHitlNotifier()));
 
@@ -51,6 +51,11 @@ public class SecurityAdvisory {
         return Path.of(Objects.requireNonNull(SecurityAdvisory.class.getResource("/security-advisory.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(SecurityAdvisory.class.getResource("/engine.yaml")).toURI());
+    }
     static VulnerabilityReport report() {
 
         return new VulnerabilityReport(

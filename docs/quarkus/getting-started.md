@@ -124,15 +124,27 @@ agentican.llm[0].model=claude-sonnet-4-5
 # agentican.llm[8].api-key=ollama
 # agentican.llm[8].model=llama3.3:70b
 
-# Optional: pre-register agents
-agentican.agents[0].name=researcher
-agentican.agents[0].role=Expert at finding and synthesizing information
-
 # Optional: tune the agent runner
 agentican.agent-runner.max-turns=15
 agentican.agent-runner.timeout=PT10M
 agentican.agent-runner.task-timeout=PT1H
 ```
+
+To pre-register agents, skills, and workflows, drop a `agentican.catalog.yaml` on the classpath:
+
+```yaml
+agents:
+  - id: researcher
+    name: researcher
+    role: Expert at finding and synthesizing information
+
+skills: []
+workflows: []
+```
+
+Each entry under `agents:`, `skills:`, and `workflows:` requires a stable `id` (slug-style, e.g. `researcher`, `incident-postmortem`). The framework rejects null/blank ids at load time.
+
+If you also want engine config (LLM, MCP, composio, agentRunner) loaded from YAML, drop a `agentican.engine.yaml` next to it. Both filenames are configurable via `agentican.engine-config` and `agentican.catalog-config`.
 
 ### Persistence (optional)
 

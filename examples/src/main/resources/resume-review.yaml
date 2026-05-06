@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Technical Recruiter
+    id: technical-recruiter
     role: |
       Recruits technical talent for engineering roles. Evaluates candidates against role
       requirements, writes personalized outreach, preps interviewers and reviews resumes
@@ -12,6 +10,7 @@ agents:
 
 skills:
   - name: Resume review rubric
+    id: resume-review-rubric
     instructions: |
       Resume review principles. Strengths must be grounded in actual resume content — no
       generic praise. Credit demonstrated skill (shipped, led, reduced, built) over

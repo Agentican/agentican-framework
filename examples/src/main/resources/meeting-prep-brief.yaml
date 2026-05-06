@@ -1,12 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
-composio:
-  apiKey: ${COMPOSIO_API_KEY}
-  userId: user-1
-
 agents:
   - name: Executive Assistant
+    id: executive-assistant
     role: |
       Prepares meeting briefs by pulling calendar events and synthesizing attendee context.
       Identifies key discussion points based on meeting titles, agendas and recent interactions
@@ -16,6 +10,7 @@ agents:
 
 skills:
   - name: Brief format
+    id: brief-format
     instructions: |
       Meeting brief structure. One brief per meeting, ordered chronologically. Each brief
       contains: title (as on the calendar), attendees (names when available, emails as
@@ -26,6 +21,7 @@ skills:
 
 workflows:
   - name: Meeting Prep Brief
+    id: meeting-prep-brief
     params:
       - name: date
         description: Date to prepare briefs for

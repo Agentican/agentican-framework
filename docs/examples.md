@@ -22,7 +22,7 @@ try (var agentican = Agentican.builder()
 Skip the planner and run a hand-built plan:
 
 ```java
-var task = WorkflowDefinition.builder("research-and-summarize")
+var task = WorkflowDefinition.builder("research-and-summarize", "Research and summarize")
         .description("Research a topic and summarize")
         .param("topic", "What to research", "AI")
         .step("research", "researcher", "Research {{param.topic}} using web search")
@@ -205,7 +205,7 @@ The agent's `ASK_QUESTION` tool result will be `{"question": "...", "answer": ".
 Process a list in parallel by composing a producer step with a loop:
 
 ```java
-var task = WorkflowDefinition.builder("create-report-cards")
+var task = WorkflowDefinition.builder("create-report-cards", "Create report cards")
         .step("get-students", "data-fetcher",
                 "Fetch all students as a JSON array with name and grades")
         .loop("create-cards", loop -> loop
@@ -227,7 +227,7 @@ The loop iterations run in parallel — each on its own virtual thread, with its
 Route work based on a classifier step's output:
 
 ```java
-var task = WorkflowDefinition.builder("triage")
+var task = WorkflowDefinition.builder("triage", "Triage")
         .step("classify", "classifier",
                 "Classify this email: {{param.email}}. Return one word: 'urgent', 'normal', or 'spam'")
         .branch("route", branch -> branch
@@ -267,6 +267,7 @@ var agentican = Agentican.builder()
                 })
         .registry().api()
             .workflow(WorkflowConfig.builder()
+                    .id("payment-enrichment")
                     .name("payment-enrichment")
                     .param("customer_id", "Customer to enrich", null, true)
                     .step("fetch-customer", s -> s
@@ -298,10 +299,12 @@ try (var agentican = Agentican.builder()
             .end()
         .registry().api()
             .agent(AgentConfig.builder()
+                    .id("classifier")
                     .name("classifier")
                     .role("Quick classifier").llm("haiku")
                     .build())
             .agent(AgentConfig.builder()
+                    .id("writer")
                     .name("writer")
                     .role("High-quality writer").llm("default")
                     .build())

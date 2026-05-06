@@ -15,7 +15,7 @@ public class LeadQualification {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -36,6 +36,11 @@ public class LeadQualification {
         return Path.of(Objects.requireNonNull(LeadQualification.class.getResource("/lead-qualification.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(LeadQualification.class.getResource("/engine.yaml")).toURI());
+    }
     static Lead lead() {
 
         return new Lead("Acme Fintech", "Jane Chen, VP Engineering");

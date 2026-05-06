@@ -15,7 +15,7 @@ class AgenticanProducerTest {
     Agentican agentican;
 
     @Inject
-    ai.agentican.framework.config.RuntimeConfig runtimeConfig;
+    ai.agentican.framework.config.EngineConfig engineConfig;
 
     @Test
     void agenticanIsProducedAsApplicationScopedBean() {
@@ -25,11 +25,11 @@ class AgenticanProducerTest {
     }
 
     @Test
-    void runtimeConfigBindsLlmFromYaml() {
+    void engineConfigBindsLlmFromYaml() {
 
-        assertEquals(1, runtimeConfig.llm().size());
+        assertEquals(1, engineConfig.llm().size());
 
-        var llm = runtimeConfig.llm().getFirst();
+        var llm = engineConfig.llm().getFirst();
 
         assertEquals("default", llm.name());
         assertEquals("anthropic", llm.provider());
@@ -38,9 +38,9 @@ class AgenticanProducerTest {
     }
 
     @Test
-    void runtimeConfigBindsAgentRunnerFromYaml() {
+    void engineConfigBindsAgentRunnerFromYaml() {
 
-        var runner = runtimeConfig.agentRunner();
+        var runner = engineConfig.agentRunner();
 
         assertNotNull(runner);
         assertEquals(15, runner.maxTurns());
@@ -51,7 +51,7 @@ class AgenticanProducerTest {
 
         var registered = agentican.registry().agents().byName("researcher");
 
-        assertNotNull(registered, "Agent loaded from agentican.yaml should be registered");
+        assertNotNull(registered, "Agent loaded from agentican.catalog.yaml should be registered");
         assertEquals("Expert at finding information", registered.role());
     }
 }

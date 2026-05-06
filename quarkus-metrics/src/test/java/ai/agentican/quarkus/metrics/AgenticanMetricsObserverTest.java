@@ -117,6 +117,6 @@ class AgenticanMetricsObserverTest {
     private static WorkflowRunLog newLog(String taskId) {
 
         return new WorkflowRunLog(taskId, "demo",
-                WorkflowDefinition.builder("demo").description("d").step("s", "a", "i").build(), Map.of());
+                WorkflowDefinition.builder("demo", "demo").description("d").step("s", "a", "i").build(), Map.of());
     }
 }

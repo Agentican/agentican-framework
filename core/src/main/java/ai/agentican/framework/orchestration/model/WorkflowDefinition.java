@@ -1,7 +1,5 @@
 package ai.agentican.framework.orchestration.model;
 
-import ai.agentican.framework.util.Ids;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -16,8 +14,8 @@ public record WorkflowDefinition(
 
     public WorkflowDefinition {
 
-        if (id == null)
-            id = Ids.generate();
+        if (id == null || id.isBlank())
+            throw new IllegalArgumentException("WorkflowDefinition id is required (name='" + name + "')");
 
         if (name == null || name.isBlank())
             throw new IllegalArgumentException("WorkflowDefinition name is required");
@@ -35,28 +33,28 @@ public record WorkflowDefinition(
             outputStep = null;
     }
 
-    public static Builder builder(String name) {
+    public static Builder builder(String id, String name) {
 
-        return new Builder(name);
+        return new Builder(id, name);
     }
 
     public static class Builder {
 
+        private final String id;
         private final String name;
 
         private final List<WorkflowParam> params = new ArrayList<>();
         private final List<WorkflowStep> steps = new ArrayList<>();
 
-        private String id;
         private String description;
         private String outputStep;
 
-        Builder(String name) {
+        Builder(String id, String name) {
 
+            this.id = id;
             this.name = name;
         }
 
-        public Builder id(String id) { this.id = id; return this; }
         public Builder description(String description) { this.description = description; return this; }
         public Builder outputStep(String stepName) { this.outputStep = stepName; return this; }
 

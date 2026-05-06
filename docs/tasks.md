@@ -18,13 +18,15 @@ record WorkflowDefinition(
 A workflow has a name, description, optional parameters, and a list of steps. Steps can depend on each other; the runner builds a dependency graph and executes independent steps in parallel.
 
 ```java
-WorkflowDefinition.builder(name)
+WorkflowDefinition.builder(id, name)
     .description(description)
     .param(...)
     .step(...)
     .outputStep("final-step")
     .build();
 ```
+
+`id` is required and must be non-blank — pick a stable slug (e.g. `research-and-summarize`).
 
 ## Step Types
 
@@ -167,6 +169,8 @@ Agentican.builder()
 
 ```java
 WorkflowConfig.builder()
+    .id("payment-enrichment")
+    .name("payment-enrichment")
     .step("fetch-customer", s -> s
         .code("http-get")
         .input(new HttpInput(
@@ -243,7 +247,7 @@ Condition sources use the same `{{step.X.output}}` and `{{param.name}}` placehol
 Use `WorkflowDefinition.builder()` for a fluent API:
 
 ```java
-var workflow = WorkflowDefinition.builder("research-task")
+var workflow = WorkflowDefinition.builder("research-task", "Research task")
         .description("Research and summarize")
         .param("topic", "What to research", "AI")
         .step("research", "researcher", "Research {{param.topic}}")
@@ -258,7 +262,7 @@ var output = agentican.workflow(workflow).input(Void.class).build().start().awai
 For loops and branches, use the inner builders:
 
 ```java
-var workflow = WorkflowDefinition.builder("multi-page")
+var workflow = WorkflowDefinition.builder("multi-page", "Multi-page")
         .step("plan", "planner", "List 3 topics as JSON array")
         .loop("create-pages", loop -> loop
                 .over("plan")
@@ -295,7 +299,7 @@ TriageOutput out = triage.start(new TriageParams("cust-42", "HIGH")).await();
 For multi-step plans, declare which step's output the typed result comes from:
 
 ```java
-WorkflowDefinition.builder("triage")
+WorkflowDefinition.builder("triage", "Triage")
     .param("customer_id", "The customer to triage", null, true)
     .step("gather", ...)
     .step(WorkflowStepAgent.builder("classify")

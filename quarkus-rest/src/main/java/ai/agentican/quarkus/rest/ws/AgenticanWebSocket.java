@@ -81,7 +81,7 @@ public class AgenticanWebSocket {
             return WsResponse.error("task is required for submit_task");
 
         var inputs = message.inputs() != null ? message.inputs() : Map.<String, String>of();
-        var handle = taskService.submit(message.task(), inputs);
+        var handle = taskService.submit(message.task().toDefinition(), inputs);
 
         return WsResponse.taskSubmitted(handle.id());
     }

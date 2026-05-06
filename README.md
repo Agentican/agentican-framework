@@ -18,6 +18,7 @@ try (var agentican = Agentican.builder()
         .build()) {
 
     var run = agentican.run("Research the top 5 CDC tools and compare them");
+    
     System.out.println(run.await());
 }
 ```
@@ -30,31 +31,31 @@ This is a multi-module project. Each module has a focused responsibility:
 
 ### Core
 
-| Module | ArtifactId | Description |
-|---|---|---|
-| [core](core/) | `agentican-framework-core` | The framework itself — agents, plans, skills, toolkits, knowledge, HITL, state, planner. Plain Java, no framework dependencies. |
+| Module | Description |
+|---|---|
+| [core](core/) | The framework itself — agents, plans, skills, toolkits, knowledge, HITL, state, planner. Plain Java, no framework dependencies. |
 
 ### Quarkus integration
 
-| Module | ArtifactId | Description |
-|---|---|---|
-| [quarkus-runtime](quarkus-runtime/) | `agentican-quarkus-runtime` | CDI bindings — `@Inject Agentican`, `application.properties` config, CDI lifecycle events, health checks. |
-| [quarkus-deployment](quarkus-deployment/) | `agentican-quarkus-deployment` | Quarkus build-time processing for the extension. |
-| [quarkus-rest](quarkus-rest/) | `agentican-quarkus-rest` | REST API + SSE streaming — 18 endpoints for tasks, checkpoints, knowledge, agents. |
-| [quarkus-metrics](quarkus-metrics/) | `agentican-quarkus-metrics` | Micrometer metrics — tasks active/completed/duration, steps, HITL checkpoints, resume outcomes. |
-| [quarkus-otel](quarkus-otel/) | `agentican-quarkus-otel` | OpenTelemetry tracing — nested spans for task → step → run → turn → llm.call / tool.call. |
-| [quarkus-scheduler](quarkus-scheduler/) | `agentican-quarkus-scheduler` | Cron-scheduled task execution via `application.properties`. |
-| [quarkus-store-jpa](quarkus-store-jpa/) | `agentican-quarkus-store-jpa` | JPA/Postgres persistence — agents, skills, plans, task execution state, knowledge. Flyway schema. |
-| [quarkus-otel-store-jpa](quarkus-otel-store-jpa/) | `agentican-quarkus-otel-store-jpa` | Persistent OTel span storage in Postgres. |
-| [quarkus-test](quarkus-test/) | `agentican-quarkus-test` | Shared test utilities for Quarkus modules. |
-| [quarkus-integration-tests](quarkus-integration-tests/) | `agentican-quarkus-integration-tests` | Cross-module integration tests. |
+| Module | Description |
+|---|---|
+| [quarkus-runtime](quarkus-runtime/) | CDI bindings — `@Inject Agentican`, `application.properties` config, CDI lifecycle events, health checks. |
+| [quarkus-deployment](quarkus-deployment/) | Quarkus build-time processing for the extension. |
+| [quarkus-rest](quarkus-rest/) | REST API + SSE streaming — 18 endpoints for tasks, checkpoints, knowledge, agents. |
+| [quarkus-metrics](quarkus-metrics/) | Micrometer metrics — tasks active/completed/duration, steps, HITL checkpoints, resume outcomes. |
+| [quarkus-otel](quarkus-otel/) | OpenTelemetry tracing — nested spans for task → step → run → turn → llm.call / tool.call. |
+| [quarkus-scheduler](quarkus-scheduler/) | Cron-scheduled task execution via `application.properties`. |
+| [quarkus-store-jpa](quarkus-store-jpa/) | JPA/Postgres persistence — agents, skills, plans, task execution state, knowledge. Flyway schema. |
+| [quarkus-otel-store-jpa](quarkus-otel-store-jpa/) | Persistent OTel span storage in Postgres. |
+| [quarkus-test](quarkus-test/) | Shared test utilities for Quarkus modules. |
+| [quarkus-integration-tests](quarkus-integration-tests/) | Cross-module integration tests. |
 
 ### Applications
 
-| Module | ArtifactId | Description |
-|---|---|---|
-| [server](server/) | `agentican-server` | Interactive web UI for exploring framework features. Not for production — designed to help developers learn what's possible. |
-| [examples](examples/) | `agentican-framework-examples` | Real-world showcase examples spanning 9 domains from simple to complex. |
+| Module | Description |
+|---|---|
+| [server](server/) | Interactive web UI for exploring framework features. Not for production — designed to help developers learn what's possible. |
+| [examples](examples/) | Real-world showcase examples spanning 9 domains from simple to complex. |
 
 ## Installation
 
@@ -108,13 +109,13 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 
 ### Core framework (`agentican-framework-core`)
 
-- **`Agentican`** — main entry point with builder API
-- **`Workflow<P, R>`** — typed handle bound to a `WorkflowDefinition`: turns typed params (`P`) into a `WorkflowRun<R>` with a typed structured result (`R`), enforced on the definition's `outputStep` via native provider JSON-schema modes
+- **`Agentican`** — main entry point via a builder API
+- **`Workflow<P, R>`** — turns typed inputs (`P`) into a `WorkflowRun<R>` with a typed output (`R`)
 - **`AgenticanRecovery`** — crash-recovery helper for resuming interrupted tasks after a restart
-- **`AgenticanRegistry`** — read-only view over registered workflows, agents, toolkits, skills, and vector indexes
-- **`WorkflowDefinition` / `WorkflowStep`** — declarative workflow model (agent steps, loops, branches, typed code steps)
-- **`WorkflowConfig`** — fluent builder for workflows with `step()`, `loop()`, `branch()`, `codeStep()`, `outputStep()`
-- **`CodeStep<I, O>` / `CodeStepSpec<I, O>`** — register typed Java functions as workflow steps (no LLM round-trip)
+- **`AgenticanRegistry`** — registered workflows, agents, toolkits, skills, and vector indexes
+- **`WorkflowDefinition` / `WorkflowStep`** — declarative model (agent, loop, branch and code steps)
+- **`WorkflowConfig`** — fluent builder with `step()`, `loop()`, `branch()`, `codeStep()`, `outputStep()`
+- **`CodeStep<I, O>` / `CodeStepSpec<I, O>`** — register typed Java functions as workflow steps
 - **`Agent` / `AgentRunner`** — agent abstraction with pluggable runners
 - **`SmacAgentRunner`** — production agent loop with tool calling, HITL and knowledge
 - **`WorkflowPlannerAgent`** — LLM planner that creates agents, skills and workflows from natural language
@@ -122,8 +123,8 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 - **`HitlManager`** — checkpoint-based human-in-the-loop (tool approval, step approval, questions)
 - **`KnowledgeStore`** — persistent facts with LLM-driven extraction and `RECALL_KNOWLEDGE` tool
 - **`WorkflowRunStore`** — durable execution state (task → step → run → turn → tool call)
-- **LLM providers**: Anthropic Claude, OpenAI (Responses API), Groq, Google Gemini, AWS Bedrock (Converse API — Claude / Llama / Nova / Mistral / Cohere / DeepSeek / AI21), SambaNova, Together, Fireworks, plus an `openai-compatible` escape hatch for Ollama / vLLM / LiteLLM / corporate proxies
-- **Tool integrations**: Composio (100+ SaaS), Model Context Protocol (MCP)
+- **LLM providers**: Anthropic, OpenAI, Google, AWS, Groq, SambaNova/Together/Fireworks and `openai-compatible`
+- **Tool integrations**: Composio (100+ SaaS), Model Context Protocol (MCP) and custom via an API
 
 ### Quarkus integration
 
@@ -200,7 +201,7 @@ mvn quarkus:dev -pl server
 
 ## Status
 
-Agentican is under active development. The core APIs are stabilizing but may change before 1.0. Pin to a specific version in production.
+Agentican is under active development. The core APIs are stabilizing but may change before 1.0.
 
 ## License
 

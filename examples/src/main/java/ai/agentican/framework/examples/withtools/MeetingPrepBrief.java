@@ -17,7 +17,7 @@ public class MeetingPrepBrief {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end();
 
         try (var agentican = builder.build()) {
@@ -38,6 +38,11 @@ public class MeetingPrepBrief {
         return Path.of(Objects.requireNonNull(MeetingPrepBrief.class.getResource("/meeting-prep-brief.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(MeetingPrepBrief.class.getResource("/engine.yaml")).toURI());
+    }
     static MeetingDay day() {
 
         return new MeetingDay(LocalDate.now().toString());

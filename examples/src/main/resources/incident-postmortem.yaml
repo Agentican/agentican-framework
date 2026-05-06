@@ -1,8 +1,6 @@
-llm:
-  - apiKey: ${ANTHROPIC_API_KEY}
-
 agents:
   - name: Incident Communications Lead
+    id: incident-communications-lead
     role: |
       Owns customer-facing communication for production incidents. Writes postmortem
       emails that state what happened plainly, quantify customer impact, name the root
@@ -13,6 +11,7 @@ agents:
 
 skills:
   - name: Postmortem writing
+    id: postmortem-writing
     instructions: |
       Customer postmortem rules. Subject: 8 words or fewer, states service and outcome,
       no softening adverbs. Body structure: (1) what happened, two sentences; (2) impact,

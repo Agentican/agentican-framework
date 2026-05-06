@@ -3,7 +3,6 @@ package ai.agentican.quarkus.rest.resource;
 import ai.agentican.framework.Agentican;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import ai.agentican.framework.orchestration.model.WorkflowDefinitionValidator;
-import ai.agentican.framework.util.Ids;
 import ai.agentican.quarkus.audit.CatalogAuditLog;
 import ai.agentican.quarkus.rest.dto.WorkflowView;
 import ai.agentican.quarkus.rest.dto.UpsertPlanRequest;
@@ -187,9 +186,6 @@ public class WorkflowsResource {
         if (request == null || request.definition() == null)
             throw new BadRequestException("definition is required");
 
-        var src = request.definition();
-        var id = (src.id() == null || src.id().isBlank()) ? Ids.generate() : src.id();
-
-        return new WorkflowDefinition(id, src.name(), src.description(), src.params(), src.steps(), src.outputStep());
+        return request.definition().toDefinition();
     }
 }

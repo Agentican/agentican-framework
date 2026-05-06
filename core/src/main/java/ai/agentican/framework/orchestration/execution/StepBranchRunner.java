@@ -2,6 +2,7 @@ package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.orchestration.model.*;
 import ai.agentican.framework.store.WorkflowRunStore;
+import ai.agentican.framework.util.Ids;
 
 import ai.agentican.framework.util.Json;
 
@@ -53,7 +54,7 @@ class StepBranchRunner {
 
         workflowRunStore.branchPathChosen(parentTaskId, parentStepId, selectedPath.pathName());
 
-        var subPlan = WorkflowDefinition.builder(step.name() + "-" + selectedPath.pathName())
+        var subPlan = WorkflowDefinition.builder(Ids.generate(), step.name() + "-" + selectedPath.pathName())
                 .description("")
                 .steps(selectedPath.body())
                 .build();

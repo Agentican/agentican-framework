@@ -27,7 +27,7 @@ public class DashboardScope {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end()
                 .hitlManager(new HitlManager(new CliHitlNotifier()));
 
@@ -52,6 +52,11 @@ public class DashboardScope {
         return Path.of(Objects.requireNonNull(DashboardScope.class.getResource("/dashboard-scope.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(DashboardScope.class.getResource("/engine.yaml")).toURI());
+    }
     static DashboardRequest request() {
 
         return new DashboardRequest(

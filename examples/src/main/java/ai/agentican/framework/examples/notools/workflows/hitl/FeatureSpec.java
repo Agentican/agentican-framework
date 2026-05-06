@@ -18,7 +18,7 @@ public class FeatureSpec {
     static void main() throws Exception {
 
         var builder = Agentican.builder()
-                .configuration().yaml().path(config()).end()
+                .configuration().yaml().path(engine()).end()
                 .registry().yaml().path(config()).end()
                 .hitlManager(new HitlManager(new CliHitlNotifier()));
 
@@ -40,6 +40,11 @@ public class FeatureSpec {
         return Path.of(Objects.requireNonNull(FeatureSpec.class.getResource("/feature-spec.yaml")).toURI());
     }
 
+
+    static Path engine() throws Exception {
+
+        return Path.of(Objects.requireNonNull(FeatureSpec.class.getResource("/engine.yaml")).toURI());
+    }
     static FeatureTicket ticket() {
 
         return new FeatureTicket(

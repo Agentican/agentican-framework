@@ -167,6 +167,6 @@ class TaskEventBusTest {
 
     private static WorkflowDefinition task(String name) {
 
-        return WorkflowDefinition.builder(name).description("d").step("s", "a", "i").build();
+        return WorkflowDefinition.builder(name, name).description("d").step("s", "a", "i").build();
     }
 }
