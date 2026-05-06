@@ -123,7 +123,7 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 - **`HitlManager`** — checkpoint-based human-in-the-loop (tool approval, step approval, questions)
 - **`KnowledgeStore`** — persistent facts with LLM-driven extraction and `RECALL_KNOWLEDGE` tool
 - **`WorkflowRunStore`** — durable execution state (task → step → run → turn → tool call)
-- **LLM providers**: Anthropic, OpenAI, Google, AWS, Groq, SambaNova/Together/Fireworks and `openai-compatible`
+- **LLM providers**: Anthropic, OpenAI, Google, AWS, Groq, SambaNova/Together/Fireworks and `openai-compat`
 - **Tool integrations**: Composio (100+ SaaS), Model Context Protocol (MCP) and custom via an API
 
 ### Quarkus integration
