@@ -57,8 +57,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 
 public class Agentican implements AutoCloseable {
 
@@ -500,13 +502,76 @@ public class Agentican implements AutoCloseable {
 
                 Api() {}
 
-                public Api llm(LlmConfig llm) { llmConfigs.add(llm); return this; }
-                public Api mcp(McpConfig mcp) { mcpConfigs.add(mcp); return this; }
-                public Api composio(ComposioConfig composio) { composioConfig = composio; return this; }
-                public Api worker(WorkerConfig worker) { workerConfig = worker; return this; }
                 public Api strict() { strict = true; return this; }
 
+                public LlmEntry llm()           { return new LlmEntry(); }
+                public McpEntry mcp()           { return new McpEntry(); }
+                public ComposioEntry composio() { return new ComposioEntry(); }
+                public WorkerEntry worker()     { return new WorkerEntry(); }
+
                 public Builder end() { return Builder.this; }
+
+                public final class LlmEntry {
+
+                    private final LlmConfig.LlmConfigBuilder delegate = LlmConfig.builder();
+
+                    LlmEntry() {}
+
+                    public LlmEntry name(String name)               { delegate.name(name); return this; }
+                    public LlmEntry provider(String provider)       { delegate.provider(provider); return this; }
+                    public LlmEntry model(String model)             { delegate.model(model); return this; }
+                    public LlmEntry apiKey(String apiKey)           { delegate.apiKey(apiKey); return this; }
+                    public LlmEntry secretKey(String secretKey)     { delegate.secretKey(secretKey); return this; }
+                    public LlmEntry region(String region)           { delegate.region(region); return this; }
+                    public LlmEntry maxTokens(long maxTokens)       { delegate.maxTokens(maxTokens); return this; }
+                    public LlmEntry temperature(Double temperature) { delegate.temperature(temperature); return this; }
+                    public LlmEntry baseUrl(String baseUrl)         { delegate.baseUrl(baseUrl); return this; }
+
+                    public Api end() { llmConfigs.add(delegate.build()); return Api.this; }
+                }
+
+                public final class McpEntry {
+
+                    private final McpConfig.McpConfigBuilder delegate = McpConfig.builder();
+
+                    McpEntry() {}
+
+                    public McpEntry slug(String slug)                       { delegate.slug(slug); return this; }
+                    public McpEntry name(String name)                       { delegate.name(name); return this; }
+                    public McpEntry url(String url)                         { delegate.url(url); return this; }
+                    public McpEntry queryParam(String key, String value)    { delegate.queryParam(key, value); return this; }
+                    public McpEntry header(String key, String value)        { delegate.header(key, value); return this; }
+
+                    public Api end() { mcpConfigs.add(delegate.build()); return Api.this; }
+                }
+
+                public final class ComposioEntry {
+
+                    private final ComposioConfig.ComposioConfigBuilder delegate = ComposioConfig.builder();
+
+                    ComposioEntry() {}
+
+                    public ComposioEntry apiKey(String apiKey) { delegate.apiKey(apiKey); return this; }
+                    public ComposioEntry userId(String userId) { delegate.userId(userId); return this; }
+
+                    public Api end() { composioConfig = delegate.build(); return Api.this; }
+                }
+
+                public final class WorkerEntry {
+
+                    private final WorkerConfig.WorkerConfigBuilder delegate = WorkerConfig.builder();
+
+                    WorkerEntry() {}
+
+                    public WorkerEntry maxTurns(int maxTurns)                       { delegate.maxTurns(maxTurns); return this; }
+                    public WorkerEntry timeout(Duration timeout)                    { delegate.timeout(timeout); return this; }
+                    public WorkerEntry taskTimeout(Duration taskTimeout)            { delegate.taskTimeout(taskTimeout); return this; }
+                    public WorkerEntry maxStepRetries(int maxStepRetries)           { delegate.maxStepRetries(maxStepRetries); return this; }
+                    public WorkerEntry llmMaxRetries(int llmMaxRetries)             { delegate.llmMaxRetries(llmMaxRetries); return this; }
+                    public WorkerEntry llmRetryBaseDelay(Duration llmRetryBaseDelay) { delegate.llmRetryBaseDelay(llmRetryBaseDelay); return this; }
+
+                    public Api end() { workerConfig = delegate.build(); return Api.this; }
+                }
             }
 
             public final class Yaml {
@@ -572,11 +637,76 @@ public class Agentican implements AutoCloseable {
 
                 Api() {}
 
-                public Api agent(AgentConfig agent)             { agents.add(agent);       return this; }
-                public Api skill(SkillConfig skill)             { skills.add(skill);       return this; }
-                public Api workflow(WorkflowConfig workflow)    { workflows.add(workflow); return this; }
+                public AgentEntry agent()       { return new AgentEntry(); }
+                public SkillEntry skill()       { return new SkillEntry(); }
+                public WorkflowEntry workflow() { return new WorkflowEntry(); }
 
                 public Builder end() { return Builder.this; }
+
+                public final class AgentEntry {
+
+                    private final AgentConfig.AgentConfigBuilder delegate = AgentConfig.builder();
+
+                    AgentEntry() {}
+
+                    public AgentEntry id(String id)                 { delegate.id(id); return this; }
+                    public AgentEntry name(String name)             { delegate.name(name); return this; }
+                    public AgentEntry role(String role)             { delegate.role(role); return this; }
+                    public AgentEntry llm(String llm)               { delegate.llm(llm); return this; }
+                    public AgentEntry runner(String runner)         { delegate.runner(runner); return this; }
+                    public AgentEntry maxTurns(Integer maxTurns)    { delegate.maxTurns(maxTurns); return this; }
+                    public AgentEntry timeout(Duration timeout)     { delegate.timeout(timeout); return this; }
+
+                    public Api end() { agents.add(delegate.build()); return Api.this; }
+                }
+
+                public final class SkillEntry {
+
+                    private final SkillConfig.SkillConfigBuilder delegate = SkillConfig.builder();
+
+                    SkillEntry() {}
+
+                    public SkillEntry id(String id)                         { delegate.id(id); return this; }
+                    public SkillEntry name(String name)                     { delegate.name(name); return this; }
+                    public SkillEntry instructions(String instructions)     { delegate.instructions(instructions); return this; }
+
+                    public Api end() { skills.add(delegate.build()); return Api.this; }
+                }
+
+                public final class WorkflowEntry {
+
+                    private final WorkflowConfig.WorkflowConfigBuilder delegate = WorkflowConfig.builder();
+
+                    WorkflowEntry() {}
+
+                    public WorkflowEntry id(String id)                                  { delegate.id(id); return this; }
+                    public WorkflowEntry name(String name)                              { delegate.name(name); return this; }
+                    public WorkflowEntry description(String description)                { delegate.description(description); return this; }
+                    public WorkflowEntry outputStep(String stepName)                    { delegate.outputStep(stepName); return this; }
+
+                    public WorkflowEntry param(WorkflowConfig.PlanParamConfig param)    { delegate.param(param); return this; }
+                    public WorkflowEntry param(String name, String description, String defaultValue, boolean required) {
+                        delegate.param(name, description, defaultValue, required);
+                        return this;
+                    }
+
+                    public WorkflowEntry step(WorkflowConfig.PlanStepConfig step)       { delegate.step(step); return this; }
+                    public WorkflowEntry steps(List<WorkflowConfig.PlanStepConfig> steps) { delegate.steps(steps); return this; }
+                    public WorkflowEntry step(String name, Consumer<WorkflowConfig.StepBuilder> config) {
+                        delegate.step(name, config);
+                        return this;
+                    }
+                    public WorkflowEntry loop(String name, Consumer<WorkflowConfig.LoopBuilder> config) {
+                        delegate.loop(name, config);
+                        return this;
+                    }
+                    public WorkflowEntry branch(String name, Consumer<WorkflowConfig.BranchBuilder> config) {
+                        delegate.branch(name, config);
+                        return this;
+                    }
+
+                    public Api end() { workflows.add(delegate.build()); return Api.this; }
+                }
             }
 
             public final class Yaml {

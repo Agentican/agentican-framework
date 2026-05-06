@@ -13,7 +13,7 @@ Describe a task in natural language and the built-in Planner breaks it into a st
 ```java
 try (var agentican = Agentican.builder()
         .configuration().api()
-            .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+            .llm().apiKey(System.getenv("ANTHROPIC_API_KEY")).end()
             .end()
         .build()) {
 

@@ -27,13 +27,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("triage").id("triage")
-                        .role("Triage agent").llm("default").build())
+                        .role("Triage agent").llm("default").end()
                     .end()
                 .build()) {
 
@@ -63,13 +63,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("triage").id("triage")
-                        .role("Triage agent").llm("default").build())
+                        .role("Triage agent").llm("default").end()
                     .end()
                 .build()) {
 
@@ -97,7 +97,7 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .build()) {
@@ -116,13 +116,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("triage").id("triage")
-                        .role("Triage agent").llm("default").build())
+                        .role("Triage agent").llm("default").end()
                     .end()
                 .build()) {
 
@@ -152,13 +152,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("noparam").id("noparam")
-                        .role("Agent").llm("default").build())
+                        .role("Agent").llm("default").end()
                     .end()
                 .build()) {
 
@@ -184,13 +184,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("triage").id("triage")
-                        .role("Agent").llm("default").build())
+                        .role("Agent").llm("default").end()
                     .end()
                 .build()) {
 
@@ -218,13 +218,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("acct").id("acct")
-                        .role("Agent").llm("default").build())
+                        .role("Agent").llm("default").end()
                     .end()
                 .build()) {
 
@@ -257,13 +257,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("triage").id("triage")
-                        .role("Triage agent").llm("default").build())
+                        .role("Triage agent").llm("default").end()
                     .end()
                 .build()) {
 
@@ -294,13 +294,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("triage").id("triage")
-                        .role("Agent").llm("default").build())
+                        .role("Agent").llm("default").end()
                     .end()
                 .build()) {
 
@@ -324,13 +324,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("triage").id("triage")
-                        .role("Agent").llm("default").build())
+                        .role("Agent").llm("default").end()
                     .end()
                 .build()) {
 
@@ -358,13 +358,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", llmClient)
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("triage").id("triage")
-                        .role("Triage agent").llm("default").build())
+                        .role("Triage agent").llm("default").end()
                     .end()
                 .build()) {
 
@@ -402,13 +402,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", llmClient)
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("triage").id("triage")
-                        .role("Agent").llm("default").build())
+                        .role("Agent").llm("default").end()
                     .end()
                 .build()) {
 
@@ -440,13 +440,13 @@ class AgenticanTypedTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("triage").id("triage")
-                        .role("Agent").llm("default").build())
+                        .role("Agent").llm("default").end()
                     .end()
                 .build()) {
 

@@ -155,11 +155,12 @@ The framework will detect the call, create a checkpoint, and pause until your `H
 
 ```java
 Agentican.builder()
-        .llm(LlmConfig.builder().apiKey(anthropicKey).build())
-        .composio(ComposioConfig.builder()
-                .apiKey(composioApiKey)
-                .userId("user@example.com")
-                .build())
+        .configuration().api()
+            .llm().apiKey(anthropicKey).end()
+            .composio()
+                    .apiKey(composioApiKey)
+                    .userId("user@example.com").end()
+            .end()
         .build();
 ```
 
@@ -171,18 +172,18 @@ On startup, Agentican calls Composio's API to discover the user's connected tool
 
 ```java
 Agentican.builder()
-        .llm(...)
-        .mcp(McpConfig.builder()
-                .slug("filesystem")
-                .name("Local Filesystem")
-                .url("http://localhost:3000")
-                .build())
-        .mcp(McpConfig.builder()
-                .slug("github")
-                .name("GitHub MCP")
-                .url("https://github-mcp.example.com")
-                .header("Authorization", "Bearer " + token)
-                .build())
+        .configuration().api()
+            .llm().apiKey(apiKey).end()
+            .mcp()
+                    .slug("filesystem")
+                    .name("Local Filesystem")
+                    .url("http://localhost:3000").end()
+            .mcp()
+                    .slug("github")
+                    .name("GitHub MCP")
+                    .url("https://github-mcp.example.com")
+                    .header("Authorization", "Bearer " + token).end()
+            .end()
         .build();
 ```
 

@@ -50,7 +50,7 @@ The main entry point. Owns the runtime configuration, registries, planner, and w
 ```java
 try (var agentican = Agentican.builder()
         .configuration().api()
-            .llm(LlmConfig.builder().apiKey(apiKey).build())
+            .llm().apiKey(apiKey).end()
             .end()
         .build()) {
 

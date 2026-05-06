@@ -8,7 +8,7 @@ Plan and execute a task from natural language:
 
 ```java
 try (var agentican = Agentican.builder()
-        .llm(LlmConfig.builder().apiKey(apiKey).build())
+        .llm().apiKey(apiKey).end()
         .build()) {
 
     var result = agentican.run("Summarize the latest news about quantum computing").result();
@@ -266,7 +266,7 @@ var agentican = Agentican.builder()
                     return new HttpOutput(response.body(), response.statusCode());
                 })
         .registry().api()
-            .workflow(WorkflowConfig.builder()
+            .workflow()
                     .id("payment-enrichment")
                     .name("payment-enrichment")
                     .param("customer_id", "Customer to enrich", null, true)
@@ -280,7 +280,7 @@ var agentican = Agentican.builder()
                             .instructions("Customer record:\n{{step.fetch-customer.output.body}}\n\n"
                                         + "HTTP status was {{step.fetch-customer.output.status}}.")
                             .dependencies("fetch-customer"))
-                    .build())
+                    .end()
             .end()
         .build();
 ```
@@ -294,20 +294,18 @@ Use a fast/cheap model for classification and a stronger one for content generat
 ```java
 try (var agentican = Agentican.builder()
         .configuration().api()
-            .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
-            .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
+            .llm().name("default").apiKey(key).model("claude-sonnet-4-5").end()
+            .llm().name("haiku").apiKey(key).model("claude-haiku-4-5").end()
             .end()
         .registry().api()
-            .agent(AgentConfig.builder()
+            .agent()
                     .id("classifier")
                     .name("classifier")
-                    .role("Quick classifier").llm("haiku")
-                    .build())
-            .agent(AgentConfig.builder()
+                    .role("Quick classifier").llm("haiku").end()
+            .agent()
                     .id("writer")
                     .name("writer")
-                    .role("High-quality writer").llm("default")
-                    .build())
+                    .role("High-quality writer").llm("default").end()
             .end()
         .build()) {
     // use agentican — classifier uses haiku, writer uses default

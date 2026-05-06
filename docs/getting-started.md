@@ -36,7 +36,7 @@ public class Hello {
 
         try (var agentican = Agentican.builder()
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+                    .llm().apiKey(System.getenv("ANTHROPIC_API_KEY")).end()
                     .end()
                 .build()) {
 
@@ -60,14 +60,14 @@ mvn compile exec:java -Dexec.mainClass=Hello
 Swap the `LlmConfig` for an OpenAI-backed one — everything else is identical:
 
 ```java
-var llm = LlmConfig.builder()
-        .provider("openai")
-        .apiKey(System.getenv("OPENAI_API_KEY"))
-        .model("gpt-4o-mini")
-        .build();
-
 try (var agentican = Agentican.builder()
-        .configuration().api().llm(llm).end()
+        .configuration().api()
+            .llm()
+                .provider("openai")
+                .apiKey(System.getenv("OPENAI_API_KEY"))
+                .model("gpt-4o-mini")
+                .end()
+            .end()
         .build()) { /* use agentican */ }
 ```
 
@@ -76,14 +76,14 @@ try (var agentican = Agentican.builder()
 Same shape, `provider = "gemini"`. Google Search grounding is on by default; pick any Gemini 2.0+ model:
 
 ```java
-var llm = LlmConfig.builder()
-        .provider("gemini")
-        .apiKey(System.getenv("GOOGLE_API_KEY"))
-        .model("gemini-2.5-flash")
-        .build();
-
 try (var agentican = Agentican.builder()
-        .configuration().api().llm(llm).end()
+        .configuration().api()
+            .llm()
+                .provider("gemini")
+                .apiKey(System.getenv("GOOGLE_API_KEY"))
+                .model("gemini-2.5-flash")
+                .end()
+            .end()
         .build()) { /* use agentican */ }
 ```
 
@@ -112,14 +112,14 @@ The framework ships native support for four OSS-focused providers. All four take
 Bedrock's Converse API serves Claude, Llama, Nova, Mistral, Cohere, and DeepSeek through one unified request/response shape. Auth comes from your AWS credentials (env vars, `~/.aws/credentials`, IAM role — whatever the AWS SDK's default chain picks up):
 
 ```java
-var llm = LlmConfig.builder()
-        .provider("bedrock")
-        .region("us-east-1")
-        .model("anthropic.claude-sonnet-4-5-20250929-v1:0")
-        .build();
-
 try (var agentican = Agentican.builder()
-        .configuration().api().llm(llm).end()
+        .configuration().api()
+            .llm()
+                .provider("bedrock")
+                .region("us-east-1")
+                .model("anthropic.claude-sonnet-4-5-20250929-v1:0")
+                .end()
+            .end()
         .build()) { /* use agentican */ }
 ```
 
@@ -138,15 +138,15 @@ For static credentials — e.g. in tests — pair `apiKey` and `secretKey`:
 Point the framework at Ollama, vLLM, LiteLLM, LocalAI, or any corporate proxy with the `openai-compatible` provider plus an explicit `baseUrl`:
 
 ```java
-var llm = LlmConfig.builder()
-        .provider("openai-compatible")
-        .baseUrl("http://localhost:11434/v1")
-        .apiKey("ollama")          // Ollama ignores; any non-blank string works
-        .model("llama3.3:70b")
-        .build();
-
 try (var agentican = Agentican.builder()
-        .configuration().api().llm(llm).end()
+        .configuration().api()
+            .llm()
+                .provider("openai-compatible")
+                .baseUrl("http://localhost:11434/v1")
+                .apiKey("ollama")          // Ollama ignores; any non-blank string works
+                .model("llama3.3:70b")
+                .end()
+            .end()
         .build()) { /* use agentican */ }
 ```
 
@@ -201,7 +201,7 @@ var myToolkit = new MyCustomToolkit();
 try (var agentican = Agentican.builder()
         .toolkit("my-tools", myToolkit)
         .configuration().api()
-            .llm(LlmConfig.builder().apiKey(apiKey).build())
+            .llm().apiKey(apiKey).end()
             .end()
         .build()) {
 
@@ -231,7 +231,7 @@ var hitlManager = new HitlManager((mgr, checkpoint) -> {
 try (var agentican = Agentican.builder()
         .hitlManager(hitlManager)
         .configuration().api()
-            .llm(LlmConfig.builder().apiKey(apiKey).build())
+            .llm().apiKey(apiKey).end()
             .end()
         .build()) {
 

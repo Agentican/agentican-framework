@@ -21,13 +21,13 @@ class AgentInvokerBuilderTest {
 
         return Agentican.builder()
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", llm.toLlmClient())
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                             .name("Analyst").id("Analyst")
-                            .role("Competitive research analyst").llm("default").build())
+                            .role("Competitive research analyst").llm("default").end()
                     .end();
     }
 
@@ -190,13 +190,13 @@ class AgentInvokerBuilderTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", llm)
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("Analyst").id("Analyst")
-                        .role("Analyst").llm("default").build())
+                        .role("Analyst").llm("default").end()
                     .end()
                 .build()) {
 
@@ -244,15 +244,15 @@ class AgentInvokerBuilderTest {
         try (var runtime = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", llm.toLlmClient())
                 .registry().api()
-                    .agent(AgentConfig.builder()
+                    .agent()
                         .name("Analyst").id("Analyst")
-                        .role("Analyst").llm("default").build())
-                    .skill(ai.agentican.framework.config.SkillConfig.builder()
-                        .name("Tone").id("Tone").instructions("Be terse").build())
+                        .role("Analyst").llm("default").end()
+                    .skill()
+                        .name("Tone").id("Tone").instructions("Be terse").end()
                     .end()
                 .build()) {
 

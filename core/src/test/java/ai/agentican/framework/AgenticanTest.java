@@ -35,7 +35,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .build()) {
@@ -50,7 +50,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .build()) {
@@ -68,7 +68,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .build()) {
@@ -107,7 +107,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .build()) {
@@ -139,7 +139,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .build()) {
@@ -174,7 +174,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .build()) {
@@ -221,7 +221,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .toolkit("my-toolkit", myToolkit)
@@ -256,7 +256,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .hitlManager(hitlManager)
@@ -299,7 +299,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .hitlManager(hitlManager)
@@ -343,7 +343,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .hitlManager(hitlManager)
@@ -394,7 +394,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .toolkit("tools", toolkit)
@@ -414,7 +414,7 @@ class AgenticanTest {
         var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .build();
@@ -482,7 +482,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .toolkit("notion", notionToolkit)
@@ -503,11 +503,11 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .registry().api()
-                    .agent(new AgentConfig("FluentAgent", "FluentAgent", "a fluent test role", null, null, null, null))
+                    .agent().id("FluentAgent").name("FluentAgent").role("a fluent test role").end()
                     .end()
                 .build()) {
 
@@ -522,11 +522,11 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .registry().api()
-                    .skill(new SkillConfig("FluentSkill", "FluentSkill", "do the thing"))
+                    .skill().id("FluentSkill").name("FluentSkill").instructions("do the thing").end()
                     .end()
                 .build()) {
 
@@ -537,19 +537,17 @@ class AgenticanTest {
     @Test
     void fluentPlanIsRegistered() {
 
-        var step = new WorkflowConfig.PlanStepConfig("s1", "agent", "noop", "do nothing",
-                List.of(), false, List.of(), List.of(), null, null, List.of(), null, List.of(), null, null);
-
-        var planConfig = new WorkflowConfig("fluent-plan", "fluent-plan", "desc", List.of(), List.of(step), null);
-
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .registry().api()
-                    .workflow(planConfig)
+                    .workflow()
+                        .id("fluent-plan").name("fluent-plan").description("desc")
+                        .step("s1", s -> s.agent("noop").instructions("do nothing"))
+                        .end()
                     .end()
                 .build()) {
 
@@ -563,12 +561,12 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .registry().api()
-                    .agent(new AgentConfig("FromConfig", "FromConfig", "config role", null, null, null, null))
-                    .agent(new AgentConfig("FromFluent", "FromFluent", "fluent role", null, null, null, null))
+                    .agent().id("FromConfig").name("FromConfig").role("config role").end()
+                    .agent().id("FromFluent").name("FromFluent").role("fluent role").end()
                     .end()
                 .build()) {
 
@@ -585,7 +583,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .workflowRunStore(store)
@@ -615,7 +613,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .workflowRunStore(store)
@@ -654,11 +652,11 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(new AgentConfig("worker", "worker", "Worker role", null, null, null, null))
+                    .agent().id("worker").name("worker").role("Worker role").end()
                     .end()
 
                 .workflowRunStore(store)
@@ -711,7 +709,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .workflowRunStore(store)
@@ -739,7 +737,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .workflowRunStore(store)
@@ -768,11 +766,11 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .registry().api()
-                    .agent(new AgentConfig("worker", "worker", "Worker", null, null, null, null))
+                    .agent().id("worker").name("worker").role("Worker").end()
                     .end()
 
                 .workflowRunStore(store)
@@ -821,11 +819,11 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(new AgentConfig("worker", "worker", "Worker", null, null, null, null))
+                    .agent().id("worker").name("worker").role("Worker").end()
                     .end()
 
                 .workflowRunStore(store)
@@ -890,7 +888,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .workflowRunStore(store)
@@ -920,7 +918,7 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .workflowRunStore(store)
@@ -957,14 +955,14 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> {
                     llmCallCount.incrementAndGet();
                     return mockLlm.toLlmClient().send(request);
                 })
                 .registry().api()
-                    .agent(new AgentConfig("worker", "worker", "Worker", null, null, null, null))
+                    .agent().id("worker").name("worker").role("Worker").end()
                     .end()
 
                 .workflowRunStore(store)
@@ -1042,14 +1040,14 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> {
                     llmCallCount.incrementAndGet();
                     return mockLlm.toLlmClient().send(request);
                 })
                 .registry().api()
-                    .agent(new AgentConfig("worker", "worker", "Worker", null, null, null, null))
+                    .agent().id("worker").name("worker").role("Worker").end()
                     .end()
 
                 .workflowRunStore(store)
@@ -1129,11 +1127,11 @@ class AgenticanTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", mockLlm.toLlmClient())
                 .registry().api()
-                    .agent(new AgentConfig("worker", "worker", "Worker", null, null, null, null))
+                    .agent().id("worker").name("worker").role("Worker").end()
                     .end()
 
                 .workflowRunStore(store)

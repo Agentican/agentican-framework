@@ -16,7 +16,7 @@ var researcher = AgentConfig.builder()
 
 try (var agentican = Agentican.builder()
         .configuration().api()
-            .llm(LlmConfig.builder().apiKey(apiKey).build())
+            .llm().apiKey(apiKey).end()
             .end()
         .registry().api()
             .agent(researcher)
@@ -92,21 +92,18 @@ Agentican.builder()
             .llm(...)
             .end()
         .registry().api()
-            .skill(SkillConfig.builder()
+            .skill()
                     .id("statistical-rigor")
                     .name("statistical-rigor")
-                    .instructions("Use p-values, confidence intervals, and explain assumptions")
-                    .build())
-            .skill(SkillConfig.builder()
+                    .instructions("Use p-values, confidence intervals, and explain assumptions").end()
+            .skill()
                     .id("plain-english")
                     .name("plain-english")
-                    .instructions("Translate findings into non-technical language")
-                    .build())
-            .agent(AgentConfig.builder()
+                    .instructions("Translate findings into non-technical language").end()
+            .agent()
                     .id("analyst")
                     .name("analyst")
-                    .role("Data analyst").llm("default")
-                    .build())
+                    .role("Data analyst").llm("default").end()
             .end()
         .build();
 ```
@@ -169,11 +166,13 @@ The default runner. Configurable via `WorkerConfig`:
 
 ```java
 Agentican.builder()
-        .llm(...)
-        .worker(WorkerConfig.builder()
+        .configuration().api()
+            .llm().apiKey(apiKey).end()
+            .worker()
                 .maxTurns(20)                    // max LLM turns per step
                 .timeout(Duration.ofMinutes(10)) // per-step timeout
-                .build())
+                .end()
+            .end()
         .build();
 ```
 
@@ -215,8 +214,8 @@ Define the LLMs in config:
 ```java
 Agentican.builder()
         .configuration().api()
-            .llm(LlmConfig.builder().name("default").apiKey(key).model("claude-sonnet-4-5").build())
-            .llm(LlmConfig.builder().name("haiku").apiKey(key).model("claude-haiku-4-5").build())
+            .llm().name("default").apiKey(key).model("claude-sonnet-4-5").end()
+            .llm().name("haiku").apiKey(key).model("claude-haiku-4-5").end()
             .end()
         .build();
 ```

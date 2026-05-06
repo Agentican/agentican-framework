@@ -22,7 +22,7 @@ Requires Java 25.
 
 ```java
 try (var agentican = Agentican.builder()
-        .llm(LlmConfig.builder().apiKey(System.getenv("ANTHROPIC_API_KEY")).build())
+        .llm().apiKey(System.getenv("ANTHROPIC_API_KEY")).end()
         .build()) {
     
     var task = agentican.run("Research the top 5 CDC tools and compare them");

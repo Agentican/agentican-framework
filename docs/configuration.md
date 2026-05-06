@@ -25,11 +25,11 @@ Agentican.builder()
 
     // Framework-wiring config (api XOR yaml)
     .configuration().api()
-        .llm(LlmConfig)
-        .mcp(McpConfig)
-        .composio(ComposioConfig)
-        .worker(WorkerConfig)
-        .strict()
+        .llm()…end()        // call once per LLM provider
+        .mcp()…end()        // call once per MCP server
+        .composio()…end()   // singleton; called twice replaces silently
+        .worker()…end()     // singleton; called twice replaces silently
+        .strict()           // flag — no nested context
         .end()
     .configuration().yaml()
         .path(Path) | .classpath(String) | .config(EngineConfig)
@@ -37,9 +37,9 @@ Agentican.builder()
 
     // Catalog (api XOR yaml)
     .registry().api()
-        .agent(AgentConfig)
-        .skill(SkillConfig)
-        .workflow(WorkflowConfig)
+        .agent()…end()      // call once per agent
+        .skill()…end()      // call once per skill
+        .workflow()…end()   // call once per workflow
         .end()
     .registry().yaml()
         .path(Path) | .classpath(String) | .config(CatalogConfig)
@@ -57,12 +57,12 @@ Each sub-builder exits via `.end()`, returning the outer `Builder`. The `.api()`
 ```java
 try (var agentican = Agentican.builder()
         .configuration().api()
-            .llm(LlmConfig.builder().apiKey(apiKey).build())
-            .worker(WorkerConfig.builder().maxTurns(20).build())
+            .llm().apiKey(apiKey).end()
+            .worker().maxTurns(20).end()
             .end()
         .registry().api()
-            .agent(AgentConfig.builder().id("researcher").name("researcher").role("...").llm("default").build())
-            .skill(SkillConfig.builder().id("citations").name("citations").instructions("Always cite sources").build())
+            .agent().id("researcher").name("researcher").role("...").llm("default").end()
+            .skill().id("citations").name("citations").instructions("Always cite sources").end()
             .end()
         .build()) {
     // use agentican
@@ -99,7 +99,7 @@ try (var agentican = Agentican.builder()
 try (var agentican = Agentican.builder()
         .configuration().yaml().classpath("engine.yaml").end()
         .registry().api()
-            .workflow(WorkflowConfig.builder()...build())
+            .workflow().id("...").name("...").step(...).end()
             .end()
         .build()) {
     // use agentican
@@ -218,14 +218,13 @@ You can register multiple LLMs — mixing providers freely — and assign them t
 ```java
 Agentican.builder()
         .configuration().api()
-            .llm(LlmConfig.builder().name("default").apiKey(anthropicKey).model("claude-sonnet-4-5").build())
-            .llm(LlmConfig.builder().name("fast").provider("openai").apiKey(openaiKey).model("gpt-4o-mini").build())
-            .llm(LlmConfig.builder().name("grounded").provider("gemini").apiKey(geminiKey).model("gemini-2.5-flash").build())
+            .llm().name("default").apiKey(anthropicKey).model("claude-sonnet-4-5").end()
+            .llm().name("fast").provider("openai").apiKey(openaiKey).model("gpt-4o-mini").end()
+            .llm().name("grounded").provider("gemini").apiKey(geminiKey).model("gemini-2.5-flash").end()
             .end()
         .registry().api()
-            .agent(AgentConfig.builder()
-                    .id("classifier").name("classifier").role("...").llm("fast")
-                    .build())
+            .agent()
+                    .id("classifier").name("classifier").role("...").llm("fast").end()
             .end()
         .build();
 ```

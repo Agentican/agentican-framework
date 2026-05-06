@@ -34,7 +34,7 @@ class AgenticanVectorIndexTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .vectorIndex(docsKb())
@@ -60,7 +60,7 @@ class AgenticanVectorIndexTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .build()) {
@@ -78,7 +78,7 @@ class AgenticanVectorIndexTest {
 
         var builder = Agentican.builder()
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .vectorIndex(first);
@@ -92,7 +92,7 @@ class AgenticanVectorIndexTest {
         var builder = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .toolkit(RetrievalToolkit.SLUG, new Toolkit() {
@@ -116,7 +116,7 @@ class AgenticanVectorIndexTest {
         try (var agentican = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .vectorIndex(docsKb)
@@ -138,7 +138,7 @@ class AgenticanVectorIndexTest {
         var builder = Agentican.builder()
 
                 .configuration().api()
-                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .llm().apiKey("mock").end()
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .codeStep(RetrieveCodeStep.SLUG, Void.class, Void.class, (input, ctx) -> null)
