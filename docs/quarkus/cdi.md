@@ -39,7 +39,7 @@ agenticanService.reapOrphans();         // mark unrecoverable tasks FAILED
 
 You don't usually need to call these yourself — `ResumeOnStartObserver` runs `resumeInterrupted` automatically on `StartupEvent`. Toggle that behavior with `agentican.resume-on-start=false` and tune fan-out with `agentican.resume-max-concurrent`.
 
-## `@Workflow` qualifier — typed `Workflow<P, R>`
+## `@AgenticanWorkflow` qualifier — typed `Workflow<P, R>`
 
 Inject a typed, reusable handle bound to a specific workflow. Two type parameters: input record `P` and output record `R` (`Void` for either if not needed).
 
@@ -47,7 +47,7 @@ Inject a typed, reusable handle bound to a specific workflow. Two type parameter
 record TriageParams(String customerId, String priority) {}
 record TriageOutput(String classification, String reason) {}
 
-@Inject @Workflow(name = "triage")
+@Inject @AgenticanWorkflow(name = "triage")
 Workflow<TriageParams, TriageOutput> triage;
 
 TriageOutput out = triage.start(new TriageParams("cust-42", "HIGH")).await();
@@ -79,13 +79,13 @@ var workflow = agentican.workflow("some-workflow")
         .build();
 ```
 
-## `@Task` qualifier — single-step ad-hoc workflow
+## `@AgenticanTask` qualifier — single-step ad-hoc workflow
 
-For one-shot agent invocations without a pre-registered workflow definition, use `@Task` to declaratively bind a single agent step:
+For one-shot agent invocations without a pre-registered workflow definition, use `@AgenticanTask` to declaratively bind a single agent step:
 
 ```java
 @Inject
-@Task(name = "Research Question",
+@AgenticanTask(name = "Research Question",
       agent = "researcher",
       instructions = "Research {{input}} and summarize the findings.")
 Workflow<String, String> researcher;
@@ -135,10 +135,10 @@ event loop.
 
 ## Typed reactive workflow — `ReactiveWorkflowAdapter<P, R>`
 
-The reactive counterpart to `@Workflow(name = "...") Workflow<P, R>`. Same qualifier, same generic params, just returns `Uni<...>` so you can compose without blocking:
+The reactive counterpart to `@AgenticanWorkflow(name = "...") Workflow<P, R>`. Same qualifier, same generic params, just returns `Uni<...>` so you can compose without blocking:
 
 ```java
-@Inject @Workflow(name = "triage")
+@Inject @AgenticanWorkflow(name = "triage")
 ReactiveWorkflowAdapter<TriageParams, TriageOutput> triage;
 
 @GET

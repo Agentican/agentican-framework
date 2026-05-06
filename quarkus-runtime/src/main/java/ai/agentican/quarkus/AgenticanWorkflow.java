@@ -15,7 +15,7 @@ import java.lang.annotation.Target;
  *
  * <pre>{@code
  * @Inject
- * @ai.agentican.quarkus.Workflow(name = "Email Labeling")
+ * @AgenticanWorkflow(name = "Email Labeling")
  * Workflow<LabelingInput, LabelingResults> labelingWorkflow;
  * }</pre>
  *
@@ -24,16 +24,11 @@ import java.lang.annotation.Target;
  * in the registry. If multiple typed beans need to bind to the same
  * definition with different I/O typings, declare manual {@code @Produces}
  * methods instead.
- *
- * <p>This annotation shares its simple name with
- * {@link ai.agentican.framework.Workflow}; in source files that
- * import both, fully-qualify one (typically the annotation at the
- * injection site).
  */
 @Qualifier
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.TYPE})
-public @interface Workflow {
+public @interface AgenticanWorkflow {
 
     @Nonbinding String name();
 }

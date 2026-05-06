@@ -17,11 +17,11 @@ class AgenticanTaskQualifierTest {
     static final String INSTRUCTIONS = "Research {{input}} and summarize the findings.";
 
     @Inject
-    @Task(name = TASK_NAME, agent = AGENT_NAME, instructions = INSTRUCTIONS)
+    @AgenticanTask(name = TASK_NAME, agent = AGENT_NAME, instructions = INSTRUCTIONS)
     Workflow<String, String> researcher;
 
     @Inject
-    @Task(
+    @AgenticanTask(
             name = "Research With Skill",
             agent = AGENT_NAME,
             instructions = INSTRUCTIONS,

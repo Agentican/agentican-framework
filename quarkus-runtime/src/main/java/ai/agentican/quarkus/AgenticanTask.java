@@ -16,14 +16,14 @@ import java.lang.annotation.Target;
  *
  * <pre>{@code
  * @Inject
- * @Task(name = "Sentiment", agent = "sentiment-agent", instructions = "Classify the sentiment.")
+ * @AgenticanTask(name = "Sentiment", agent = "sentiment-agent", instructions = "Classify the sentiment.")
  * Workflow<SentimentInput, String> sentimentTask;
  * }</pre>
  */
 @Qualifier
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.TYPE})
-public @interface Task {
+public @interface AgenticanTask {
 
     @Nonbinding String name();
 

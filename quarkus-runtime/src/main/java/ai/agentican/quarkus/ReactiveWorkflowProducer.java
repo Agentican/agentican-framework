@@ -16,10 +16,10 @@ public class ReactiveWorkflowProducer {
 
     @Produces
     @Dependent
-    @Task(name = "", agent = "", instructions = "")
+    @AgenticanTask(name = "", agent = "", instructions = "")
     public <I, O> ReactiveWorkflow<I, O> produceTask(InjectionPoint ip) {
 
-        var ann = TaskTypeArgs.qualifier(ip, Task.class);
+        var ann = TaskTypeArgs.qualifier(ip, AgenticanTask.class);
         var types = TaskTypeArgs.of(ip);
 
         @SuppressWarnings("unchecked") Class<I> inputType = (Class<I>) types[0];
@@ -40,10 +40,10 @@ public class ReactiveWorkflowProducer {
 
     @Produces
     @Dependent
-    @ai.agentican.quarkus.Workflow(name = "")
+    @AgenticanWorkflow(name = "")
     public <I, O> ReactiveWorkflow<I, O> produceWorkflow(InjectionPoint ip) {
 
-        var ann = TaskTypeArgs.qualifier(ip, ai.agentican.quarkus.Workflow.class);
+        var ann = TaskTypeArgs.qualifier(ip, AgenticanWorkflow.class);
         var types = TaskTypeArgs.of(ip);
 
         @SuppressWarnings("unchecked") Class<I> inputType = (Class<I>) types[0];

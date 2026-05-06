@@ -25,14 +25,14 @@ import ai.agentican.framework.orchestration.model.WorkflowStep;
 import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 import ai.agentican.framework.orchestration.model.WorkflowStepBranch;
 import ai.agentican.framework.orchestration.model.WorkflowStepLoop;
-import ai.agentican.quarkus.Task;
+import ai.agentican.quarkus.AgenticanTask;
 import ai.agentican.quarkus.AgenticanBeansProducer;
 import ai.agentican.quarkus.AgenticanConfig;
 import ai.agentican.quarkus.AgenticanProducer;
 import ai.agentican.quarkus.WorkflowProducer;
 import ai.agentican.quarkus.AgentProducer;
 import ai.agentican.quarkus.ReactiveWorkflowProducer;
-import ai.agentican.quarkus.Workflow;
+import ai.agentican.quarkus.AgenticanWorkflow;
 import ai.agentican.quarkus.devui.AgenticanDevUIService;
 import ai.agentican.quarkus.event.CdiEventBridge;
 import ai.agentican.quarkus.health.AgenticanLivenessCheck;
@@ -56,8 +56,8 @@ class AgenticanProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(AgenticanProcessor.class);
     private static final String FEATURE = "agentican";
 
-    private static final DotName TASK_DOT    = DotName.createSimple(Task.class.getName());
-    private static final DotName WORKFLOW_DOT = DotName.createSimple(ai.agentican.quarkus.Workflow.class.getName());
+    private static final DotName TASK_DOT    = DotName.createSimple(AgenticanTask.class.getName());
+    private static final DotName WORKFLOW_DOT = DotName.createSimple(AgenticanWorkflow.class.getName());
 
     @BuildStep
     FeatureBuildItem feature() {
@@ -105,11 +105,11 @@ class AgenticanProcessor {
         var index = indexItem.getIndex();
 
         for (var ann : index.getAnnotations(TASK_DOT))
-            LOG.debug("@Task at {} references agent '{}'; resolution happens at runtime",
+            LOG.debug("@AgenticanTask at {} references agent '{}'; resolution happens at runtime",
                     ann.target(), ann.value("agent").asString());
 
         for (var ann : index.getAnnotations(WORKFLOW_DOT))
-            LOG.debug("@ai.agentican.quarkus.Workflow at {} references definition '{}'; resolution happens at runtime",
+            LOG.debug("@AgenticanWorkflow at {} references definition '{}'; resolution happens at runtime",
                     ann.target(), ann.value("definition").asString());
     }
 

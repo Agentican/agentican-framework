@@ -22,16 +22,16 @@ public class WorkflowProducer {
 
     @Produces
     @Dependent
-    @Task(name = "", agent = "", instructions = "")
+    @AgenticanTask(name = "", agent = "", instructions = "")
     public <I, O> Workflow<I, O> produceTask(InjectionPoint ip) {
 
-        var ann = TaskTypeArgs.qualifier(ip, Task.class);
+        var ann = TaskTypeArgs.qualifier(ip, AgenticanTask.class);
         var types = TaskTypeArgs.of(ip);
 
         @SuppressWarnings("unchecked") Class<I> inputType = (Class<I>) types[0];
         @SuppressWarnings("unchecked") Class<O> outputType = (Class<O>) types[1];
 
-        LOG.info("@Task(name=\"{}\", agent=\"{}\"): binding I={} O={}",
+        LOG.info("@AgenticanTask(name=\"{}\", agent=\"{}\"): binding I={} O={}",
                 ann.name(), ann.agent(), inputType.getSimpleName(), outputType.getSimpleName());
 
         return agentican.task(ann.name())
@@ -47,10 +47,10 @@ public class WorkflowProducer {
 
     @Produces
     @Dependent
-    @ai.agentican.quarkus.Workflow(name = "")
+    @AgenticanWorkflow(name = "")
     public <I, O> Workflow<I, O> produceWorkflow(InjectionPoint ip) {
 
-        var ann = TaskTypeArgs.qualifier(ip, ai.agentican.quarkus.Workflow.class);
+        var ann = TaskTypeArgs.qualifier(ip, AgenticanWorkflow.class);
         var types = TaskTypeArgs.of(ip);
 
         @SuppressWarnings("unchecked") Class<I> inputType = (Class<I>) types[0];
@@ -61,7 +61,7 @@ public class WorkflowProducer {
                 .output(outputType)
                 .build();
 
-        LOG.info("@Workflow(name=\"{}\"): resolved (output = {})",
+        LOG.info("@AgenticanWorkflow(name=\"{}\"): resolved (output = {})",
                 ann.name(), outputType.getSimpleName());
 
         return workflow;
