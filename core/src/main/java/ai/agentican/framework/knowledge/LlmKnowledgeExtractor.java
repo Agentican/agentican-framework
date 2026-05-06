@@ -50,7 +50,8 @@ public class LlmKnowledgeExtractor implements KnowledgeExtractor {
             userMessage.append("Extract knowledge from <agent-output>, per the rules. "
                     + "Only extract facts the agent DISCOVERED — skip any fact that already appears in <agent-input>.");
 
-            var llmResponse = llm.send(new LlmRequest(systemPrompt, null, userMessage.toString(), tools, 0, null, null, null));
+            var llmResponse = llm.send(new LlmRequest(systemPrompt, null, userMessage.toString(), tools,
+                    0, null, null, null, null, java.util.List.of()));
 
             var parsed = Json.findObject(llmResponse.text(), ExtractionOutput.class);
 
@@ -65,7 +66,9 @@ public class LlmKnowledgeExtractor implements KnowledgeExtractor {
 
                 if (action == ExtractedEntry.Action.UPDATE
                         && (rawEntry.existingEntryId == null || rawEntry.existingEntryId.isBlank())) {
+
                     LOG.debug("Skipping UPDATE entry with no existingEntryId");
+
                     continue;
                 }
 
@@ -82,12 +85,8 @@ public class LlmKnowledgeExtractor implements KnowledgeExtractor {
                 if (facts.isEmpty() && action == ExtractedEntry.Action.UPDATE) continue;
                 if (facts.isEmpty() && (rawEntry.name == null || rawEntry.name.isBlank())) continue;
 
-                entries.add(new ExtractedEntry(
-                        action,
-                        rawEntry.existingEntryId,
-                        rawEntry.name,
-                        rawEntry.description,
-                        facts));
+                entries.add(
+                        new ExtractedEntry(action, rawEntry.existingEntryId, rawEntry.name, rawEntry.description, facts));
             }
 
             return entries;
@@ -95,6 +94,7 @@ public class LlmKnowledgeExtractor implements KnowledgeExtractor {
         catch (Exception e) {
 
             LOG.warn("Fact extraction failed: {}", e.getMessage());
+
             return List.<ExtractedEntry>of();
         }
     }

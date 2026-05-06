@@ -25,7 +25,7 @@ class JsonExtractorTest {
     void findObjectFromTextWithJson() {
 
         var result =
-                Json.findObject("Here is the plan:\n\n{\"name\": \"test\", \"value\": 99}\n\nDone.",
+                Json.findObject("Here is the definition:\n\n{\"name\": \"test\", \"value\": 99}\n\nDone.",
                         TestObj.class);
 
         assertEquals("test", result.name());

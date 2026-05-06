@@ -9,7 +9,6 @@ agents:
       category match) and flags pattern anomalies (unusual timing, duplicate amounts,
       non-standard category use). Produces per-transaction findings with a decision and
       the specific policy clause that drove it — never a generic "looks fine."
-    externalId: internal-auditor
 
   - name: Finance Manager
     role: |
@@ -18,7 +17,6 @@ agents:
       issues with specific references, and tracks overall policy compliance trends.
       Does not introduce new findings — only synthesizes and routes what the auditor
       surfaced.
-    externalId: finance-manager
 
 skills:
   - name: Expense policy
@@ -29,11 +27,9 @@ skills:
       Software: needs pre-approval over $500/year. Client entertainment: requires client
       name in the note field. Auto-flag: amounts ending in round numbers over $500,
       weekend submissions over $200, repeat charges to the same vendor within 24 hours.
-    externalId: expense-policy
 
-plans:
+workflows:
   - name: Expense Audit
-    externalId: expense-audit
     outputStep: summarize
     params:
       - name: expenses

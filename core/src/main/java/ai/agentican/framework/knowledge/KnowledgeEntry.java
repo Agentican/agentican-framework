@@ -23,8 +23,8 @@ public class KnowledgeEntry {
         this(id, name, description, KnowledgeStatus.INDEXING, Instant.now(), null);
     }
 
-    public KnowledgeEntry(String id, String name, String description, KnowledgeStatus status,
-                          Instant created, Instant updated) {
+    public KnowledgeEntry(String id, String name, String description, KnowledgeStatus status, Instant created,
+                          Instant updated) {
 
         if (id == null || id.isBlank())
             throw new IllegalArgumentException("Entry id is required");
@@ -53,38 +53,11 @@ public class KnowledgeEntry {
     public Instant created() { return created; }
     public Instant updated() { return updated; }
 
-    public void setName(String name) {
+    public void setName(String name) { this.name = name; touch(); }
+    public void setDescription(String description) { this.description = description != null ? description : ""; touch(); }
+    public void setStatus(KnowledgeStatus status) { this.status = status; touch(); }
+    public void addFact(KnowledgeFact fact) { facts.add(fact); touch(); }
+    public void clearFacts() { facts.clear(); touch(); }
 
-        this.name = name;
-        touch();
-    }
-
-    public void setDescription(String description) {
-
-        this.description = description != null ? description : "";
-        touch();
-    }
-
-    public void setStatus(KnowledgeStatus status) {
-
-        this.status = status;
-        touch();
-    }
-
-    public void addFact(KnowledgeFact fact) {
-
-        facts.add(fact);
-        touch();
-    }
-
-    public void clearFacts() {
-
-        facts.clear();
-        touch();
-    }
-
-    private void touch() {
-
-        this.updated = Instant.now();
-    }
+    private void touch() { this.updated = Instant.now(); }
 }

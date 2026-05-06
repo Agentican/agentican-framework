@@ -4,7 +4,6 @@ import ai.agentican.framework.Agentican;
 import ai.agentican.framework.agent.Agent;
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.util.Ids;
-import ai.agentican.quarkus.AgenticanConfig;
 import ai.agentican.quarkus.audit.CatalogAuditLog;
 import ai.agentican.quarkus.rest.catalog.CatalogReferences;
 import ai.agentican.quarkus.rest.dto.AgentSummary;
@@ -41,7 +40,7 @@ public class AgentsResource {
     Agentican agentican;
 
     @Inject
-    AgenticanConfig config;
+    ai.agentican.framework.config.RuntimeConfig runtimeConfig;
 
     @Inject
     CatalogAuditLog audit;
@@ -52,10 +51,10 @@ public class AgentsResource {
     @GET
     public List<AgentSummary> list() {
 
-        var propertyIds = propertyDeclaredExternalIds();
+        var configNames = configDeclaredNames();
 
-        return agentican.registry().agents().getAll().stream()
-                .map(a -> AgentSummary.of(a, isPropertyDeclared(a, propertyIds)))
+        return agentican.registry().agents().list().stream()
+                .map(a -> AgentSummary.of(a, configNames.contains(a.name())))
                 .toList();
     }
 
@@ -64,33 +63,27 @@ public class AgentsResource {
     public AgentSummary get(@PathParam("ref") String ref) {
 
         var agent = resolve(ref);
-        if (agent == null) throw new NotFoundException("No agent with id, externalId or name: " + ref);
+        if (agent == null) throw new NotFoundException("No agent with id or name: " + ref);
 
-        return AgentSummary.of(agent, isPropertyDeclared(agent, propertyDeclaredExternalIds()));
+        return AgentSummary.of(agent, configDeclaredNames().contains(agent.name()));
     }
 
     @POST
     public Response create(CreateAgentRequest request) {
 
-        requireNonBlank(request.externalId(), "externalId");
-        requireNonBlank(request.name(),       "name");
-        requireNonBlank(request.role(),       "role");
-
-        if (propertyDeclaredExternalIds().contains(request.externalId()))
-            throw new CatalogConflictException("property_declared",
-                    "externalId '" + request.externalId() + "' is declared in application.properties and is read-only");
+        requireNonBlank(request.name(), "name");
+        requireNonBlank(request.role(), "role");
 
         var agents = agentican.registry().agents();
-        if (agents.getByExternalId(request.externalId()) != null)
+        if (agents.byName(request.name()) != null)
             throw new CatalogConflictException("already_exists",
-                    "Agent with externalId '" + request.externalId() + "' already exists");
+                    "Agent with name '" + request.name() + "' already exists");
 
-        var cfg = new AgentConfig(Ids.generate(), request.name(), request.role(),
-                request.llm(), request.externalId());
-        agents.register(agentican.buildAgent(cfg));
+        var cfg = new AgentConfig(Ids.generate(), request.name(), request.role(), request.llm(), null, null, null);
+        agentican.registry().agents().register(cfg);
 
-        var created = agents.getByExternalId(request.externalId());
-        audit.record(CatalogAuditLog.AGENT, request.externalId(), CatalogAuditLog.CREATED,
+        var created = agents.byName(request.name());
+        audit.record(CatalogAuditLog.AGENT, created.id(), CatalogAuditLog.CREATED,
                 null, null, toJson(cfg));
 
         return Response.status(Response.Status.CREATED)
@@ -106,11 +99,7 @@ public class AgentsResource {
         requireNonBlank(request.role(), "role");
 
         var existing = resolve(ref);
-        if (existing == null) throw new NotFoundException("No agent with id, externalId or name: " + ref);
-
-        if (isPropertyDeclared(existing, propertyDeclaredExternalIds()))
-            throw new CatalogConflictException("property_declared",
-                    "Agent '" + existing.name() + "' is declared in application.properties and is read-only");
+        if (existing == null) throw new NotFoundException("No agent with id or name: " + ref);
 
         var beforeJson = toJson(existing.config());
 
@@ -119,15 +108,16 @@ public class AgentsResource {
                 request.name(),
                 request.role(),
                 request.llm() != null ? request.llm() : existing.config().llm(),
-                existing.config().externalId());
+                existing.config().runner(),
+                existing.config().maxTurns(),
+                existing.config().timeout());
 
-        agentican.registry().agents().register(agentican.buildAgent(cfg));
+        agentican.registry().agents().register(cfg);
 
-        var key = existing.config().externalId() != null ? existing.config().externalId() : existing.id();
-        audit.record(CatalogAuditLog.AGENT, key, CatalogAuditLog.UPDATED,
+        audit.record(CatalogAuditLog.AGENT, existing.id(), CatalogAuditLog.UPDATED,
                 null, beforeJson, toJson(cfg));
 
-        return AgentSummary.of(resolve(key), false);
+        return AgentSummary.of(resolve(existing.id()), false);
     }
 
     @DELETE
@@ -135,24 +125,19 @@ public class AgentsResource {
     public Response delete(@PathParam("ref") String ref) {
 
         var existing = resolve(ref);
-        if (existing == null) throw new NotFoundException("No agent with id, externalId or name: " + ref);
-
-        if (isPropertyDeclared(existing, propertyDeclaredExternalIds()))
-            throw new CatalogConflictException("property_declared",
-                    "Agent '" + existing.name() + "' is declared in application.properties and is read-only");
+        if (existing == null) throw new NotFoundException("No agent with id or name: " + ref);
 
         var referring = referringPlans(existing);
         if (!referring.isEmpty())
             throw new CatalogConflictException("referenced",
-                    "Agent '" + existing.name() + "' is referenced by " + referring.size() + " plan(s)",
+                    "Agent '" + existing.name() + "' is referenced by " + referring.size() + " definition(s)",
                     referring);
 
         var beforeJson = toJson(existing.config());
 
         agentican.registry().agents().delete(ref);
 
-        var key = existing.config().externalId() != null ? existing.config().externalId() : existing.id();
-        audit.record(CatalogAuditLog.AGENT, key, CatalogAuditLog.DELETED,
+        audit.record(CatalogAuditLog.AGENT, existing.id(), CatalogAuditLog.DELETED,
                 null, beforeJson, null);
 
         return Response.noContent().build();
@@ -172,36 +157,24 @@ public class AgentsResource {
 
         var agents = agentican.registry().agents();
 
-        var byExt = agents.getByExternalId(ref);
-        if (byExt != null) return byExt;
-
-        var byId = agents.get(ref);
+        var byId = agents.byId(ref);
         if (byId != null) return byId;
 
-        return agents.getByName(ref);
+        return agents.byName(ref);
     }
 
-    private Set<String> propertyDeclaredExternalIds() {
+    private Set<String> configDeclaredNames() {
 
         var out = new HashSet<String>();
-        config.agents().forEach(a -> a.externalId().ifPresent(out::add));
+        runtimeConfig.agents().forEach(a -> out.add(a.name()));
         return out;
-    }
-
-    private static boolean isPropertyDeclared(Agent agent, Set<String> propertyIds) {
-
-        var ext = agent.config().externalId();
-        return ext != null && propertyIds.contains(ext);
     }
 
     private List<String> referringPlans(Agent agent) {
 
-        var plans = agentican.registry().plans();
+        var plans = agentican.registry().workflows();
 
-        var refs = new HashSet<String>();
-        refs.add(agent.id());
-        refs.add(agent.name());
-        if (agent.config().externalId() != null) refs.add(agent.config().externalId());
+        var refs = Set.of(agent.id(), agent.name());
 
         var hits = new HashSet<String>();
         for (var ref : refs)

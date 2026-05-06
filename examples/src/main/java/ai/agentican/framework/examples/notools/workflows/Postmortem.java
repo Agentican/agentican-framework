@@ -15,15 +15,16 @@ public class Postmortem {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var postmortem = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var postmortem = agentican.workflow(PLAN_NAME)
                     .input(Incident.class)
                     .output(PostmortemDoc.class)
                     .build();
 
-            var doc = postmortem.runAsync(incident()).join();
+            var doc = postmortem.start(incident()).future().join();
 
             print(doc);
         }

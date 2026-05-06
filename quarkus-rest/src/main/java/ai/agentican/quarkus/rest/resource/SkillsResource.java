@@ -3,7 +3,6 @@ package ai.agentican.quarkus.rest.resource;
 import ai.agentican.framework.Agentican;
 import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.util.Ids;
-import ai.agentican.quarkus.AgenticanConfig;
 import ai.agentican.quarkus.audit.CatalogAuditLog;
 import ai.agentican.quarkus.rest.catalog.CatalogReferences;
 import ai.agentican.quarkus.rest.dto.CreateSkillRequest;
@@ -40,7 +39,7 @@ public class SkillsResource {
     Agentican agentican;
 
     @Inject
-    AgenticanConfig config;
+    ai.agentican.framework.config.RuntimeConfig runtimeConfig;
 
     @Inject
     CatalogAuditLog audit;
@@ -51,10 +50,10 @@ public class SkillsResource {
     @GET
     public List<SkillSummary> list() {
 
-        var propertyIds = propertyDeclaredExternalIds();
+        var configNames = configDeclaredNames();
 
-        return agentican.registry().skills().getAll().stream()
-                .map(s -> SkillSummary.of(s, isPropertyDeclared(s, propertyIds)))
+        return agentican.registry().skills().list().stream()
+                .map(s -> SkillSummary.of(s, configNames.contains(s.name())))
                 .toList();
     }
 
@@ -63,32 +62,27 @@ public class SkillsResource {
     public SkillSummary get(@PathParam("ref") String ref) {
 
         var skill = resolve(ref);
-        if (skill == null) throw new NotFoundException("No skill with id, externalId or name: " + ref);
+        if (skill == null) throw new NotFoundException("No skill with id or name: " + ref);
 
-        return SkillSummary.of(skill, isPropertyDeclared(skill, propertyDeclaredExternalIds()));
+        return SkillSummary.of(skill, configDeclaredNames().contains(skill.name()));
     }
 
     @POST
     public Response create(CreateSkillRequest request) {
 
-        requireNonBlank(request.externalId(),  "externalId");
         requireNonBlank(request.name(),        "name");
         requireNonBlank(request.instructions(), "instructions");
 
-        if (propertyDeclaredExternalIds().contains(request.externalId()))
-            throw new CatalogConflictException("property_declared",
-                    "externalId '" + request.externalId() + "' is declared in application.properties and is read-only");
-
         var skills = agentican.registry().skills();
-        if (skills.getByExternalId(request.externalId()) != null)
+        if (skills.byName(request.name()) != null)
             throw new CatalogConflictException("already_exists",
-                    "Skill with externalId '" + request.externalId() + "' already exists");
+                    "Skill with name '" + request.name() + "' already exists");
 
-        var cfg = new SkillConfig(Ids.generate(), request.name(), request.instructions(), request.externalId());
+        var cfg = new SkillConfig(Ids.generate(), request.name(), request.instructions());
         skills.register(cfg);
 
-        var created = skills.getByExternalId(request.externalId());
-        audit.record(CatalogAuditLog.SKILL, request.externalId(), CatalogAuditLog.CREATED,
+        var created = skills.byName(request.name());
+        audit.record(CatalogAuditLog.SKILL, created.id(), CatalogAuditLog.CREATED,
                 null, null, toJson(cfg));
 
         return Response.status(Response.Status.CREATED)
@@ -104,22 +98,17 @@ public class SkillsResource {
         requireNonBlank(request.instructions(), "instructions");
 
         var existing = resolve(ref);
-        if (existing == null) throw new NotFoundException("No skill with id, externalId or name: " + ref);
-
-        if (isPropertyDeclared(existing, propertyDeclaredExternalIds()))
-            throw new CatalogConflictException("property_declared",
-                    "Skill '" + existing.name() + "' is declared in application.properties and is read-only");
+        if (existing == null) throw new NotFoundException("No skill with id or name: " + ref);
 
         var beforeJson = toJson(existing);
 
-        var cfg = new SkillConfig(existing.id(), request.name(), request.instructions(), existing.externalId());
+        var cfg = new SkillConfig(existing.id(), request.name(), request.instructions());
         agentican.registry().skills().register(cfg);
 
-        var key = existing.externalId() != null ? existing.externalId() : existing.id();
-        audit.record(CatalogAuditLog.SKILL, key, CatalogAuditLog.UPDATED,
+        audit.record(CatalogAuditLog.SKILL, existing.id(), CatalogAuditLog.UPDATED,
                 null, beforeJson, toJson(cfg));
 
-        return SkillSummary.of(resolve(key), false);
+        return SkillSummary.of(resolve(existing.id()), false);
     }
 
     @DELETE
@@ -127,24 +116,19 @@ public class SkillsResource {
     public Response delete(@PathParam("ref") String ref) {
 
         var existing = resolve(ref);
-        if (existing == null) throw new NotFoundException("No skill with id, externalId or name: " + ref);
-
-        if (isPropertyDeclared(existing, propertyDeclaredExternalIds()))
-            throw new CatalogConflictException("property_declared",
-                    "Skill '" + existing.name() + "' is declared in application.properties and is read-only");
+        if (existing == null) throw new NotFoundException("No skill with id or name: " + ref);
 
         var referring = referringPlans(existing);
         if (!referring.isEmpty())
             throw new CatalogConflictException("referenced",
-                    "Skill '" + existing.name() + "' is referenced by " + referring.size() + " plan(s)",
+                    "Skill '" + existing.name() + "' is referenced by " + referring.size() + " definition(s)",
                     referring);
 
         var beforeJson = toJson(existing);
 
         agentican.registry().skills().delete(ref);
 
-        var key = existing.externalId() != null ? existing.externalId() : existing.id();
-        audit.record(CatalogAuditLog.SKILL, key, CatalogAuditLog.DELETED,
+        audit.record(CatalogAuditLog.SKILL, existing.id(), CatalogAuditLog.DELETED,
                 null, beforeJson, null);
 
         return Response.noContent().build();
@@ -164,36 +148,24 @@ public class SkillsResource {
 
         var skills = agentican.registry().skills();
 
-        var byExt = skills.getByExternalId(ref);
-        if (byExt != null) return byExt;
-
-        var byId = skills.get(ref);
+        var byId = skills.byId(ref);
         if (byId != null) return byId;
 
-        return skills.getByName(ref);
+        return skills.byName(ref);
     }
 
-    private Set<String> propertyDeclaredExternalIds() {
+    private Set<String> configDeclaredNames() {
 
         var out = new HashSet<String>();
-        config.skills().forEach(s -> s.externalId().ifPresent(out::add));
+        runtimeConfig.skills().forEach(s -> out.add(s.name()));
         return out;
-    }
-
-    private static boolean isPropertyDeclared(SkillConfig skill, Set<String> propertyIds) {
-
-        var ext = skill.externalId();
-        return ext != null && propertyIds.contains(ext);
     }
 
     private List<String> referringPlans(SkillConfig skill) {
 
-        var plans = agentican.registry().plans();
+        var plans = agentican.registry().workflows();
 
-        var refs = new HashSet<String>();
-        refs.add(skill.id());
-        refs.add(skill.name());
-        if (skill.externalId() != null) refs.add(skill.externalId());
+        var refs = Set.of(skill.id(), skill.name());
 
         var hits = new HashSet<String>();
         for (var ref : refs)

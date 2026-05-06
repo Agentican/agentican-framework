@@ -1,9 +1,9 @@
 package ai.agentican.quarkus.rest;
 
 import ai.agentican.framework.hitl.HitlCheckpoint;
-import ai.agentican.framework.state.TaskLog;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.state.WorkflowRunLog;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.quarkus.event.HitlCheckpointEvent;
 import ai.agentican.quarkus.event.StepCompletedEvent;
 import ai.agentican.quarkus.event.TaskCompletedEvent;
@@ -38,16 +38,16 @@ class TaskEventBusTest {
         bus.stream("t1").subscribe().with(collectedT1::add);
         bus.stream("t2").subscribe().with(collectedT2::add);
 
-        var t1Log = new TaskLog("t1", "demo", task("demo"), Map.of());
-        var t2Log = new TaskLog("t2", "demo", task("demo"), Map.of());
+        var t1Log = new WorkflowRunLog("t1", "demo", task("demo"), Map.of());
+        var t2Log = new WorkflowRunLog("t2", "demo", task("demo"), Map.of());
 
         bus.onTaskStarted(new TaskStartedEvent("t1", "demo", t1Log));
         bus.onTaskStarted(new TaskStartedEvent("t2", "demo", t2Log));
 
-        bus.onStepCompleted(new StepCompletedEvent(null, "t1", "step-a", TaskStatus.COMPLETED));
+        bus.onStepCompleted(new StepCompletedEvent(null, "t1", "step-a", WorkflowRunStatus.COMPLETED));
 
-        bus.onTaskCompleted(new TaskCompletedEvent("t1", "demo", TaskStatus.COMPLETED, t1Log));
-        bus.onTaskCompleted(new TaskCompletedEvent("t2", "demo", TaskStatus.FAILED, t2Log));
+        bus.onTaskCompleted(new TaskCompletedEvent("t1", "demo", WorkflowRunStatus.COMPLETED, t1Log));
+        bus.onTaskCompleted(new TaskCompletedEvent("t2", "demo", WorkflowRunStatus.FAILED, t2Log));
 
         assertEquals(3, collectedT1.size());
 
@@ -91,8 +91,8 @@ class TaskEventBusTest {
         bus.onHitlCheckpoint(new HitlCheckpointEvent("t1", "sid", "s",
                 new HitlCheckpoint("ck-1", HitlCheckpoint.Type.STEP_OUTPUT, "s", "d", "c")));
 
-        bus.onTaskCompleted(new TaskCompletedEvent("t1", "demo", TaskStatus.COMPLETED,
-                new TaskLog("t1", "demo", task("demo"), Map.of())));
+        bus.onTaskCompleted(new TaskCompletedEvent("t1", "demo", WorkflowRunStatus.COMPLETED,
+                new WorkflowRunLog("t1", "demo", task("demo"), Map.of())));
 
         assertEquals(0, bus.pendingFor("t1").size());
         assertTrue(completed[0], "Stream should complete on TaskCompletedEvent");
@@ -116,10 +116,10 @@ class TaskEventBusTest {
     @Test
     void replayBufferDeliversMissedEventsOnReconnect() {
 
-        var log = new TaskLog("t1", "demo", task("demo"), Map.of());
+        var log = new WorkflowRunLog("t1", "demo", task("demo"), Map.of());
 
         bus.onTaskStarted(new TaskStartedEvent("t1", "demo", log));
-        bus.onStepCompleted(new StepCompletedEvent(null, "t1", "s", TaskStatus.COMPLETED));
+        bus.onStepCompleted(new StepCompletedEvent(null, "t1", "s", WorkflowRunStatus.COMPLETED));
 
         var replayed = new CopyOnWriteArrayList<SequencedEvent>();
         bus.stream("t1", -1).subscribe().with(replayed::add);
@@ -128,7 +128,7 @@ class TaskEventBusTest {
         assertEquals(0, replayed.get(0).id());
         assertEquals(1, replayed.get(1).id());
 
-        bus.onStepCompleted(new StepCompletedEvent(null, "t1", "s2", TaskStatus.COMPLETED));
+        bus.onStepCompleted(new StepCompletedEvent(null, "t1", "s2", WorkflowRunStatus.COMPLETED));
         assertEquals(3, replayed.size());
         assertEquals(2, replayed.get(2).id());
     }
@@ -136,11 +136,11 @@ class TaskEventBusTest {
     @Test
     void replayFromMiddleSkipsEarlierEvents() {
 
-        var log = new TaskLog("t1", "demo", task("demo"), Map.of());
+        var log = new WorkflowRunLog("t1", "demo", task("demo"), Map.of());
 
         bus.onTaskStarted(new TaskStartedEvent("t1", "demo", log));
-        bus.onStepCompleted(new StepCompletedEvent(null, "t1", "s", TaskStatus.COMPLETED));
-        bus.onStepCompleted(new StepCompletedEvent(null, "t1", "s2", TaskStatus.COMPLETED));
+        bus.onStepCompleted(new StepCompletedEvent(null, "t1", "s", WorkflowRunStatus.COMPLETED));
+        bus.onStepCompleted(new StepCompletedEvent(null, "t1", "s2", WorkflowRunStatus.COMPLETED));
 
         var replayed = new CopyOnWriteArrayList<SequencedEvent>();
         bus.stream("t1", 1).subscribe().with(replayed::add);
@@ -152,10 +152,10 @@ class TaskEventBusTest {
     @Test
     void completedTaskReplaysThenCompletes() {
 
-        var log = new TaskLog("t1", "demo", task("demo"), Map.of());
+        var log = new WorkflowRunLog("t1", "demo", task("demo"), Map.of());
 
         bus.onTaskStarted(new TaskStartedEvent("t1", "demo", log));
-        bus.onTaskCompleted(new TaskCompletedEvent("t1", "demo", TaskStatus.COMPLETED, log));
+        bus.onTaskCompleted(new TaskCompletedEvent("t1", "demo", WorkflowRunStatus.COMPLETED, log));
 
         var replayed = new CopyOnWriteArrayList<SequencedEvent>();
         var completed = new boolean[] { false };
@@ -165,8 +165,8 @@ class TaskEventBusTest {
         assertEquals(0, replayed.size());
     }
 
-    private static Plan task(String name) {
+    private static WorkflowDefinition task(String name) {
 
-        return Plan.builder(name).description("d").step("s", "a", "i").build();
+        return WorkflowDefinition.builder(name).description("d").step("s", "a", "i").build();
     }
 }

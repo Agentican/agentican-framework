@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.rest;
 
 import ai.agentican.framework.hitl.HitlCheckpoint;
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.quarkus.event.*;
 import ai.agentican.quarkus.rest.sse.EventTimeline;
 import ai.agentican.quarkus.rest.sse.SequencedEvent;
@@ -22,17 +22,17 @@ public class TaskEventBus {
 
     private static final int DEFAULT_BUFFER_CAPACITY = 100;
 
-    @Inject TaskStateStore taskStateStore;
+    @Inject WorkflowRunStore workflowRunStore;
 
     private final ConcurrentMap<String, EventTimeline> timelines = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, List<HitlCheckpoint>> pendingCheckpoints = new ConcurrentHashMap<>();
 
-    public void onPlanStarted(@Observes PlanStartedEvent event) {
+    public void onPlanStarted(@Observes WfRunStartedEvent event) {
 
         emitAndBubble(event.taskId(), event);
     }
 
-    public void onPlanCompleted(@Observes PlanCompletedEvent event) {
+    public void onPlanCompleted(@Observes WfRunCompletedEvent event) {
 
         emitAndBubble(event.taskId(), event);
     }
@@ -127,13 +127,13 @@ public class TaskEventBus {
 
         timelineFor(taskId).emit(event);
 
-        var taskLog = taskStateStore != null ? taskStateStore.load(taskId) : null;
+        var taskLog = workflowRunStore != null ? workflowRunStore.load(taskId) : null;
         var guard = 0;
 
         while (taskLog != null && taskLog.parentTaskId() != null && guard++ < 32) {
 
             timelineFor(taskLog.parentTaskId()).emit(event);
-            taskLog = taskStateStore.load(taskLog.parentTaskId());
+            taskLog = workflowRunStore.load(taskLog.parentTaskId());
         }
     }
 

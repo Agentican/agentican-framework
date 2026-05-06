@@ -24,20 +24,22 @@ public class DealDiscount {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var desk = agentican.agentTask(TASK_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var desk = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(DealContext.class)
-                    .output(DiscountDecision.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
                     .hitl(true)
+                    .input(DealContext.class)
+                    .output(DiscountDecision.class)
                     .build();
 
-            var decision = desk.runAsync(deal()).join();
+            var decision = desk.start(deal()).future().join();
 
             print(decision);
         }

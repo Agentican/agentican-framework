@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.rest.dto;
 
-import ai.agentican.framework.state.TaskLog;
+import ai.agentican.framework.state.WorkflowRunLog;
 
 import java.time.Instant;
 import java.util.List;
@@ -21,7 +21,7 @@ public record TaskLogView(
         long cacheReadTokens,
         long cacheWriteTokens) {
 
-    public static TaskLogView of(TaskLog log) {
+    public static TaskLogView of(WorkflowRunLog log) {
 
         var steps = log.steps().values().stream()
                 .map(StepLogView::of)

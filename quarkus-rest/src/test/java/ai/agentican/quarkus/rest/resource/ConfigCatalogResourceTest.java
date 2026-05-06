@@ -12,8 +12,6 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -36,7 +34,7 @@ class ConfigCatalogResourceTest {
                 .statusCode(200)
                 .body("agents", notNullValue())
                 .body("skills", notNullValue())
-                .body("plans", notNullValue());
+                .body("workflows", notNullValue());
     }
 
     @Test
@@ -49,23 +47,23 @@ class ConfigCatalogResourceTest {
                 .header("Content-Disposition", containsString("catalog.yaml"))
                 .body(containsString("agents"))
                 .body(containsString("skills"))
-                .body(containsString("plans"));
+                .body(containsString("workflows"));
     }
 
     @Test
     void dryRunImportReportsCountsWithoutMutating() {
 
-        var externalId = "dry-imp-" + System.nanoTime();
+        var name = "dry-analyst-" + System.nanoTime();
 
         var body = """
                 {
                   "agents": [
-                    {"externalId": "%s", "name": "dry-analyst", "role": "Reviews", "llm": null}
+                    {"name": "%s", "role": "Reviews", "llm": null}
                   ],
                   "skills": [],
-                  "plans": []
+                  "workflows": []
                 }
-                """.formatted(externalId);
+                """.formatted(name);
 
         given().contentType("application/json").body(body).queryParam("dryRun", true)
                 .when().post("/agentican/config/import")
@@ -75,26 +73,23 @@ class ConfigCatalogResourceTest {
                 .body("agents.created", is(1))
                 .body("errors", hasSize(0));
 
-        given().when().get("/agentican/config/export")
-                .then()
-                .statusCode(200)
-                .body("agents.externalId", org.hamcrest.Matchers.not(hasItem(externalId)));
+        given().when().get("/agentican/agents/" + name).then().statusCode(404);
     }
 
     @Test
     void importRoundTripCreatesThenUpdates() {
 
-        var externalId = "imp-" + System.nanoTime();
+        var name = "imp-analyst-" + System.nanoTime();
 
         var createBody = """
                 {
                   "agents": [
-                    {"externalId": "%s", "name": "imp-analyst", "role": "Initial role", "llm": null}
+                    {"name": "%s", "role": "Initial role", "llm": null}
                   ],
                   "skills": [],
-                  "plans": []
+                  "workflows": []
                 }
-                """.formatted(externalId);
+                """.formatted(name);
 
         try {
 
@@ -109,12 +104,12 @@ class ConfigCatalogResourceTest {
             var updateBody = """
                     {
                       "agents": [
-                        {"externalId": "%s", "name": "imp-analyst", "role": "Updated role", "llm": null}
+                        {"name": "%s", "role": "Updated role", "llm": null}
                       ],
                       "skills": [],
-                      "plans": []
+                      "workflows": []
                     }
-                    """.formatted(externalId);
+                    """.formatted(name);
 
             given().contentType("application/json").body(updateBody)
                     .when().post("/agentican/config/import")
@@ -123,65 +118,37 @@ class ConfigCatalogResourceTest {
                     .body("agents.created", is(0))
                     .body("agents.updated", is(1));
 
-            given().when().get("/agentican/agents/" + externalId)
+            given().when().get("/agentican/agents/" + name)
                     .then()
                     .statusCode(200)
                     .body("role", equalTo("Updated role"));
         }
         finally {
 
-            given().when().delete("/agentican/agents/" + externalId).then()
+            given().when().delete("/agentican/agents/" + name).then()
                     .statusCode(anyOf(is(204), is(404)));
         }
     }
 
     @Test
-    void importSkipsPropertyDeclaredEntries() {
-
-        var body = """
-                {
-                  "agents": [
-                    {"externalId": "researcher", "name": "researcher", "role": "overridden by import", "llm": null}
-                  ],
-                  "skills": [],
-                  "plans": []
-                }
-                """;
-
-        given().contentType("application/json").body(body)
-                .when().post("/agentican/config/import")
-                .then()
-                .statusCode(200)
-                .body("agents.skipped", greaterThanOrEqualTo(1))
-                .body("agents.created", is(0))
-                .body("agents.updated", is(0));
-
-        given().when().get("/agentican/agents/researcher")
-                .then()
-                .statusCode(200)
-                .body("role", equalTo("Expert at finding information"));
-    }
-
-    @Test
     void importInvalidPlanRecordsError() {
 
-        var externalId = "bad-imp-plan-" + System.nanoTime();
+        var name = "bad-imp-definition-" + System.nanoTime();
 
         var body = """
                 {
                   "agents": [],
                   "skills": [],
-                  "plans": [
+                  "workflows": [
                     {
-                      "name": "imp-bad",
-                      "externalId": "%s",
+                      "name": "%s",
                       "outputStep": "ghost",
                       "params": [],
                       "steps": [
                         {
                           "type": "agent",
                           "name": "ghost",
-                          "agentId": "nonexistent-agent",
+                          "agentName": "nonexistent-agent",
                           "instructions": "work",
                           "dependencies": [],
                           "hitl": false,
@@ -192,31 +159,30 @@ class ConfigCatalogResourceTest {
                     }
                   ]
                 }
-                """.formatted(externalId);
+                """.formatted(name);
 
         given().contentType("application/json").body(body)
                 .when().post("/agentican/config/import")
                 .then()
                 .statusCode(200)
-                .body("plans.skipped", is(1))
-                .body("plans.created", is(0))
+                .body("workflows.skipped", is(1))
+                .body("workflows.created", is(0))
                 .body("errors", hasSize(1));
     }
 
     @Test
     void importYamlBodyParses() {
 
-        var externalId = "yaml-imp-" + System.nanoTime();
+        var name = "yaml-analyst-" + System.nanoTime();
 
         var body = """
                 agents:
-                  - externalId: %s
-                    name: yaml-analyst
+                  - name: %s
                     role: Came in via YAML
                     llm: null
                 skills: []
-                plans: []
-                """.formatted(externalId);
+                workflows: []
+                """.formatted(name);
 
         try {
 
@@ -229,7 +195,7 @@ class ConfigCatalogResourceTest {
         }
         finally {
 
-            given().when().delete("/agentican/agents/" + externalId).then()
+            given().when().delete("/agentican/agents/" + name).then()
                     .statusCode(anyOf(is(204), is(404)));
         }
     }

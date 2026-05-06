@@ -1,51 +1,85 @@
 package ai.agentican.framework.registry;
 
 import ai.agentican.framework.agent.Agent;
+import ai.agentican.framework.config.AgentConfig;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
 
 public class AgentRegistryMemory implements AgentRegistry {
 
     private final ConcurrentMap<String, Agent> byId = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Agent> byName = new ConcurrentHashMap<>();
 
-    @Override
-    public void register(Agent agent) {
+    private Function<AgentConfig, Agent> agentFactory;
 
-        byId.put(agent.id(), agent);
-        byName.put(agent.name(), agent);
+    @Override
+    public void agentFactory(Function<AgentConfig, Agent> factory) {
+
+        this.agentFactory = factory;
     }
 
     @Override
-    public boolean isRegistered(String id) {
+    public Agent register(Agent agent) {
+
+        byId.put(agent.id(), agent);
+        byName.put(agent.name(), agent);
+
+        return agent;
+    }
+
+    @Override
+    public Agent register(AgentConfig config) {
+
+        if (agentFactory == null)
+            throw new IllegalStateException(
+                    "AgentRegistry has no factory set; call agentFactory(...) before register(AgentConfig)");
+
+        return register(agentFactory.apply(config));
+    }
+
+    @Override
+    public Agent registerIfAbsent(Agent agent) {
+
+        var existing = byId.putIfAbsent(agent.id(), agent);
+
+        if (existing != null) return existing;
+
+        byName.putIfAbsent(agent.name(), agent);
+
+        return agent;
+    }
+
+    @Override
+    public boolean hasById(String id) {
 
         return byId.containsKey(id);
     }
 
     @Override
-    public boolean isRegisteredByName(String name) {
+    public boolean hasByName(String name) {
 
         return byName.containsKey(name);
     }
 
     @Override
-    public Agent get(String id) {
+    public Agent byId(String id) {
 
         return byId.get(id);
     }
 
     @Override
-    public Agent getByName(String name) {
+    public Agent byName(String name) {
 
         return byName.get(name);
     }
 
     @Override
-    public Collection<Agent> getAll() {
+    public Collection<Agent> list() {
 
         return Collections.unmodifiableCollection(byId.values());
     }
@@ -59,8 +93,8 @@ public class AgentRegistryMemory implements AgentRegistry {
     @Override
     public void delete(String ref) {
 
-        var agent = getByExternalId(ref);
-        if (agent == null) agent = byId.get(ref);
+        var agent = byId.get(ref);
+
         if (agent == null) agent = byName.get(ref);
 
         if (agent == null) return;

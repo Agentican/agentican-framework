@@ -15,9 +15,6 @@ public class SkillEntity extends PanacheEntityBase {
     @Id
     public String id;
 
-    @Column(name = "external_id", unique = true)
-    public String externalId;
-
     @Column(nullable = false)
     public String name;
 

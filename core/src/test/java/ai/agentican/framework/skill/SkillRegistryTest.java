@@ -12,29 +12,29 @@ class SkillRegistryTest {
     void registerAndGet() {
 
         var registry = new SkillRegistryMemory();
-        var skill = new SkillConfig("summarize", "Summarize", "Summarize long text", null);
+        var skill = new SkillConfig("summarize", "Summarize", "Summarize long text");
 
         registry.register(skill);
 
-        assertSame(skill, registry.get("summarize"));
-        assertTrue(registry.isRegistered("summarize"));
-        assertFalse(registry.isRegistered("unknown"));
-        assertSame(skill, registry.getByName("Summarize"));
+        assertSame(skill, registry.byId("summarize"));
+        assertTrue(registry.hasById("summarize"));
+        assertFalse(registry.hasById("unknown"));
+        assertSame(skill, registry.byName("Summarize"));
     }
 
     @Test
     void registerIfAbsentIsFirstWins() {
 
         var registry = new SkillRegistryMemory();
-        var first = new SkillConfig("cite", "Cite Claims", "First version", null);
-        var second = new SkillConfig("cite", "Cite Claims", "Second version", null);
+        var first = new SkillConfig("cite", "Cite Claims", "First version");
+        var second = new SkillConfig("cite", "Cite Claims", "Second version");
 
         var kept = registry.registerIfAbsent(first);
         var rejected = registry.registerIfAbsent(second);
 
         assertSame(first, kept);
         assertSame(first, rejected);
-        assertSame(first, registry.get("cite"));
+        assertSame(first, registry.byId("cite"));
     }
 
     @Test
@@ -42,10 +42,10 @@ class SkillRegistryTest {
 
         var registry = new SkillRegistryMemory();
 
-        registry.register(new SkillConfig("a", "A Skill", "A", null));
-        registry.register(new SkillConfig("b", "B Skill", "B", null));
+        registry.register(new SkillConfig("a", "A Skill", "A"));
+        registry.register(new SkillConfig("b", "B Skill", "B"));
 
-        assertEquals(2, registry.getAll().size());
+        assertEquals(2, registry.list().size());
         assertEquals(2, registry.asMap().size());
     }
 
@@ -54,7 +54,7 @@ class SkillRegistryTest {
 
         var registry = new SkillRegistryMemory();
 
-        assertNull(registry.get("nope"));
-        assertNull(registry.getByName("nope"));
+        assertNull(registry.byId("nope"));
+        assertNull(registry.byName("nope"));
     }
 }

@@ -15,15 +15,16 @@ public class EmailTriage {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var triage = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var triage = agentican.workflow(PLAN_NAME)
                     .input(Inbox.class)
                     .output(TriageSummary.class)
                     .build();
 
-            var summary = triage.runAsync(inbox()).join();
+            var summary = triage.start(inbox()).future().join();
 
             print(summary);
         }

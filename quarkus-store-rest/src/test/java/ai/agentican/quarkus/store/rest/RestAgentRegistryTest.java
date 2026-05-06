@@ -27,18 +27,19 @@ class RestAgentRegistryTest {
     void seedUsesFactoryToBuildAgents() {
 
         var rows = List.of(
-                new RestAgentView("a-1", "Analyst", "Market analyst", "default", "ext.analyst"),
-                new RestAgentView("a-2", "Writer",  "Copywriter",     "default", null));
+                new RestAgentView("a-1", "Analyst", "Market analyst", "default"),
+                new RestAgentView("a-2", "Writer",  "Copywriter",     "default"));
 
         var client = new FakeRestCatalogClient("[]", rows, List.of());
         var registry = registryWith(client);
 
-        registry.seed(cfg -> new Agent(cfg, DUMMY_RUNNER));
+        registry.agentFactory(cfg -> new Agent(cfg, DUMMY_RUNNER));
+        registry.seed();
 
-        assertEquals(2, registry.getAll().size());
-        assertEquals("Analyst", registry.getByName("Analyst").name());
-        assertEquals("Market analyst", registry.getByName("Analyst").role());
-        assertEquals("default", registry.getByName("Analyst").config().llm());
+        assertEquals(2, registry.list().size());
+        assertEquals("Analyst", registry.byName("Analyst").name());
+        assertEquals("Market analyst", registry.byName("Analyst").role());
+        assertEquals("default", registry.byName("Analyst").config().llm());
     }
 
     @Test
@@ -46,7 +47,7 @@ class RestAgentRegistryTest {
 
         var registry = registryWith(new FakeRestCatalogClient("[]", List.of(), List.of()));
 
-        assertThrows(IllegalArgumentException.class, () -> registry.seed(null));
+        assertThrows(IllegalStateException.class, registry::seed);
     }
 
     @Test
@@ -60,9 +61,9 @@ class RestAgentRegistryTest {
         };
 
         var registry = registryWith(client);
+        registry.agentFactory(cfg -> new Agent(cfg, DUMMY_RUNNER));
 
-        var ex = assertThrows(IllegalStateException.class,
-                () -> registry.seed(cfg -> new Agent(cfg, DUMMY_RUNNER)));
+        var ex = assertThrows(IllegalStateException.class, registry::seed);
         assertTrue(ex.getMessage().contains("Failed to seed agents"));
     }
 
@@ -70,14 +71,15 @@ class RestAgentRegistryTest {
     void registerAddsLocalAgent() {
 
         var registry = registryWith(new FakeRestCatalogClient("[]", List.of(), List.of()));
-        registry.seed(cfg -> new Agent(cfg, DUMMY_RUNNER));
+        registry.agentFactory(cfg -> new Agent(cfg, DUMMY_RUNNER));
+        registry.seed();
 
-        var cfg = new AgentConfig("a-local", "Local", "Local agent", "default", "ext.local");
+        var cfg = new AgentConfig("a-local", "Local", "Local agent", "default", null, null, null);
         var agent = new Agent(cfg, DUMMY_RUNNER);
 
         registry.register(agent);
 
-        assertEquals(agent, registry.get("a-local"));
-        assertEquals(agent, registry.getByName("Local"));
+        assertEquals(agent, registry.byId("a-local"));
+        assertEquals(agent, registry.byName("Local"));
     }
 }

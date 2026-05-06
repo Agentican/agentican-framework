@@ -17,17 +17,18 @@ public class FraudTriage {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var triage = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var triage = agentican.workflow(PLAN_NAME)
                     .input(FlaggedBatch.class)
                     .output(ActionList.class)
                     .build();
 
-            var actions = triage.runAsync(batch()).join();
+            var actions = triage.start(batch()).future().join();
 
             print(actions);
         }

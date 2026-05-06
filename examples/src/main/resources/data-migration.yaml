@@ -8,14 +8,12 @@ agents:
       progress while preserving a real rollback. Insists on explicit cutover
       windows (with timezone) and never waves away the window where a
       customer-facing error is possible. Refuses plans without a named rollback.
-    externalId: infrastructure-lead
 
   - name: Runbook Author
     role: |
       Converts approved migration plans into operator-ready runbooks. Every step
       names the exact command, the expected output, the failure action, and the
       person on the hook. No implicit "check logs" steps.
-    externalId: runbook-author
 
 skills:
   - name: Migration planning
@@ -25,7 +23,6 @@ skills:
       moment in the plan where a customer-facing error is possible. Do not
       accept "zero downtime" without a dual-write strategy; do not accept
       rollback-by-time-travel without a named snapshot.
-    externalId: migration-planning
 
   - name: Runbook writing
     instructions: |
@@ -33,11 +30,9 @@ skills:
       (one line), failure action ("if output does not match, run X and page Y"),
       and owner. The runbook ends with an explicit acceptance check — the step
       the operator runs to confirm migration success.
-    externalId: runbook-writing
 
-plans:
+workflows:
   - name: Data Migration Plan
-    externalId: data-migration-plan
     outputStep: runbook
     params:
       - name: current_system
@@ -60,7 +55,7 @@ plans:
           Current system: {{param.current_system}}
           Target system: {{param.target_system}}
           Constraints: {{param.constraints}}
-      - name: plan
+      - name: definition
         agent: Infrastructure Lead
         skills: [Migration planning]
         dependencies: [analyze]
@@ -75,7 +70,7 @@ plans:
       - name: runbook
         agent: Runbook Author
         skills: [Runbook writing]
-        dependencies: [plan]
+        dependencies: [definition]
         instructions: |
           Convert this approved migration plan into an operator-ready runbook:
 

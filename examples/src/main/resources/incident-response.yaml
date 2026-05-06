@@ -14,7 +14,6 @@ agents:
       criticality, gathers diagnostic context from error rates and deployment history,
       and produces structured triage reports — severity, affected services, blast-radius
       estimate, likely contributing factors.
-    externalId: site-reliability-engineer
 
   - name: Software Engineer
     role: |
@@ -24,7 +23,6 @@ agents:
       stakeholder updates. Investigates causes starting from recent deployment history to
       their service, not hunches. Never silently closes an incident without a clear
       resolution note the next responder can reconstruct.
-    externalId: software-engineer
 
 skills:
   - name: Incident runbook
@@ -37,11 +35,9 @@ skills:
       Response SLAs — P1: page on-call immediately, war room within 15 minutes, stakeholder
       update within 30 minutes. P2: page within 30 minutes, incident ticket within 1 hour.
       P3/P4: ticket created, triaged in next business day standup.
-    externalId: incident-runbook
 
-plans:
+workflows:
   - name: Incident Response
-    externalId: incident-response
     outputStep: triage
     params:
       - name: alert

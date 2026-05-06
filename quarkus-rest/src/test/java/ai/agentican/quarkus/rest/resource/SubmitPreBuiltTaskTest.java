@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.rest.resource;
 
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -21,10 +21,10 @@ class SubmitPreBuiltTaskTest {
     @Test
     void submitWithPreBuiltTaskReturnsTaskId() throws Exception {
 
-        var step = new PlanStepAgent("research", "researcher", "do something",
+        var step = new WorkflowStepAgent("research", "researcher", "do something",
                 List.of(), false, List.of(), List.of());
 
-        var task = Plan.builder("rest-prebuilt-task").description("test description").step(step).build();
+        var task = WorkflowDefinition.builder("rest-prebuilt-task").description("test description").step(step).build();
 
         var taskJson = objectMapper.writeValueAsString(task);
 

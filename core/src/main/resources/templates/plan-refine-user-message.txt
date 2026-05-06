@@ -1,6 +1,6 @@
-<initial-plan>
+<initial-definition>
 {planJson}
-</initial-plan>
+</initial-definition>
 
 <registered-agents>{#for agent in agents}
   <agent>
@@ -26,5 +26,5 @@
     <description>{tool.description}</description>
     <input-schema>{tool.schema}</input-schema>
   </tool>{/for}{#if tools.isEmpty}
-  <none>The initial plan referenced no tools; no refinement of tool-specific detail is required.</none>{/if}
+  <none>The initial definition referenced no tools; no refinement of tool-specific detail is required.</none>{/if}
 </tool-schemas>

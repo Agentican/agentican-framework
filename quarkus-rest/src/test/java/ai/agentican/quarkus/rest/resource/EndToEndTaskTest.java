@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.rest.resource;
 
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.orchestration.model.Plan;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import ai.agentican.quarkus.test.MockLlmClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
@@ -37,9 +37,9 @@ class EndToEndTaskTest {
 
         mockLlm.queueEndTurn("Here is the research result about agent frameworks.");
 
-        var step = new PlanStepAgent("research", "researcher", "Find papers on agents",
+        var step = new WorkflowStepAgent("research", "researcher", "Find papers on agents",
                 List.of(), false, List.of(), List.of());
-        var task = Plan.builder("e2e-prebuilt").description("E2E test task").step(step).build();
+        var task = WorkflowDefinition.builder("e2e-prebuilt").description("E2E test task").step(step).build();
         var taskJson = objectMapper.writeValueAsString(task);
 
         var taskId = given()
@@ -74,9 +74,9 @@ class EndToEndTaskTest {
 
         mockLlm.queueEndTurn("Result from list test.");
 
-        var step = new PlanStepAgent("work", "researcher", "Do something",
+        var step = new WorkflowStepAgent("work", "researcher", "Do something",
                 List.of(), false, List.of(), List.of());
-        var task = Plan.builder("e2e-list").description("List test").step(step).build();
+        var task = WorkflowDefinition.builder("e2e-list").description("List test").step(step).build();
         var taskJson = objectMapper.writeValueAsString(task);
 
         var taskId = given()

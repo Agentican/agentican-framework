@@ -1,8 +1,8 @@
 package ai.agentican.quarkus.rest.resource;
 
-import ai.agentican.framework.state.TaskLog;
-import ai.agentican.framework.store.TaskStateStore;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.state.WorkflowRunLog;
+import ai.agentican.framework.store.WorkflowRunStore;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.quarkus.rest.TaskEventBus;
 import ai.agentican.quarkus.rest.TaskService;
 import ai.agentican.quarkus.rest.dto.SubmitTaskRequest;
@@ -46,7 +46,7 @@ public class TasksResource {
     TaskService taskService;
 
     @Inject
-    TaskStateStore taskStateStore;
+    WorkflowRunStore workflowRunStore;
 
     @Inject
     TaskEventBus eventBus;
@@ -78,11 +78,11 @@ public class TasksResource {
                         : taskService.submit(request.task(), inputs);
 
         var location = uriInfo.getAbsolutePathBuilder()
-                .path(handle.taskId())
+                .path(handle.id())
                 .build();
 
         return Response.created(location)
-                .entity(new SubmitTaskResponse(handle.taskId()))
+                .entity(new SubmitTaskResponse(handle.id()))
                 .build();
     }
 
@@ -95,12 +95,12 @@ public class TasksResource {
                 ? DEFAULT_LIMIT
                 : Math.min(Math.max(limit, 1), MAX_LIMIT);
 
-        var stream = taskStateStore.list().stream()
+        var stream = workflowRunStore.list().stream()
                 .sorted(Comparator.comparing(log -> log.createdAt(), Comparator.reverseOrder()));
 
         if (status != null && !status.isBlank()) {
             var match = status.equalsIgnoreCase("RUNNING") ? null
-                    : TaskStatus.valueOf(status.toUpperCase());
+                    : WorkflowRunStatus.valueOf(status.toUpperCase());
             stream = stream.filter(log -> log.status() == match);
         }
 
@@ -213,9 +213,9 @@ public class TasksResource {
         return param != null ? param : -1;
     }
 
-    private TaskLog loadOrThrow(String taskId) {
+    private WorkflowRunLog loadOrThrow(String taskId) {
 
-        var log = taskStateStore.load(taskId);
+        var log = workflowRunStore.load(taskId);
 
         if (log == null)
             throw new NotFoundException("No task with id: " + taskId);

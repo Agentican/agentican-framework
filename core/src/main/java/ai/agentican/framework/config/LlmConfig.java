@@ -29,10 +29,10 @@ public record LlmConfig(
                         "model is required for provider 'bedrock' (e.g. 'anthropic.claude-sonnet-4-5-20250929-v1:0')");
 
             if (apiKey != null && !apiKey.isBlank() && (secretKey == null || secretKey.isBlank()))
-                throw new IllegalArgumentException(
-                        "secretKey is required when apiKey is set for provider 'bedrock'");
+                throw new IllegalArgumentException("secretKey is required when apiKey is set for provider 'bedrock'");
 
-        } else {
+        }
+        else {
 
             if (apiKey == null || apiKey.isBlank())
                 throw new IllegalArgumentException("LLM API key is required");
@@ -41,8 +41,7 @@ public record LlmConfig(
         }
 
         if ("openai-compatible".equals(provider) && (baseUrl == null || baseUrl.isBlank()))
-            throw new IllegalArgumentException(
-                    "baseUrl is required when provider is 'openai-compatible'");
+            throw new IllegalArgumentException("baseUrl is required when provider is 'openai-compatible'");
     }
 
     public static LlmConfigBuilder builder() {

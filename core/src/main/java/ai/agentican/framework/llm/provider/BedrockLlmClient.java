@@ -24,6 +24,10 @@ import software.amazon.awssdk.services.bedrockruntime.model.Message;
 import software.amazon.awssdk.services.bedrockruntime.model.StopReason;
 import software.amazon.awssdk.services.bedrockruntime.model.SystemContentBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.Tool;
+import software.amazon.awssdk.services.bedrockruntime.model.ToolResultBlock;
+import software.amazon.awssdk.services.bedrockruntime.model.ToolResultContentBlock;
+import software.amazon.awssdk.services.bedrockruntime.model.ToolResultStatus;
+import software.amazon.awssdk.services.bedrockruntime.model.ToolUseBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.ToolConfiguration;
 import software.amazon.awssdk.services.bedrockruntime.model.ToolInputSchema;
 import software.amazon.awssdk.services.bedrockruntime.model.ToolSpecification;
@@ -82,10 +86,12 @@ public class BedrockLlmClient {
                 .text(request.systemPrompt())
                 .build();
 
-        var userMessage = Message.builder()
-                .role(ConversationRole.USER)
-                .content(ContentBlock.fromText(buildUserText(request)))
-                .build();
+        var messages = request.messages().isEmpty()
+                ? List.of(Message.builder()
+                        .role(ConversationRole.USER)
+                        .content(ContentBlock.fromText(buildUserText(request)))
+                        .build())
+                : translateMessages(request.messages());
 
         var inferenceBuilder = InferenceConfiguration.builder().maxTokens(maxTokens);
         if (temperature != null) inferenceBuilder.temperature(temperature);
@@ -93,7 +99,7 @@ public class BedrockLlmClient {
         var converseBuilder = ConverseRequest.builder()
                 .modelId(modelId)
                 .system(systemBlock)
-                .messages(userMessage)
+                .messages(messages)
                 .inferenceConfig(inferenceBuilder.build());
 
         if (request.tools() != null && !request.tools().isEmpty()) {
@@ -124,6 +130,47 @@ public class BedrockLlmClient {
         var response = client.converse(converseBuilder.build());
 
         return translate(response);
+    }
+
+    private static List<Message> translateMessages(List<ai.agentican.framework.llm.Message> messages) {
+
+        var out = new ArrayList<Message>(messages.size());
+
+        for (var msg : messages) {
+
+            var contents = new ArrayList<ContentBlock>();
+
+            for (var block : msg.blocks()) {
+
+                switch (block) {
+
+                    case ai.agentican.framework.llm.Message.TextBlock t ->
+                            contents.add(ContentBlock.fromText(t.text()));
+
+                    case ai.agentican.framework.llm.Message.ToolUseBlock tu ->
+                            contents.add(ContentBlock.fromToolUse(ToolUseBlock.builder()
+                                    .toolUseId(tu.id())
+                                    .name(tu.toolName())
+                                    .input(toDocument(tu.args()))
+                                    .build()));
+
+                    case ai.agentican.framework.llm.Message.ToolResultBlock tr ->
+                            contents.add(ContentBlock.fromToolResult(ToolResultBlock.builder()
+                                    .toolUseId(tr.toolUseId())
+                                    .content(ToolResultContentBlock.fromText(tr.content()))
+                                    .status(tr.isError() ? ToolResultStatus.ERROR : ToolResultStatus.SUCCESS)
+                                    .build()));
+                }
+            }
+
+            out.add(Message.builder()
+                    .role(msg.role() == ai.agentican.framework.llm.Message.Role.USER
+                            ? ConversationRole.USER : ConversationRole.ASSISTANT)
+                    .content(contents)
+                    .build());
+        }
+
+        return out;
     }
 
     private static String buildUserText(LlmRequest request) {

@@ -7,7 +7,7 @@ import ai.agentican.framework.llm.ToolCall;
 import ai.agentican.framework.orchestration.execution.resume.ResumeClassifier;
 import ai.agentican.framework.orchestration.execution.resume.ResumePlan;
 import ai.agentican.framework.orchestration.execution.resume.TurnResumeState;
-import ai.agentican.framework.store.TaskStateStoreMemory;
+import ai.agentican.framework.store.WorkflowRunStoreMemory;
 import ai.agentican.framework.tools.ToolDefinition;
 import ai.agentican.framework.tools.ToolResult;
 import ai.agentican.framework.tools.Toolkit;
@@ -37,12 +37,12 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeWithNoSavedTurnsBehavesAsFreshRun() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
         var mockLlm = new MockLlmClient().onSend("", endTurn("Fresh completion"));
 
         var runner = SmacAgentRunner.builder()
                 .llmClient(mockLlm.toLlmClient())
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .maxIterations(3)
                 .build();
 
@@ -64,12 +64,12 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeStartedNoMessageAbandonsTurnAndRunsFresh() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
         var mockLlm = new MockLlmClient().onSend("", endTurn("Completed after resume"));
 
         var runner = SmacAgentRunner.builder()
                 .llmClient(mockLlm.toLlmClient())
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .maxIterations(3)
                 .build();
 
@@ -87,8 +87,8 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.Plan.builder("p").description("")
-                        .step(new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p").description("")
+                        .step(new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                                 "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
                         .build());
 
@@ -108,7 +108,7 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeToolsPartialReExecutesOnlyMissingTools() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         var toolkit = new MockToolkit(List.of(
                 new ToolDefinition("FOO", "foo tool", Map.of("x", Map.of("type", "string")))
@@ -118,7 +118,7 @@ class SmacAgentRunnerResumeTest {
 
         var runner = SmacAgentRunner.builder()
                 .llmClient(mockLlm.toLlmClient())
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .maxIterations(3)
                 .build();
 
@@ -133,7 +133,7 @@ class SmacAgentRunnerResumeTest {
         store.turnStarted(taskId, runId, turnId);
 
         store.messageSent(taskId, turnId,
-                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c"));
+                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
 
         var tc1 = new ToolCall("tc-1", "FOO", Map.of("x", "a"));
         var tc2 = new ToolCall("tc-2", "FOO", Map.of("x", "b"));
@@ -149,8 +149,8 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.Plan.builder("p").description("")
-                        .step(new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p").description("")
+                        .step(new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                                 "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
                         .build());
 
@@ -177,7 +177,7 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeResponseReceivedExecutesAllToolsWithoutReCallingLlm() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         var toolkit = new MockToolkit(List.of(
                 new ToolDefinition("BAR", "bar tool", Map.of())
@@ -187,7 +187,7 @@ class SmacAgentRunnerResumeTest {
 
         var runner = SmacAgentRunner.builder()
                 .llmClient(mockLlm.toLlmClient())
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .maxIterations(3)
                 .build();
 
@@ -202,7 +202,7 @@ class SmacAgentRunnerResumeTest {
         store.turnStarted(taskId, runId, turnId);
 
         store.messageSent(taskId, turnId,
-                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c"));
+                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
 
         var tc = new ToolCall("tc-1", "BAR", Map.of());
         var response = new ai.agentican.framework.llm.LlmResponse(
@@ -213,8 +213,8 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.Plan.builder("p").description("")
-                        .step(new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p").description("")
+                        .step(new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                                 "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
                         .build());
 
@@ -233,13 +233,13 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeMessageSentAbandonsTurnTokenPathLeavesNoWasteBeyondOneRequest() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         var mockLlm = new MockLlmClient().onSend("", endTurn("Done after resume"));
 
         var runner = SmacAgentRunner.builder()
                 .llmClient(mockLlm.toLlmClient())
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .maxIterations(3)
                 .build();
 
@@ -253,14 +253,14 @@ class SmacAgentRunnerResumeTest {
         store.runStarted(taskId, stepId, runId, "resume-agent");
         store.turnStarted(taskId, runId, deadTurnId);
         store.messageSent(taskId, deadTurnId,
-                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c"));
+                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
 
         var taskLog = store.load(taskId);
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.Plan.builder("p").description("")
-                        .step(new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p").description("")
+                        .step(new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                                 "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
                         .build());
 
@@ -278,13 +278,13 @@ class SmacAgentRunnerResumeTest {
     @Test
     void resumeClosedEndTurnShortCircuitsWithoutCallingLlm() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         var mockLlm = new MockLlmClient();
 
         var runner = SmacAgentRunner.builder()
                 .llmClient(mockLlm.toLlmClient())
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .maxIterations(3)
                 .build();
 
@@ -298,7 +298,7 @@ class SmacAgentRunnerResumeTest {
         store.runStarted(taskId, stepId, runId, "resume-agent");
         store.turnStarted(taskId, runId, turnId);
         store.messageSent(taskId, turnId,
-                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c"));
+                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
 
         var response = new ai.agentican.framework.llm.LlmResponse(
                 "all done", List.of(), StopReason.END_TURN, 1, 1, 0, 0, 0);
@@ -309,8 +309,8 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.Plan.builder("p").description("")
-                        .step(new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p").description("")
+                        .step(new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                                 "work", "resume-agent", "do it", List.of(), false, List.of(), List.of()))
                         .build());
 

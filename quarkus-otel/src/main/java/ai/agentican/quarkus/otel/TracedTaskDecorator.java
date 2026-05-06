@@ -1,11 +1,11 @@
 package ai.agentican.quarkus.otel;
 
-import ai.agentican.framework.orchestration.execution.TaskDecorator;
+import ai.agentican.framework.orchestration.execution.WorkflowRunDecorator;
 import io.opentelemetry.context.Context;
 
 import java.util.function.Supplier;
 
-public class TracedTaskDecorator implements TaskDecorator {
+public class TracedTaskDecorator implements WorkflowRunDecorator {
 
     @Override
     public <T> Supplier<T> decorate(Supplier<T> task) {
@@ -22,11 +22,11 @@ public class TracedTaskDecorator implements TaskDecorator {
     }
 
     @Override
-    public TaskDecorator snapshot() {
+    public WorkflowRunDecorator snapshot() {
 
         var snapshotContext = Context.current();
 
-        return new TaskDecorator() {
+        return new WorkflowRunDecorator() {
 
             @Override
             public <T> Supplier<T> decorate(Supplier<T> task) {

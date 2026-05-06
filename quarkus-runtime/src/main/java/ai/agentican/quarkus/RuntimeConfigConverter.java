@@ -1,39 +1,30 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.ComposioConfig;
 import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.config.McpConfig;
 import ai.agentican.framework.config.RuntimeConfig;
-import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.config.WorkerConfig;
+
+import java.util.ArrayList;
+import java.util.List;
 
 final class RuntimeConfigConverter {
 
     private RuntimeConfigConverter() {}
 
-    static RuntimeConfig toRuntimeConfig(AgenticanConfig source) {
+    static RuntimeConfig fromProperties(AgenticanConfig source) {
 
-        var llms = new java.util.ArrayList<LlmConfig>();
-        var mcps = new java.util.ArrayList<McpConfig>();
-        var agents = new java.util.ArrayList<AgentConfig>();
-        var skills = new java.util.ArrayList<SkillConfig>();
+        var llms = new ArrayList<LlmConfig>();
+        var mcps = new ArrayList<McpConfig>();
 
         source.llm().forEach(llm -> llms.add(toLlmConfig(llm)));
         source.mcp().forEach(mcp -> mcps.add(toMcpConfig(mcp)));
-        source.agents().forEach(agent -> agents.add(toAgentConfig(agent)));
-        source.skills().forEach(skill -> skills.add(toSkillConfig(skill)));
 
         var worker = source.agentRunner().map(RuntimeConfigConverter::toWorkerConfig).orElse(null);
         var composio = source.composio().map(RuntimeConfigConverter::toComposioConfig).orElse(null);
 
-        return new RuntimeConfig(llms, mcps, composio, worker, agents, skills, java.util.List.of());
-    }
-
-    private static SkillConfig toSkillConfig(AgenticanConfig.SkillConfig source) {
-
-        return new SkillConfig(source.id().orElse(null), source.name(), source.instructions(),
-                source.externalId().orElse(null));
+        return new RuntimeConfig(llms, mcps, composio, worker, List.of(), List.of(), List.of(), source.strict());
     }
 
     private static LlmConfig toLlmConfig(AgenticanConfig.LlmConfig source) {
@@ -77,19 +68,6 @@ final class RuntimeConfigConverter {
 
         source.queryParams().forEach(builder::queryParam);
         source.headers().forEach(builder::header);
-
-        return builder.build();
-    }
-
-    private static AgentConfig toAgentConfig(AgenticanConfig.AgentConfig source) {
-
-        var builder = AgentConfig.builder()
-                .name(source.name())
-                .role(source.role());
-
-        source.id().ifPresent(builder::id);
-        source.externalId().ifPresent(builder::externalId);
-        source.llm().ifPresent(builder::llm);
 
         return builder.build();
     }

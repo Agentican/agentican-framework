@@ -9,7 +9,6 @@ agents:
       timestamps (or relative offsets when missing) and factual descriptions. Distinguishes
       detection, diagnostic and mitigation events. Flags timeline gaps explicitly rather
       than smoothing them over.
-    externalId: site-reliability-engineer
 
   - name: Principal Engineer
     role: |
@@ -18,7 +17,6 @@ agents:
       started it) from underlying conditions (what made the system vulnerable). Never
       stops at "human error"; asks why the system allowed the error to cause impact.
       Groups contributing factors by category: technical, process, organizational.
-    externalId: principal-engineer
 
   - name: Engineering Manager
     role: |
@@ -27,7 +25,6 @@ agents:
       follow, incorporates the verified timeline and contributing factors, and produces
       concrete action items with owner role, type (preventive / detective / corrective)
       and success criteria. Avoids hand-wavy "improve monitoring" action items.
-    externalId: engineering-manager
 
 skills:
   - name: Postmortem discipline
@@ -39,11 +36,9 @@ skills:
       items are concrete, owned, and measurable — each has a named owner role, a type
       (preventive, detective, corrective), and one-line success criteria. No "improve
       monitoring" or "do better next time."
-    externalId: postmortem-discipline
 
-plans:
+workflows:
   - name: Incident Postmortem
-    externalId: postmortem
     outputStep: draft
     params:
       - name: incident

@@ -9,7 +9,6 @@ agents:
       trend, support ticket volume, sentiment drift, feature engagement, contract
       recency — and produces numeric risk scores backed by concrete signals from the
       account summary. Avoids speculation; every signal cited maps to a data point.
-    externalId: account-manager
 
   - name: Customer Success Manager
     role: |
@@ -18,7 +17,6 @@ agents:
       accounts, executive business reviews for medium risk, named-sponsor save plans
       with root-cause investigation timelines for high risk. Every step in a plan
       names an owner and a date — no generic advice.
-    externalId: customer-success-manager
 
 skills:
   - name: Churn signals
@@ -30,11 +28,9 @@ skills:
       escalations, negative sentiment, executive-level friction, renewal approaching.
       Weight: usage trend (40%), sentiment (30%), ticket velocity (20%), feature adoption
       (10%).
-    externalId: churn-signals
 
-plans:
+workflows:
   - name: Churn Risk Assessment
-    externalId: churn-risk
     outputStep: analyze
     params:
       - name: account

@@ -10,7 +10,6 @@ agents:
       are already operating at the next level" decision. Calibrates compensation to
       stay in band with market and internal peers. Writes team announcements that are
       celebratory but name the new scope the person owns — never generic praise.
-    externalId: engineering-manager
 
 skills:
   - name: Promotion rubric
@@ -29,4 +28,3 @@ skills:
       is not evidence. If the evidence maps cleanly to the current level and not the
       next one, the decision is "strengthen and re-nominate next cycle" — draft the
       concrete gap the engineer should close.
-    externalId: promotion-rubric

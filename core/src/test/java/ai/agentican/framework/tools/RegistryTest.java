@@ -34,7 +34,7 @@ class RegistryTest {
 
         registry.register(agent);
 
-        assertSame(agent, registry.getByName("agent-1"));
+        assertSame(agent, registry.byName("agent-1"));
     }
 
     @Test
@@ -45,8 +45,8 @@ class RegistryTest {
         registry.register(dummyAgent("agent-1"));
         registry.register(dummyAgent("agent-2"));
 
-        assertTrue(registry.isRegisteredByName("agent-1"));
-        assertFalse(registry.isRegisteredByName("unknown"));
+        assertTrue(registry.hasByName("agent-1"));
+        assertFalse(registry.hasByName("unknown"));
         assertEquals(2, registry.asMap().size());
     }
 

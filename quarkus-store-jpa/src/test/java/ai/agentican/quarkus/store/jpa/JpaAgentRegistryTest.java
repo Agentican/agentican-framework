@@ -33,60 +33,49 @@ class JpaAgentRegistryTest {
     @Test
     void registerPersistsCatalogAndExposesInMemory() {
 
-        var cfg = new AgentConfig("ag-" + Ids.generate(), "Researcher", "Investigates topics", "claude", null);
+        var cfg = new AgentConfig("ag-" + Ids.generate(), "Researcher", "Investigates topics", "claude", null, null, null);
         var agent = Agent.builder().config(cfg).runner(NOOP_RUNNER).build();
 
         registry.register(agent);
 
-        assertTrue(registry.isRegistered(cfg.id()));
-        assertTrue(registry.isRegisteredByName("Researcher"));
-        assertSame(agent, registry.get(cfg.id()));
+        assertTrue(registry.hasById(cfg.id()));
+        assertTrue(registry.hasByName("Researcher"));
+        assertSame(agent, registry.byId(cfg.id()));
     }
 
     @Test
     void seedRehydratesFromCatalogViaFactory() {
 
         var id = "ag-" + Ids.generate();
-        var cfg = new AgentConfig(id, "Archivist", "Keeps records", "claude", "agent.archivist.v1");
+        var cfg = new AgentConfig(id, "Archivist", "Keeps records", "claude", null, null, null);
         registry.register(Agent.builder().config(cfg).runner(NOOP_RUNNER).build());
 
         var fresh = new JpaAgentRegistry();
-        fresh.seed(config -> Agent.builder().config(config).runner(NOOP_RUNNER).build());
+        fresh.agentFactory(config -> Agent.builder().config(config).runner(NOOP_RUNNER).build());
+        fresh.seed();
 
-        var rehydrated = fresh.get(id);
+        var rehydrated = fresh.byId(id);
         assertNotNull(rehydrated, "seed() should have rehydrated the agent from the catalog");
         assertEquals("Archivist", rehydrated.name());
         assertEquals("claude", rehydrated.config().llm());
     }
 
     @Test
-    void externalIdUpsertPreservesInternalIdAcrossDeploys() {
+    void registerSameIdUpdatesRowInPlace() {
 
-        var cfg1 = new AgentConfig(null, "Researcher", "Investigates topics", "claude", "researcher");
-        registry.register(Agent.builder().config(cfg1).runner(NOOP_RUNNER).build());
-        var firstInternalId = registry.getByExternalId("researcher").id();
+        var id = "ag-" + Ids.generate();
+        var first = new AgentConfig(id, "Researcher", "v1", "claude", null, null, null);
+        registry.register(Agent.builder().config(first).runner(NOOP_RUNNER).build());
 
-        var cfg2 = new AgentConfig(null, "Researcher", "Investigates topics, v2", "claude", "researcher");
-        registry.register(Agent.builder().config(cfg2).runner(NOOP_RUNNER).build());
-        var secondInternalId = registry.getByExternalId("researcher").id();
-
-        assertEquals(firstInternalId, secondInternalId,
-                "External-id upsert must preserve the DB's internal id across deploys");
-    }
-
-    @Test
-    void agentsWithoutExternalIdAreNotPersisted() {
-
-        var agent = new Agent(
-                AgentConfig.builder().id("ag-" + Ids.generate()).name("Ad-hoc").role("No catalog").build(),
-                NOOP_RUNNER);
-        registry.register(agent);
-
-        assertTrue(registry.isRegistered(agent.id()));
+        var second = new AgentConfig(id, "Researcher", "v2", "claude", null, null, null);
+        registry.register(Agent.builder().config(second).runner(NOOP_RUNNER).build());
 
         var fresh = new JpaAgentRegistry();
-        fresh.seed(config -> Agent.builder().config(config).runner(NOOP_RUNNER).build());
-        assertNull(fresh.get(agent.id()),
-                "Agents without an externalId shouldn't appear in the catalog");
+        fresh.agentFactory(config -> Agent.builder().config(config).runner(NOOP_RUNNER).build());
+        fresh.seed();
+
+        var rehydrated = fresh.byId(id);
+        assertNotNull(rehydrated, "Re-registering with the same id should update, not duplicate");
+        assertEquals("v2", rehydrated.config().role());
     }
 }

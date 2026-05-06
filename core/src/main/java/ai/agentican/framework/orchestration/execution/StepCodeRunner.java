@@ -3,9 +3,9 @@ package ai.agentican.framework.orchestration.execution;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.orchestration.code.CodeStep;
 import ai.agentican.framework.orchestration.code.CodeStepRegistry;
-import ai.agentican.framework.orchestration.code.StepContext;
-import ai.agentican.framework.orchestration.model.PlanStepCode;
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.orchestration.code.CodeStepContext;
+import ai.agentican.framework.orchestration.model.WorkflowStepCode;
+import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.framework.util.Json;
 import ai.agentican.framework.util.Placeholders;
 
@@ -26,18 +26,18 @@ class StepCodeRunner {
     private static final Logger LOG = LoggerFactory.getLogger(StepCodeRunner.class);
 
     private final CodeStepRegistry codeStepRegistry;
-    private final TaskStateStore taskStateStore;
+    private final WorkflowRunStore workflowRunStore;
     private final HitlManager hitlManager;
 
     StepCodeRunner(CodeStepRegistry codeStepRegistry,
-                   TaskStateStore taskStateStore, HitlManager hitlManager) {
+                   WorkflowRunStore workflowRunStore, HitlManager hitlManager) {
 
         this.codeStepRegistry = codeStepRegistry;
-        this.taskStateStore = taskStateStore;
+        this.workflowRunStore = workflowRunStore;
         this.hitlManager = hitlManager;
     }
 
-    TaskStepResult run(PlanStepCode<?> taskStep, Map<String, String> parentStepOutputs,
+    WorkflowStepResult run(WorkflowStepCode<?> taskStep, Map<String, String> parentStepOutputs,
                        Map<String, String> taskParams, AtomicBoolean cancelled,
                        String taskId, String stepId) {
 
@@ -47,9 +47,10 @@ class StepCodeRunner {
         if (registered == null) {
 
             var message = "No code step registered for slug '" + slug + "'";
+
             LOG.error(message);
 
-            return new TaskStepResult(taskStep.name(), TaskStatus.FAILED, message, List.of());
+            return new WorkflowStepResult(taskStep.name(), WorkflowRunStatus.FAILED, message, List.of());
         }
 
         LOG.info("Running code step '{}' (slug={})", taskStep.name(), slug);
@@ -60,34 +61,34 @@ class StepCodeRunner {
 
         try {
 
-            Object typedInput = resolveInput(taskStep.input(), inputType, parentStepOutputs, taskParams);
+            var typedInput = resolveInput(taskStep.input(), inputType, parentStepOutputs, taskParams);
 
-            var context = new StepContext(taskId, stepId, cancelled, taskStateStore, hitlManager);
+            var context = new CodeStepContext(taskId, stepId, cancelled, workflowRunStore, hitlManager);
 
             @SuppressWarnings({"unchecked", "rawtypes"})
-            Object output = ((CodeStep) registered.executor()).execute(typedInput, context);
+            var output = ((CodeStep) registered.executor()).execute(typedInput, context);
 
             var stored = serializeOutput(output, outputType);
 
-            return new TaskStepResult(taskStep.name(), TaskStatus.COMPLETED, stored, List.of());
+            return new WorkflowStepResult(taskStep.name(), WorkflowRunStatus.COMPLETED, stored, List.of());
 
         } catch (RuntimeException e) {
 
             LOG.error("Code step '{}' (slug={}) threw: {}", taskStep.name(), slug, e.getMessage(), e);
 
-            return new TaskStepResult(taskStep.name(), TaskStatus.FAILED,
+            return new WorkflowStepResult(taskStep.name(), WorkflowRunStatus.FAILED,
                     "Error: " + e.getMessage(), List.of(), e);
         }
     }
 
-    private Object resolveInput(Object planInputs, Class<?> inputType,
-                                Map<String, String> parentStepOutputs,
+    private Object resolveInput(Object planInputs, Class<?> inputType, Map<String, String> parentStepOutputs,
                                 Map<String, String> taskParams) {
 
         if (inputType == Void.class || planInputs == null)
             return null;
 
         var rawNode = planInputs instanceof JsonNode n ? n : Json.mapper().valueToTree(planInputs);
+
         var resolvedNode = resolvePlaceholders(rawNode, parentStepOutputs, taskParams);
 
         if (JsonNode.class.isAssignableFrom(inputType))
@@ -107,24 +108,29 @@ class StepCodeRunner {
         if (node instanceof ObjectNode obj) {
 
             var resolved = Json.mapper().createObjectNode();
+
             obj.fields().forEachRemaining(entry ->
-                    resolved.set(entry.getKey(),
-                            resolvePlaceholders(entry.getValue(), parentStepOutputs, taskParams)));
+                    resolved.set(entry.getKey(), resolvePlaceholders(entry.getValue(), parentStepOutputs, taskParams)));
+
             return resolved;
         }
 
         if (node instanceof ArrayNode arr) {
 
             var resolved = Json.mapper().createArrayNode();
+
             arr.forEach(child -> resolved.add(resolvePlaceholders(child, parentStepOutputs, taskParams)));
+
             return resolved;
         }
 
         if (node instanceof TextNode text) {
 
             var raw = text.asText();
+
             var afterParams = Placeholders.resolveParams(raw, taskParams);
             var afterSteps = Placeholders.resolveStepOutputsRaw(afterParams, parentStepOutputs);
+
             return raw.equals(afterSteps) ? text : new TextNode(afterSteps);
         }
 
@@ -140,9 +146,11 @@ class StepCodeRunner {
             return s;
 
         try {
+
             return Json.mapper().writeValueAsString(output);
         }
         catch (Exception e) {
+
             throw new RuntimeException("Failed to serialize code step output: " + e.getMessage(), e);
         }
     }

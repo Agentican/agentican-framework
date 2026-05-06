@@ -26,19 +26,21 @@ public class DashboardScope {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var scope = agentican.agentTask(TASK_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var scope = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(DashboardRequest.class)
-                    .output(DashboardSpec.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(DashboardRequest.class)
+                    .output(DashboardSpec.class)
                     .build();
 
-            var spec = scope.runAsync(request()).join();
+            var spec = scope.start(request()).future().join();
 
             print(spec);
         }

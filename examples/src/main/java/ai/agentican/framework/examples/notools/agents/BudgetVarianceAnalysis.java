@@ -23,17 +23,19 @@ public class BudgetVarianceAnalysis {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var analyst = agentican.agentTask(TASK_NAME)
+            var analyst = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(Variance.class)
-                    .output(Explanation.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(Variance.class)
+                    .output(Explanation.class)
                     .build();
 
-            var expl = analyst.runAsync(variance()).join();
+            var expl = analyst.start(variance()).future().join();
 
             print(expl);
         }
@@ -76,10 +78,10 @@ public class BudgetVarianceAnalysis {
 
     record Explanation(
 
-            @JsonPropertyDescription("One of: favorable (under plan), unfavorable (over plan)")
+            @JsonPropertyDescription("One of: favorable (under definition), unfavorable (over definition)")
             String direction,
 
-            @JsonPropertyDescription("Magnitude as percent-of-plan — e.g. '+35% over plan'")
+            @JsonPropertyDescription("Magnitude as percent-of-definition — e.g. '+35% over definition'")
             String magnitude,
 
             @JsonPropertyDescription("Most likely drivers, ordered by confidence")

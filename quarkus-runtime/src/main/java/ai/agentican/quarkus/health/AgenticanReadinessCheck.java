@@ -16,7 +16,7 @@ public class AgenticanReadinessCheck implements HealthCheck {
     Agentican agentican;
 
     @Inject
-    AgenticanConfig config;
+    ai.agentican.framework.config.RuntimeConfig runtimeConfig;
 
     @Override
     public HealthCheckResponse call() {
@@ -26,25 +26,24 @@ public class AgenticanReadinessCheck implements HealthCheck {
         if (agentican == null)
             return builder.down().withData("reason", "Agentican bean not initialized").build();
 
-        if (config.llm().isEmpty())
-            return builder.down().withData("reason", "No agentican.llm[*] entries configured").build();
+        if (runtimeConfig.llm().isEmpty())
+            return builder.down().withData("reason", "No LLMs configured").build();
 
-        for (var agentConfig : config.agents()) {
+        var registered = agentican.registry().agents().asMap().size();
+        var declared = runtimeConfig.agents().size();
 
-            var byId = agentConfig.id().map(id -> agentican.registry().agents().get(id)).orElse(null);
-            var byName = agentican.registry().agents().getByName(agentConfig.name());
+        if (registered < declared) {
 
-            if (byId == null && byName == null) {
-
-                return builder.down()
-                        .withData("reason", "Configured agent not registered: " + agentConfig.name())
-                        .build();
-            }
+            return builder.down()
+                    .withData("reason", "Configured agents not all registered")
+                    .withData("declared", declared)
+                    .withData("registered", registered)
+                    .build();
         }
 
         return builder.up()
-                .withData("llms", config.llm().size())
-                .withData("agents", config.agents().size())
+                .withData("llms", runtimeConfig.llm().size())
+                .withData("agents", registered)
                 .build();
     }
 }

@@ -1,8 +1,8 @@
 package ai.agentican.framework.knowledge;
 
-import ai.agentican.framework.orchestration.execution.TaskListener;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
+import ai.agentican.framework.store.WorkflowRunStore;
 
 import ai.agentican.framework.store.KnowledgeStore;
 import org.slf4j.Logger;
@@ -10,26 +10,26 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Executor;
 
-public class KnowledgeIngestor implements TaskListener {
+public class KnowledgeIngestor implements WorkflowRunListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(KnowledgeIngestor.class);
 
     static final String ACQUIRED_MARKER = "KNOWLEDGE_ACQUIRED";
 
-    private final TaskStateStore taskStateStore;
+    private final WorkflowRunStore workflowRunStore;
     private final KnowledgeStore knowledgeStore;
     private final KnowledgeExtractor extractor;
     private final Executor executor;
 
-    public KnowledgeIngestor(TaskStateStore taskStateStore, KnowledgeStore knowledgeStore,
+    public KnowledgeIngestor(WorkflowRunStore workflowRunStore, KnowledgeStore knowledgeStore,
                              KnowledgeExtractor extractor, Executor executor) {
 
-        if (taskStateStore == null) throw new IllegalArgumentException("taskStateStore is required");
+        if (workflowRunStore == null) throw new IllegalArgumentException("workflowRunStore is required");
         if (knowledgeStore == null) throw new IllegalArgumentException("knowledgeStore is required");
         if (extractor == null) throw new IllegalArgumentException("extractor is required");
         if (executor == null) throw new IllegalArgumentException("executor is required");
 
-        this.taskStateStore = taskStateStore;
+        this.workflowRunStore = workflowRunStore;
         this.knowledgeStore = knowledgeStore;
         this.extractor = extractor;
         this.executor = executor;
@@ -38,22 +38,22 @@ public class KnowledgeIngestor implements TaskListener {
     @Override
     public void onStepCompleted(String taskId, String stepId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         if (taskLog == null) return;
 
         var stepLog = taskLog.findStepById(stepId);
         if (stepLog == null) return;
 
-        if (stepLog.status() != TaskStatus.COMPLETED) return;
-
+        if (stepLog.status() != WorkflowRunStatus.COMPLETED) return;
         if (stepLog.runs().isEmpty()) return;
 
         var output = stepLog.output();
         if (output == null || output.isBlank()) return;
 
         if (!output.contains(ACQUIRED_MARKER)) {
-            LOG.debug("Step '{}' output has no {} marker; skipping extraction",
-                    stepLog.stepName(), ACQUIRED_MARKER);
+
+            LOG.debug("Step '{}' output has no {} marker; skipping extraction", stepLog.stepName(), ACQUIRED_MARKER);
+
             return;
         }
 
@@ -61,6 +61,7 @@ public class KnowledgeIngestor implements TaskListener {
 
         var firstRun = stepLog.runs().getFirst();
         var firstTurn = firstRun.turns().isEmpty() ? null : firstRun.turns().getFirst();
+
         var input = firstTurn != null && firstTurn.request() != null
                 ? firstTurn.request().userTask()
                 : null;
@@ -79,7 +80,9 @@ public class KnowledgeIngestor implements TaskListener {
             var extraction = extractor.extract(input, output, existing);
 
             if (extraction.isEmpty()) {
+
                 LOG.debug("No knowledge extracted from step '{}'", stepName);
+
                 return;
             }
 
@@ -90,12 +93,8 @@ public class KnowledgeIngestor implements TaskListener {
 
                 switch (entry.action()) {
 
-                    case CREATE -> {
-                        if (create(entry)) created++;
-                    }
-                    case UPDATE -> {
-                        if (update(entry)) updated++;
-                    }
+                    case CREATE -> { if (create(entry)) created++; }
+                    case UPDATE -> { if (update(entry)) updated++; }
                 }
             }
 
@@ -131,7 +130,9 @@ public class KnowledgeIngestor implements TaskListener {
         var target = knowledgeStore.get(entry.existingEntryId());
 
         if (target == null) {
+
             LOG.debug("UPDATE target not found, skipping: {}", entry.existingEntryId());
+
             return false;
         }
 
@@ -140,6 +141,7 @@ public class KnowledgeIngestor implements TaskListener {
         for (var fact : entry.facts()) target.addFact(fact);
 
         if (entry.name() != null && !entry.name().isBlank()) target.setName(entry.name());
+
         if (entry.description() != null && !entry.description().isBlank())
             target.setDescription(entry.description());
 

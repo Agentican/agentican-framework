@@ -10,7 +10,6 @@ agents:
       deadline), reply-needed (expects a response, no firm deadline), fyi-only, archive
       (promotional, automated). When ambiguous, leans toward action-required rather than
       quietly dropping a request.
-    externalId: executive-assistant
 
   - name: Operations Manager
     role: |
@@ -19,7 +18,6 @@ agents:
       flags patterns worth surfacing (three vendor emails about the same contract, a
       recurring sender the user always archives). Does not revisit individual triage
       decisions — trusts the assistant's call.
-    externalId: operations-manager
 
 skills:
   - name: Triage rules
@@ -31,11 +29,9 @@ skills:
       into. Archive: promotional, automated notifications, alerts the user has muted.
       Priority rules: senders in the user's org default one step higher priority; external
       senders require explicit signal to escalate beyond reply-needed.
-    externalId: triage-rules
 
-plans:
+workflows:
   - name: Email Triage
-    externalId: email-triage
     outputStep: summarize
     params:
       - name: emails

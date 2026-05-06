@@ -1021,7 +1021,7 @@ body {
 }
 .agent-field-value { color: var(--text); font-size: 13px; line-height: 1.4; }
 
-/* Steps list inside plan cards */
+/* Steps list inside definition cards */
 .plan-card-details {
   max-height: 0;
   overflow: hidden;

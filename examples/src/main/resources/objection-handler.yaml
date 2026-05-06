@@ -9,7 +9,6 @@ agents:
       objection — acknowledging the concern honestly rather than deflecting — and scores
       each strategy by situational fit (who the buyer is, where they are in the cycle,
       what they've said before). Avoids canned scripts that sound rehearsed.
-    externalId: sales-coach
 
 skills:
   - name: Objection playbook
@@ -21,11 +20,9 @@ skills:
       features is really trust. Cost-of-inaction: make the status quo feel expensive.
       Rules: no strategy starts with "but"; no response longer than 60 words spoken aloud;
       every response names one concrete next step.
-    externalId: objection-playbook
 
-plans:
+workflows:
   - name: Objection Handler
-    externalId: objection-handler
     params:
       - name: objection
         description: The customer's objection

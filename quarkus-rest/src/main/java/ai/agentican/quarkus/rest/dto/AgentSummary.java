@@ -8,7 +8,6 @@ public record AgentSummary(
         String name,
         String role,
         String llm,
-        String externalId,
         boolean declaredInConfig) {
 
     public static AgentSummary of(Agent agent, boolean declaredInConfig) {
@@ -18,7 +17,6 @@ public record AgentSummary(
                 agent.name(),
                 agent.role(),
                 agent.config().llm(),
-                agent.config().externalId(),
                 declaredInConfig);
     }
 }

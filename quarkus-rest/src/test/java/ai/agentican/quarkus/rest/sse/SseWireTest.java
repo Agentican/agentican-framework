@@ -1,8 +1,8 @@
 package ai.agentican.quarkus.rest.sse;
 
-import ai.agentican.framework.state.TaskLog;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.state.WorkflowRunLog;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.quarkus.event.StepCompletedEvent;
 import ai.agentican.quarkus.event.TaskCompletedEvent;
 import ai.agentican.quarkus.event.TaskStartedEvent;
@@ -57,8 +57,8 @@ class SseWireTest {
         var log = newTaskLog(taskId);
 
         bus.onTaskStarted(new TaskStartedEvent(taskId, "demo", log));
-        bus.onStepCompleted(new StepCompletedEvent(null, taskId, "s", TaskStatus.COMPLETED));
-        bus.onTaskCompleted(new TaskCompletedEvent(taskId, "demo", TaskStatus.COMPLETED, log));
+        bus.onStepCompleted(new StepCompletedEvent(null, taskId, "s", WorkflowRunStatus.COMPLETED));
+        bus.onTaskCompleted(new TaskCompletedEvent(taskId, "demo", WorkflowRunStatus.COMPLETED, log));
 
         assertTrue(latch.await(10, TimeUnit.SECONDS), "Should receive task_completed event");
         future.cancel(true);
@@ -74,9 +74,9 @@ class SseWireTest {
                 "SSE stream should contain id: lines for replay support");
     }
 
-    private static TaskLog newTaskLog(String taskId) {
+    private static WorkflowRunLog newTaskLog(String taskId) {
 
-        var task = Plan.builder("demo").description("d").step("s", "a", "i").build();
-        return new TaskLog(taskId, "demo", task, Map.of());
+        var task = WorkflowDefinition.builder("demo").description("d").step("s", "a", "i").build();
+        return new WorkflowRunLog(taskId, "demo", task, Map.of());
     }
 }

@@ -1,8 +1,8 @@
 package ai.agentican.quarkus.store.rest;
 
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanCodec;
-import ai.agentican.framework.registry.PlanRegistry;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowDefinitionCodec;
+import ai.agentican.framework.registry.WorkflowRegistry;
 import ai.agentican.framework.util.Json;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,20 +24,19 @@ import java.util.concurrent.ConcurrentMap;
 
 @ApplicationScoped
 @IfBuildProperty(name = "agentican.store.backend", stringValue = "rest")
-public class RestPlanRegistry implements PlanRegistry {
+public class RestPlanRegistry implements WorkflowRegistry {
 
     private static final Logger LOG = LoggerFactory.getLogger(RestPlanRegistry.class);
 
-    private final ConcurrentMap<String, Plan> byId = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, WorkflowDefinition> byId = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, String> idByName = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, String> idByExternalId = new ConcurrentHashMap<>();
 
     @Inject
     @RestClient
     RestCatalogClient client;
 
     @Inject
-    Instance<PlanCodec> planCodec;
+    Instance<WorkflowDefinitionCodec> planCodec;
 
     @Override
     public void seed() {
@@ -62,9 +61,6 @@ public class RestPlanRegistry implements PlanRegistry {
                 byId.put(plan.id(), plan);
                 idByName.put(plan.name(), plan.id());
 
-                if (plan.externalId() != null)
-                    idByExternalId.put(plan.externalId(), plan.id());
-
                 loaded++;
             }
 
@@ -80,23 +76,17 @@ public class RestPlanRegistry implements PlanRegistry {
     }
 
     @Override
-    public Plan register(Plan plan) {
+    public WorkflowDefinition register(WorkflowDefinition plan) {
 
         byId.put(plan.id(), plan);
         idByName.put(plan.name(), plan.id());
 
-        if (plan.externalId() != null)
-            idByExternalId.put(plan.externalId(), plan.id());
-
-        LOG.debug("Registered plan '{}' locally (not persisted to central catalog)", plan.name());
+        LOG.debug("Registered definition '{}' locally (not persisted to central catalog)", plan.name());
         return plan;
     }
 
     @Override
-    public Plan registerIfAbsent(Plan plan) {
-
-        if (plan.externalId() != null && idByExternalId.containsKey(plan.externalId()))
-            return byId.get(idByExternalId.get(plan.externalId()));
+    public WorkflowDefinition registerIfAbsent(WorkflowDefinition plan) {
 
         var existing = byId.putIfAbsent(plan.id(), plan);
 
@@ -104,37 +94,37 @@ public class RestPlanRegistry implements PlanRegistry {
 
         idByName.putIfAbsent(plan.name(), plan.id());
 
-        if (plan.externalId() != null)
-            idByExternalId.putIfAbsent(plan.externalId(), plan.id());
-
         return plan;
     }
 
     @Override
-    public Plan get(String name) {
+    public WorkflowDefinition byName(String name) {
 
         var id = idByName.get(name);
         return id != null ? byId.get(id) : null;
     }
 
     @Override
-    public Plan getById(String id) { return byId.get(id); }
+    public WorkflowDefinition byId(String id) { return byId.get(id); }
 
     @Override
-    public boolean isRegistered(String name) { return idByName.containsKey(name); }
+    public boolean hasById(String id) { return byId.containsKey(id); }
 
     @Override
-    public Collection<Plan> getAll() { return Collections.unmodifiableCollection(byId.values()); }
+    public boolean hasByName(String name) { return idByName.containsKey(name); }
 
     @Override
-    public Map<String, Plan> asMap() { return Collections.unmodifiableMap(byId); }
+    public Collection<WorkflowDefinition> list() { return Collections.unmodifiableCollection(byId.values()); }
 
-    private Plan readPlanFromView(JsonNode viewNode) {
+    @Override
+    public Map<String, WorkflowDefinition> asMap() { return Collections.unmodifiableMap(byId); }
 
-        var planNode = viewNode != null ? viewNode.get("plan") : null;
+    private WorkflowDefinition readPlanFromView(JsonNode viewNode) {
+
+        var planNode = viewNode != null ? viewNode.get("definition") : null;
 
         if (planNode == null || planNode.isNull()) {
-            LOG.warn("Catalog plan entry is missing 'plan' field; skipping");
+            LOG.warn("Catalog definition entry is missing 'definition' field; skipping");
             return null;
         }
 
@@ -146,16 +136,16 @@ public class RestPlanRegistry implements PlanRegistry {
         catch (Exception e) {
 
             var name = viewNode.hasNonNull("name") ? viewNode.get("name").asText() : "<unknown>";
-            LOG.warn("Failed to deserialize plan '{}': {}", name, e.getMessage());
+            LOG.warn("Failed to deserialize definition '{}': {}", name, e.getMessage());
             return null;
         }
     }
 
-    private Plan readPlan(String planJson) throws Exception {
+    private WorkflowDefinition readPlan(String planJson) throws Exception {
 
         if (planCodec != null && planCodec.isResolvable())
-            return planCodec.get().fromJson(planJson, Plan.class);
+            return planCodec.get().fromJson(planJson, WorkflowDefinition.class);
 
-        return Json.readValue(planJson, Plan.class);
+        return Json.readValue(planJson, WorkflowDefinition.class);
     }
 }

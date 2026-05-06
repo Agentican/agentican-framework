@@ -17,17 +17,18 @@ public class FeatureSpec {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var review = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var review = agentican.workflow(PLAN_NAME)
                     .input(FeatureTicket.class)
                     .output(EngineeringBreakdown.class)
                     .build();
 
-            var breakdown = review.runAsync(ticket()).join();
+            var breakdown = review.start(ticket()).future().join();
 
             print(breakdown);
         }

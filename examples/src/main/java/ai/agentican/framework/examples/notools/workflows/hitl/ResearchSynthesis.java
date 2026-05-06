@@ -17,17 +17,18 @@ public class ResearchSynthesis {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var synth = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var synth = agentican.workflow(PLAN_NAME)
                     .input(ResearchCorpus.class)
                     .output(ResearchBrief.class)
                     .build();
 
-            var brief = synth.runAsync(corpus()).join();
+            var brief = synth.start(corpus()).future().join();
 
             print(brief);
         }

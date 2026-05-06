@@ -9,7 +9,6 @@ agents:
       legal has reviewed the wording creates more risk than the vulnerability itself.
       Asks for patch availability and legal-review status if the report doesn't
       state them.
-    externalId: security-engineer
 
 skills:
   - name: Advisory writing
@@ -23,4 +22,3 @@ skills:
       the patch must be generally available, legal must have signed off on the
       wording, and comms must have agreed the send time. If any of these three is
       not confirmed in the report, ask — never infer or assume.
-    externalId: advisory-writing

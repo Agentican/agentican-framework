@@ -1,12 +1,12 @@
 package ai.agentican.quarkus.otel;
 
-import ai.agentican.framework.orchestration.execution.TaskListener;
+import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
 import ai.agentican.framework.agent.AgentStatus;
 import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.state.StepLog;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.framework.hitl.HitlCheckpoint;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.Span;
@@ -18,7 +18,7 @@ import io.opentelemetry.context.Scope;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-public class TracedLifecycleListener implements TaskListener {
+public class TracedLifecycleListener implements WorkflowRunListener {
 
     private static final String TASK_SPAN = "agentican.task";
     private static final String STEP_SPAN_PREFIX = "agentican.step ";
@@ -53,14 +53,14 @@ public class TracedLifecycleListener implements TaskListener {
     private static final AttributeKey<String> GEN_AI_FINISH = AttributeKey.stringKey("gen_ai.response.finish_reasons");
 
     private final Tracer tracer;
-    private final TaskStateStore taskStateStore;
+    private final WorkflowRunStore workflowRunStore;
     private final ConcurrentHashMap<String, SpanAndScope> spans = new ConcurrentHashMap<>();
     private final java.util.Set<String> resumedTaskIds = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    public TracedLifecycleListener(Tracer tracer, TaskStateStore taskStateStore) {
+    public TracedLifecycleListener(Tracer tracer, WorkflowRunStore workflowRunStore) {
 
         this.tracer = tracer;
-        this.taskStateStore = taskStateStore;
+        this.workflowRunStore = workflowRunStore;
     }
 
     @Override
@@ -77,7 +77,7 @@ public class TracedLifecycleListener implements TaskListener {
     @Override
     public void onTaskStarted(String taskId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
 
         var builder = tracer.spanBuilder(TASK_SPAN).setAttribute(TASK_ID, taskId);
         stampResumedIfApplicable(builder, taskId);
@@ -99,7 +99,7 @@ public class TracedLifecycleListener implements TaskListener {
     }
 
     @Override
-    public void onTaskCompleted(String taskId, TaskStatus status) {
+    public void onTaskCompleted(String taskId, WorkflowRunStatus status) {
 
         resumedTaskIds.remove(taskId);
 
@@ -107,12 +107,12 @@ public class TracedLifecycleListener implements TaskListener {
 
         if (entry == null) return;
 
-        if (status == TaskStatus.FAILED || status == TaskStatus.CANCELLED)
+        if (status == WorkflowRunStatus.FAILED || status == WorkflowRunStatus.CANCELLED)
             entry.span.setStatus(StatusCode.ERROR, status.name());
         else
             entry.span.setStatus(StatusCode.OK);
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
 
         if (taskLog != null && taskLog.completedAt() != null) {
 
@@ -157,7 +157,7 @@ public class TracedLifecycleListener implements TaskListener {
 
             entry.span.setAttribute(STEP_STATUS, status.name());
 
-            if (status == TaskStatus.FAILED || status == TaskStatus.CANCELLED)
+            if (status == WorkflowRunStatus.FAILED || status == WorkflowRunStatus.CANCELLED)
                 entry.span.setStatus(StatusCode.ERROR, status.name());
             else
                 entry.span.setStatus(StatusCode.OK);
@@ -177,7 +177,7 @@ public class TracedLifecycleListener implements TaskListener {
     @Override
     public void onRunStarted(String taskId, String runId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var run = taskLog != null ? taskLog.findRunById(runId) : null;
         var agentName = run != null && run.agentName() != null ? run.agentName() : "unknown";
 
@@ -208,7 +208,7 @@ public class TracedLifecycleListener implements TaskListener {
     @Override
     public void onTurnStarted(String taskId, String turnId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
         var turnIndex = turnLog != null ? turnLog.index() : 0;
 
@@ -257,7 +257,7 @@ public class TracedLifecycleListener implements TaskListener {
 
         entry.span.setStatus(StatusCode.OK);
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
 
         if (turnLog != null && turnLog.completedAt() != null) {
@@ -272,7 +272,7 @@ public class TracedLifecycleListener implements TaskListener {
     @Override
     public void onMessageSent(String taskId, String turnId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
         var request = turnLog != null ? turnLog.request() : null;
 
@@ -299,7 +299,7 @@ public class TracedLifecycleListener implements TaskListener {
 
         if (entry == null) return;
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
         var response = turnLog != null ? turnLog.response() : null;
 
@@ -323,7 +323,7 @@ public class TracedLifecycleListener implements TaskListener {
     @Override
     public void onToolCallStarted(String taskId, String toolCallId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var toolName = resolveToolNameByCallId(taskLog, toolCallId);
 
         var toolBuilder = tracer.spanBuilder(TOOL_SPAN).setAttribute(TOOL_NAME, toolName);
@@ -340,7 +340,7 @@ public class TracedLifecycleListener implements TaskListener {
 
         if (entry == null) return;
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var toolResult = resolveToolResultByCallId(taskLog, toolCallId);
 
         if (toolResult != null && toolResult.isError()) {
@@ -380,12 +380,12 @@ public class TracedLifecycleListener implements TaskListener {
 
     private StepLog resolveStepById(String taskId, String stepId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
 
         return taskLog != null ? taskLog.findStepById(stepId) : null;
     }
 
-    private static String resolveToolNameByCallId(ai.agentican.framework.state.TaskLog taskLog, String toolCallId) {
+    private static String resolveToolNameByCallId(ai.agentican.framework.state.WorkflowRunLog taskLog, String toolCallId) {
 
         if (taskLog == null) return "unknown";
 
@@ -399,7 +399,7 @@ public class TracedLifecycleListener implements TaskListener {
 
                         for (var tc : turn.response().toolCalls()) {
 
-                            if (toolCallId.equals(tc.id())) return tc.toolName();
+                            if (toolCallId.equals(tc.id())) return tc.name();
                         }
                     }
                 }
@@ -410,7 +410,7 @@ public class TracedLifecycleListener implements TaskListener {
     }
 
     private static ai.agentican.framework.tools.ToolResult resolveToolResultByCallId(
-            ai.agentican.framework.state.TaskLog taskLog, String toolCallId) {
+            ai.agentican.framework.state.WorkflowRunLog taskLog, String toolCallId) {
 
         if (taskLog == null) return null;
 

@@ -31,9 +31,7 @@ public class KnowledgeStoreMemory implements KnowledgeStore {
     @Override
     public List<KnowledgeEntry> indexed() {
 
-        return entries.values().stream()
-                .filter(e -> e.status() == KnowledgeStatus.INDEXED)
-                .toList();
+        return entries.values().stream().filter(e -> e.status() == KnowledgeStatus.INDEXED).toList();
     }
 
     @Override

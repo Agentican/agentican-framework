@@ -13,7 +13,6 @@ agents:
       validates completeness against required fields, cross-references vendors against
       the system, and normalizes amounts to USD. Flags missing PO numbers, unknown
       vendors, and duplicates. Escalates ambiguous cases rather than guessing.
-    externalId: accounts-payable-specialist
 
   - name: Finance Controller
     role: |
@@ -22,7 +21,6 @@ agents:
       range (flags deviations >10% from PO value), and the vendor is in good standing.
       Provides a clear approve, hold, or reject recommendation with the specific policy
       criteria that drove the decision. Never approves ambiguous cases — escalates them.
-    externalId: finance-controller
 
   - name: Treasury Analyst
     role: |
@@ -31,7 +29,6 @@ agents:
       the vendor contact and posts a summary to the internal finance channel. Logs
       transactions with audit-ready detail — approval chain, policy applied, settlement
       account — so month-end reconciliation is mechanical.
-    externalId: treasury-analyst
 
 skills:
   - name: AP policy
@@ -47,11 +44,9 @@ skills:
 
       Reject criteria: no PO number provided, vendor on the hold list, duplicate invoice
       number detected, or invoice dated more than 90 days in the past.
-    externalId: ap-policy
 
-plans:
+workflows:
   - name: Invoice Processing
-    externalId: invoice-processing
     outputStep: validate
     params:
       - name: email_id

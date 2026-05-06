@@ -27,17 +27,25 @@ public class RestAgentRegistry implements AgentRegistry {
 
     private final ConcurrentMap<String, Agent> byId = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, String> idByName = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, String> idByExternalId = new ConcurrentHashMap<>();
+
+    private Function<AgentConfig, Agent> agentFactory;
 
     @Inject
     @RestClient
     RestCatalogClient client;
 
     @Override
-    public void seed(Function<AgentConfig, Agent> factory) {
+    public void agentFactory(Function<AgentConfig, Agent> factory) {
 
-        if (factory == null)
-            throw new IllegalArgumentException("Agent factory is required for seed()");
+        this.agentFactory = factory;
+    }
+
+    @Override
+    public void seed() {
+
+        if (agentFactory == null)
+            throw new IllegalStateException(
+                    "RestAgentRegistry has no factory set; call agentFactory(...) before seed()");
 
         try {
 
@@ -47,14 +55,11 @@ public class RestAgentRegistry implements AgentRegistry {
 
             for (var row : rows) {
 
-                var cfg = new AgentConfig(row.id(), row.name(), row.role(), row.llm(), row.externalId());
-                var agent = factory.apply(cfg);
+                var cfg = new AgentConfig(row.id(), row.name(), row.role(), row.llm(), null, null, null);
+                var agent = agentFactory.apply(cfg);
 
                 byId.put(agent.id(), agent);
                 idByName.put(agent.name(), agent.id());
-
-                if (row.externalId() != null)
-                    idByExternalId.put(row.externalId(), agent.id());
             }
 
             if (!rows.isEmpty())
@@ -69,37 +74,51 @@ public class RestAgentRegistry implements AgentRegistry {
     }
 
     @Override
-    public void register(Agent agent) {
+    public Agent register(Agent agent) {
 
         byId.put(agent.id(), agent);
         idByName.put(agent.name(), agent.id());
 
-        var externalId = agent.config().externalId();
-
-        if (externalId != null)
-            idByExternalId.put(externalId, agent.id());
-
         LOG.debug("Registered agent '{}' locally (not persisted to central catalog)", agent.name());
+        return agent;
     }
 
     @Override
-    public boolean isRegistered(String id) { return byId.containsKey(id); }
+    public Agent register(AgentConfig config) {
+
+        if (agentFactory == null)
+            throw new IllegalStateException(
+                    "RestAgentRegistry has no factory set; call agentFactory(...) before register(AgentConfig)");
+
+        return register(agentFactory.apply(config));
+    }
 
     @Override
-    public boolean isRegisteredByName(String name) { return idByName.containsKey(name); }
+    public Agent registerIfAbsent(Agent agent) {
+
+        var existing = byId.get(agent.id());
+        if (existing != null) return existing;
+        return register(agent);
+    }
 
     @Override
-    public Agent get(String id) { return byId.get(id); }
+    public boolean hasById(String id) { return byId.containsKey(id); }
 
     @Override
-    public Agent getByName(String name) {
+    public boolean hasByName(String name) { return idByName.containsKey(name); }
+
+    @Override
+    public Agent byId(String id) { return byId.get(id); }
+
+    @Override
+    public Agent byName(String name) {
 
         var id = idByName.get(name);
         return id != null ? byId.get(id) : null;
     }
 
     @Override
-    public Collection<Agent> getAll() { return Collections.unmodifiableCollection(byId.values()); }
+    public Collection<Agent> list() { return Collections.unmodifiableCollection(byId.values()); }
 
     @Override
     public Map<String, Agent> asMap() { return Collections.unmodifiableMap(byId); }

@@ -28,36 +28,26 @@ public class JpaAgentRegistry implements AgentRegistry {
 
     private final ConcurrentMap<String, Agent> byId = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, String> idByName = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, String> idByExternalId = new ConcurrentHashMap<>();
+
+    private Function<AgentConfig, Agent> agentFactory;
+
+    @Override
+    public void agentFactory(Function<AgentConfig, Agent> factory) {
+
+        this.agentFactory = factory;
+    }
 
     @Override
     @Transactional
-    public void register(Agent agent) {
+    public Agent register(Agent agent) {
 
         var cfg = agent.config();
 
-        if (cfg.externalId() == null) {
-            LOG.debug("Agent '{}' has no externalId — skipping catalog persistence", agent.name());
-            byId.put(agent.id(), agent);
-            idByName.put(agent.name(), agent.id());
-            return;
-        }
+        var existing = (AgentEntity) AgentEntity.findById(agent.id());
+        var e = existing != null ? existing : new AgentEntity();
 
-        var existing = (AgentEntity) AgentEntity.find("externalId", cfg.externalId()).firstResult();
-        AgentEntity e;
-        Agent canonical = agent;
-
-        if (existing != null) {
-            e = existing;
-            if (!e.id.equals(agent.id())) {
-                var alignedCfg = new AgentConfig(e.id, cfg.name(), cfg.role(), cfg.llm(), cfg.externalId());
-                canonical = new Agent(alignedCfg, agent.runner());
-            }
-        }
-        else {
-            e = new AgentEntity();
+        if (existing == null) {
             e.id = agent.id();
-            e.externalId = cfg.externalId();
             e.createdAt = Instant.now();
         }
 
@@ -68,59 +58,73 @@ public class JpaAgentRegistry implements AgentRegistry {
 
         e.persist();
 
-        byId.put(canonical.id(), canonical);
-        idByName.put(canonical.name(), canonical.id());
-        idByExternalId.put(cfg.externalId(), canonical.id());
+        byId.put(agent.id(), agent);
+        idByName.put(agent.name(), agent.id());
+
+        return agent;
     }
 
     @Override
     @Transactional
-    public void seed(Function<AgentConfig, Agent> factory) {
+    public Agent register(AgentConfig config) {
 
-        if (factory == null)
-            throw new IllegalArgumentException("Agent factory is required for seed()");
+        if (agentFactory == null)
+            throw new IllegalStateException(
+                    "JpaAgentRegistry has no factory set; call agentFactory(...) before register(AgentConfig)");
+
+        return register(agentFactory.apply(config));
+    }
+
+    @Override
+    @Transactional
+    public Agent registerIfAbsent(Agent agent) {
+
+        var existing = byId.get(agent.id());
+        if (existing != null) return existing;
+        return register(agent);
+    }
+
+    @Override
+    @Transactional
+    public void seed() {
+
+        if (agentFactory == null)
+            throw new IllegalStateException(
+                    "JpaAgentRegistry has no factory set; call agentFactory(...) before seed()");
 
         java.util.List<AgentEntity> rows = AgentEntity.listAll();
 
         for (var row : rows) {
 
-            var cfg = new AgentConfig(row.id, row.name, row.role, row.llm, row.externalId);
-            var agent = factory.apply(cfg);
+            var cfg = new AgentConfig(row.id, row.name, row.role, row.llm, null, null, null);
+            var agent = agentFactory.apply(cfg);
 
             byId.put(agent.id(), agent);
             idByName.put(agent.name(), agent.id());
-            if (row.externalId != null)
-                idByExternalId.put(row.externalId, agent.id());
         }
 
         if (!rows.isEmpty())
             LOG.info("JpaAgentRegistry seeded {} agents from catalog", rows.size());
     }
 
-    public Agent getByExternalId(String externalId) {
-
-        var id = idByExternalId.get(externalId);
-        return id != null ? byId.get(id) : null;
-    }
+    @Override
+    public boolean hasById(String id) { return byId.containsKey(id); }
 
     @Override
-    public boolean isRegistered(String id) { return byId.containsKey(id); }
+    public boolean hasByName(String name) { return idByName.containsKey(name); }
 
     @Override
-    public boolean isRegisteredByName(String name) { return idByName.containsKey(name); }
+    public Agent byId(String id) { return byId.get(id); }
 
     @Override
-    public Agent get(String id) { return byId.get(id); }
-
-    @Override
-    public Agent getByName(String name) {
+    public Agent byName(String name) {
 
         var id = idByName.get(name);
         return id != null ? byId.get(id) : null;
     }
 
     @Override
-    public Collection<Agent> getAll() { return Collections.unmodifiableCollection(byId.values()); }
+    public Collection<Agent> list() { return Collections.unmodifiableCollection(byId.values()); }
 
     @Override
     public Map<String, Agent> asMap() { return Collections.unmodifiableMap(byId); }
@@ -136,26 +140,19 @@ public class JpaAgentRegistry implements AgentRegistry {
             return;
         }
 
-        var cfg = agent.config();
-
-        if (cfg.externalId() != null)
-            AgentEntity.delete("externalId", cfg.externalId());
+        AgentEntity.deleteById(agent.id());
 
         byId.remove(agent.id());
         idByName.remove(agent.name());
-        if (cfg.externalId() != null) idByExternalId.remove(cfg.externalId());
 
-        LOG.info("Agent '{}' (externalId={}) deleted from catalog", agent.name(), cfg.externalId());
+        LOG.info("Agent '{}' (id={}) deleted from catalog", agent.name(), agent.id());
     }
 
     private Agent resolve(String ref) {
 
-        var byExternal = getByExternalId(ref);
-        if (byExternal != null) return byExternal;
-
         var byIdHit = byId.get(ref);
         if (byIdHit != null) return byIdHit;
 
-        return getByName(ref);
+        return byName(ref);
     }
 }

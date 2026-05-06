@@ -15,15 +15,16 @@ public class ObjectionHandler {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var handler = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var handler = agentican.workflow(PLAN_NAME)
                     .input(ObjectionContext.class)
                     .output(ResponseSet.class)
                     .build();
 
-            var set = handler.runAsync(input()).join();
+            var set = handler.start(input()).future().join();
 
             print(set);
         }

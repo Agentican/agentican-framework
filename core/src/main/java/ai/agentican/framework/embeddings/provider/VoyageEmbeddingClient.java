@@ -16,12 +16,12 @@ import java.util.Map;
 public final class VoyageEmbeddingClient implements EmbeddingClient {
 
     private static final Map<String, Integer> NATIVE_DIMENSIONS = Map.of(
-            "voyage-3-large",   1024,
-            "voyage-3",         1024,
-            "voyage-3-lite",     512,
-            "voyage-code-3",    1024,
+            "voyage-3-large", 1024,
+            "voyage-3", 1024,
+            "voyage-3-lite", 512,
+            "voyage-code-3", 1024,
             "voyage-finance-2", 1024,
-            "voyage-law-2",     1024);
+            "voyage-law-2", 1024);
 
     private static final String DEFAULT_BASE_URL = "https://api.voyageai.com/v1/embeddings";
 
@@ -36,11 +36,11 @@ public final class VoyageEmbeddingClient implements EmbeddingClient {
                                   String model, int dimensions, Duration timeout) {
 
         this.httpClient = httpClient;
-        this.apiKey     = apiKey;
-        this.baseUrl    = baseUrl;
-        this.model      = model;
+        this.apiKey = apiKey;
+        this.baseUrl = baseUrl;
+        this.model = model;
         this.dimensions = dimensions;
-        this.timeout    = timeout;
+        this.timeout = timeout;
     }
 
     public static Builder builder() {
@@ -54,6 +54,7 @@ public final class VoyageEmbeddingClient implements EmbeddingClient {
         if (texts == null || texts.isEmpty()) return List.of();
 
         try {
+
             var body = Json.writeValueAsString(Map.of(
                     "input", texts,
                     "model", model));
@@ -69,70 +70,82 @@ public final class VoyageEmbeddingClient implements EmbeddingClient {
             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() < 200 || response.statusCode() >= 300)
-                throw new RuntimeException(
-                        "Voyage API error " + response.statusCode() + ": " + response.body());
+                throw new RuntimeException("Voyage API error " + response.statusCode() + ": " + response.body());
 
             return parseResponse(response.body());
         }
         catch (InterruptedException e) {
+
             Thread.currentThread().interrupt();
+
             throw new RuntimeException("Voyage embed interrupted", e);
         }
         catch (IOException e) {
+
             throw new RuntimeException("Voyage embed failed: " + e.getMessage(), e);
         }
     }
 
-    @Override public int    dimensions() { return dimensions; }
+    @Override
+    public int dimensions() {
 
-    @Override public String modelId()    { return "voyage:" + model; }
+        return dimensions;
+    }
+
+    @Override
+    public String modelId() {
+
+        return "voyage:" + model;
+    }
 
     private static List<float[]> parseResponse(String body) {
 
         try {
+
             var parsed = Json.mapper().readTree(body);
-            var data   = parsed.get("data");
+            var data = parsed.get("data");
 
             if (data == null || !data.isArray())
                 throw new RuntimeException("Voyage response missing 'data' array: " + body);
 
             var vectors = new ArrayList<float[]>(data.size());
+
             for (var item : data) {
 
                 var emb = item.get("embedding");
+
                 if (emb == null || !emb.isArray())
                     throw new RuntimeException("Voyage response item missing 'embedding' array");
 
                 var arr = new float[emb.size()];
+
                 for (var i = 0; i < emb.size(); i++) arr[i] = (float) emb.get(i).asDouble();
+
                 vectors.add(arr);
             }
+
             return vectors;
         }
         catch (Exception e) {
+
             throw new RuntimeException("Voyage failed to parse response: " + e.getMessage(), e);
         }
     }
 
     public static final class Builder {
 
-        private String     apiKey;
-        private String     baseUrl    = DEFAULT_BASE_URL;
-        private String     model      = "voyage-3";
-        private Integer    dimensions;
-        private Duration   timeout    = Duration.ofSeconds(60);
+        private String apiKey;
+        private String baseUrl = DEFAULT_BASE_URL;
+        private String model = "voyage-3";
+        private Integer dimensions;
+        private Duration timeout = Duration.ofSeconds(60);
         private HttpClient httpClient;
 
         public Builder apiKey(String apiKey)         { this.apiKey = apiKey; return this; }
-
         public Builder baseUrl(String baseUrl)       { this.baseUrl = baseUrl; return this; }
-
         public Builder model(String model)           { this.model = model; return this; }
-
         public Builder dimensions(int dimensions)    { this.dimensions = dimensions; return this; }
-
         public Builder timeout(Duration timeout)     { this.timeout = timeout; return this; }
-
         public Builder httpClient(HttpClient client) { this.httpClient = client; return this; }
 
         public VoyageEmbeddingClient build() {
@@ -144,16 +157,21 @@ public final class VoyageEmbeddingClient implements EmbeddingClient {
                 throw new IllegalArgumentException("Voyage model is required");
 
             int resolvedDim;
+
             if (dimensions != null) {
+
                 resolvedDim = dimensions;
             }
             else {
+
                 var native_ = NATIVE_DIMENSIONS.get(model);
+
                 if (native_ == null)
                     throw new IllegalArgumentException(
                             "Unknown native dimensions for Voyage model '" + model
                           + "'. Call .dimensions(int) explicitly or use a known model: "
                           + NATIVE_DIMENSIONS.keySet());
+
                 resolvedDim = native_;
             }
 

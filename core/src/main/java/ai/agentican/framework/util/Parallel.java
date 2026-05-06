@@ -34,8 +34,8 @@ public class Parallel {
 
                             MDC.clear();
                         }
-                    }))
-                    .toList();
+
+                    })).toList();
 
             scope.join();
 

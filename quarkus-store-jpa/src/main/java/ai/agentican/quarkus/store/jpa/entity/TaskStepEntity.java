@@ -9,16 +9,16 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 @Entity
-@Table(name = "task_steps")
+@Table(name = "workflow_run_steps")
 public class TaskStepEntity extends PanacheEntityBase {
 
     @Id
     public String id;
 
-    @Column(name = "task_id", nullable = false)
+    @Column(name = "workflow_run_id", nullable = false)
     public String taskId;
 
-    @Column(name = "plan_step_id")
+    @Column(name = "workflow_step_id")
     public String planStepId;
 
     @Column(name = "step_name")

@@ -21,17 +21,19 @@ public class BrandTaglines {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var generator = agentican.agentTask(TASK_NAME)
+            var generator = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(Brief.class)
-                    .output(TaglineSet.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(Brief.class)
+                    .output(TaglineSet.class)
                     .build();
 
-            var set = generator.runAsync(brief()).join();
+            var set = generator.start(brief()).future().join();
 
             print(set);
         }

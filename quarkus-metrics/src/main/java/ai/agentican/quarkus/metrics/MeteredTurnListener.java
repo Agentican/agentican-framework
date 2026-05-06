@@ -1,9 +1,9 @@
 package ai.agentican.quarkus.metrics;
 
-import ai.agentican.framework.orchestration.execution.TaskListener;
+import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
 import ai.agentican.framework.agent.AgentStatus;
 import ai.agentican.framework.llm.StopReason;
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.framework.tools.ToolResult;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -11,22 +11,22 @@ import io.micrometer.core.instrument.Timer;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-public class MeteredTurnListener implements TaskListener {
+public class MeteredTurnListener implements WorkflowRunListener {
 
     private final MeterRegistry registry;
-    private final TaskStateStore taskStateStore;
+    private final WorkflowRunStore workflowRunStore;
     private final ConcurrentHashMap<String, Timer.Sample> toolTimers = new ConcurrentHashMap<>();
 
-    public MeteredTurnListener(MeterRegistry registry, TaskStateStore taskStateStore) {
+    public MeteredTurnListener(MeterRegistry registry, WorkflowRunStore workflowRunStore) {
 
         this.registry = registry;
-        this.taskStateStore = taskStateStore;
+        this.workflowRunStore = workflowRunStore;
     }
 
     @Override
     public void onRunCompleted(String taskId, String runId, AgentStatus status) {
 
-        var run = taskStateStore.load(taskId).findRunById(runId);
+        var run = workflowRunStore.load(taskId).findRunById(runId);
 
         var agentName = run != null && run.agentName() != null ? run.agentName() : "unknown";
 
@@ -36,7 +36,7 @@ public class MeteredTurnListener implements TaskListener {
     @Override
     public void onResponseReceived(String taskId, String turnId, StopReason stopReason) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
 
         var response = turnLog != null ? turnLog.response() : null;
@@ -88,7 +88,7 @@ public class MeteredTurnListener implements TaskListener {
 
         var sample = toolTimers.remove(toolCallId);
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
 
         ToolResult toolResult = null;
 

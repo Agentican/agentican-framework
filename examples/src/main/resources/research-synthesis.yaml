@@ -7,7 +7,6 @@ agents:
       Clusters raw interview and usability-test notes into themes grounded in
       verbatim quotes. Never smooths a participant's language into corporate
       register. Refuses to cluster by what seems convenient.
-    externalId: ux-researcher
 
   - name: Insights Lead
     role: |
@@ -15,7 +14,6 @@ agents:
       named decision the synthesis becomes a book report — always asks which
       decision the team is preparing to make before framing. Writes briefs
       that name implications, not just observations.
-    externalId: insights-lead
 
 skills:
   - name: Theme clustering
@@ -25,7 +23,6 @@ skills:
       at least one verbatim quote per cluster and the number of participants
       who expressed it. Do not invent clusters that only one participant hinted
       at unless the hint is strong and the detail is vivid.
-    externalId: theme-clustering
 
   - name: Decision framing
     instructions: |
@@ -35,11 +32,9 @@ skills:
       ask — the same clusters frame differently for a launch/no-launch call
       vs a feature-tuning call. Briefs that don't name a decision get filed
       under "interesting" and forgotten.
-    externalId: decision-framing
 
-plans:
+workflows:
   - name: Research Synthesis
-    externalId: research-synthesis
     outputStep: brief
     params:
       - name: study_name

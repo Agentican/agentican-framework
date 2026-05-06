@@ -13,7 +13,6 @@ agents:
       technical fit, career trajectory and communication signals, then ranks shortlists
       with rationale the recruiter can act on. Explains decisions in terms a candidate
       would recognize — not vague impressions.
-    externalId: engineering-manager
 
   - name: Recruiter
     role: |
@@ -22,7 +21,6 @@ agents:
       shipped, a talk they gave, a career transition that demonstrates adaptability.
       Keeps messages under 200 words, leads with genuine interest in the person's work
       rather than the job opening, and closes with a specific ask.
-    externalId: recruiter
 
 skills:
   - name: Hiring criteria
@@ -38,7 +36,6 @@ skills:
       Disqualify: fewer than 3 years total professional experience, exclusively frontend/mobile
       background with no backend work, or no evidence of working on systems with more than
       one service.
-    externalId: hiring-criteria
 
   - name: Outreach playbook
     instructions: |
@@ -48,11 +45,9 @@ skills:
       200 words. Close with a single specific ask (a 15-minute call at a named time
       range) rather than "let me know if interested." Avoid superlatives, buzzwords,
       and anything that reads like a template.
-    externalId: outreach-playbook
 
-plans:
+workflows:
   - name: Candidate Screening Pipeline
-    externalId: candidate-screening
     outputStep: outreach
     params:
       - name: candidates

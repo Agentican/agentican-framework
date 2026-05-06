@@ -5,14 +5,14 @@ import ai.agentican.framework.AgenticanRecovery;
 import ai.agentican.framework.registry.AgentRegistry;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.store.KnowledgeStore;
-import ai.agentican.framework.registry.PlanRegistry;
+import ai.agentican.framework.registry.WorkflowRegistry;
 import ai.agentican.framework.registry.SkillRegistry;
-import ai.agentican.framework.orchestration.execution.TaskListener;
-import ai.agentican.framework.orchestration.execution.TaskDecorator;
+import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
+import ai.agentican.framework.orchestration.execution.WorkflowRunDecorator;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmClientDecorator;
-import ai.agentican.framework.store.TaskStateStore;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.store.WorkflowRunStore;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.tools.Toolkit;
 import ai.agentican.framework.hitl.HitlCheckpoint;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -35,7 +35,7 @@ public class AgenticanProducer {
     KnowledgeStore knowledgeStore;
 
     @Inject
-    TaskStateStore taskStateStore;
+    WorkflowRunStore workflowRunStore;
 
     @Inject
     AgentRegistry agentRegistry;
@@ -44,7 +44,7 @@ public class AgenticanProducer {
     SkillRegistry skillRegistry;
 
     @Inject
-    PlanRegistry planRegistry;
+    WorkflowRegistry workflowRegistry;
 
     @Inject
     Instance<LlmClient> llmClients;
@@ -56,28 +56,87 @@ public class AgenticanProducer {
     Instance<LlmClientDecorator> llmDecorators;
 
     @Inject
-    Instance<TaskDecorator> taskDecorators;
+    Instance<WorkflowRunDecorator> taskDecorators;
 
     @Inject
-    Instance<TaskListener> stepListeners;
+    Instance<WorkflowRunListener> stepListeners;
 
     @Inject
     Instance<java.util.concurrent.ExecutorService> taskExecutors;
 
     @Produces
+    @jakarta.inject.Singleton
+    public ai.agentican.framework.config.RuntimeConfig runtimeConfig() {
+
+        var fromProps = RuntimeConfigConverter.fromProperties(config);
+
+        return switch (config.catalog()) {
+            case yaml -> {
+                var fromYaml = loadYamlFromClasspath(config.config());
+                yield new ai.agentican.framework.config.RuntimeConfig(
+                        !fromYaml.llm().isEmpty()      ? fromYaml.llm()         : fromProps.llm(),
+                        !fromYaml.mcp().isEmpty()      ? fromYaml.mcp()         : fromProps.mcp(),
+                        fromYaml.composio() != null    ? fromYaml.composio()    : fromProps.composio(),
+                        fromYaml.agentRunner() != null ? fromYaml.agentRunner() : fromProps.agentRunner(),
+                        fromYaml.agents(),
+                        fromYaml.skills(),
+                        fromYaml.workflows(),
+                        fromYaml.strict() || fromProps.strict());
+            }
+            case database -> fromProps;
+        };
+    }
+
+    private static ai.agentican.framework.config.RuntimeConfig loadYamlFromClasspath(String resourcePath) {
+
+        var classloader = Thread.currentThread().getContextClassLoader();
+        if (classloader == null) classloader = AgenticanProducer.class.getClassLoader();
+
+        try (var in = classloader.getResourceAsStream(resourcePath)) {
+
+            if (in == null)
+                throw new IllegalStateException(
+                        "agentican.config not found on classpath: " + resourcePath
+                                + ". Place a RuntimeConfig YAML at src/main/resources/" + resourcePath);
+
+            return ai.agentican.framework.config.RuntimeConfig.load(in);
+        }
+        catch (java.io.IOException e) {
+            throw new IllegalStateException("Failed to load agentican config from " + resourcePath, e);
+        }
+    }
+
+    @Produces
     @ApplicationScoped
     @io.quarkus.runtime.Startup
-    public Agentican agentican() {
+    public Agentican agentican(ai.agentican.framework.config.RuntimeConfig runtimeConfig) {
 
-        var runtimeConfig = RuntimeConfigConverter.toRuntimeConfig(config);
+        Agentican.Builder builder = Agentican.builder();
 
-        var builder = Agentican.builder(runtimeConfig)
-                .hitlManager(hitlManager)
-                .knowledgeStore(knowledgeStore)
-                .taskStateStore(taskStateStore)
-                .agentRegistry(agentRegistry)
-                .skillRegistry(skillRegistry)
-                .planRegistry(planRegistry);
+        switch (config.catalog()) {
+            case yaml -> {
+                builder.configuration().yaml().config(runtimeConfig);
+                builder.registry().yaml().config(runtimeConfig);
+            }
+            case database -> {
+                var configurationApi = builder.configuration().api();
+                runtimeConfig.llm().forEach(configurationApi::llm);
+                runtimeConfig.mcp().forEach(configurationApi::mcp);
+                if (runtimeConfig.composio() != null) configurationApi.composio(runtimeConfig.composio());
+                if (runtimeConfig.agentRunner() != null) configurationApi.worker(runtimeConfig.agentRunner());
+                if (runtimeConfig.strict()) configurationApi.strict();
+            }
+        }
+
+        builder.hitlManager(hitlManager);
+        builder.knowledgeStore(knowledgeStore);
+        builder.workflowRunStore(workflowRunStore);
+
+        if (config.catalog() == AgenticanConfig.Catalog.database) {
+            builder.agentRegistry(agentRegistry);
+            builder.skillRegistry(skillRegistry);
+            builder.workflowRegistry(workflowRegistry);
+        }
 
         var llmDecoratorList = llmDecorators.stream().toList();
         if (!llmDecoratorList.isEmpty()) {
@@ -90,16 +149,16 @@ public class AgenticanProducer {
 
         var taskDecoratorList = taskDecorators.stream().toList();
         if (!taskDecoratorList.isEmpty()) {
-            builder.taskDecorator(new TaskDecorator() {
+            builder.workflowRunDecorator(new WorkflowRunDecorator() {
                 @Override public <T> java.util.function.Supplier<T> decorate(java.util.function.Supplier<T> task) {
                     var result = task;
                     for (var d : taskDecoratorList) result = d.decorate(result);
                     return result;
                 }
-                @Override public TaskDecorator snapshot() {
+                @Override public WorkflowRunDecorator snapshot() {
                     var snapshots = taskDecoratorList.stream()
-                            .map(TaskDecorator::snapshot).toList();
-                    return new TaskDecorator() {
+                            .map(WorkflowRunDecorator::snapshot).toList();
+                    return new WorkflowRunDecorator() {
                         @Override public <T> java.util.function.Supplier<T> decorate(java.util.function.Supplier<T> task) {
                             var result = task;
                             for (var s : snapshots) result = s.decorate(result);
@@ -112,7 +171,7 @@ public class AgenticanProducer {
 
         var listenerList = stepListeners.stream().toList();
         if (!listenerList.isEmpty()) {
-            builder.stepListener(new TaskListener() {
+            builder.workflowRunListener(new WorkflowRunListener() {
                 @Override public void onPlanStarted(String taskId) {
                     listenerList.forEach(l -> l.onPlanStarted(taskId));
                 }
@@ -122,7 +181,7 @@ public class AgenticanProducer {
                 @Override public void onTaskStarted(String taskId) {
                     listenerList.forEach(l -> l.onTaskStarted(taskId));
                 }
-                @Override public void onTaskCompleted(String taskId, TaskStatus status) {
+                @Override public void onTaskCompleted(String taskId, WorkflowRunStatus status) {
                     listenerList.forEach(l -> l.onTaskCompleted(taskId, status));
                 }
                 @Override public void onStepStarted(String taskId, String stepId) {
@@ -207,10 +266,10 @@ public class AgenticanProducer {
     }
 
     @Produces
-    @ApplicationScoped
+    @jakarta.inject.Singleton
     public AgenticanRecovery agenticanRecovery(Agentican runtime) {
 
-        return new AgenticanRecovery(runtime);
+        return runtime.recovery();
     }
 
     public void disposeAgenticanRecovery(@Disposes AgenticanRecovery recovery) {

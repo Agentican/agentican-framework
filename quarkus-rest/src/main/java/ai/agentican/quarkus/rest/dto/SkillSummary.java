@@ -7,7 +7,6 @@ public record SkillSummary(
         String id,
         String name,
         String instructions,
-        String externalId,
         boolean declaredInConfig) {
 
     public static SkillSummary of(SkillConfig skill, boolean declaredInConfig) {
@@ -16,7 +15,6 @@ public record SkillSummary(
                 skill.id(),
                 skill.name(),
                 skill.instructions(),
-                skill.externalId(),
                 declaredInConfig);
     }
 }

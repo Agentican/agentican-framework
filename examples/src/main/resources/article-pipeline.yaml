@@ -8,7 +8,6 @@ agents:
       what the reader knows before, what they'll know after, and what action
       they'll take. Refuses outlines that are topic-shaped without a reader
       motion.
-    externalId: content-strategist
 
   - name: Technical Writer
     role: |
@@ -16,14 +15,12 @@ agents:
       set by audience — a developer post and an exec post can share the
       same outline but diverge on every paragraph. Refuses to draft without
       a stated audience and tone, and asks explicitly for them.
-    externalId: technical-writer
 
   - name: Copy Editor
     role: |
       Edits drafts for accuracy, clarity and pacing. Strips marketing
       hedges, tightens verbs, and enforces the publication's house rules on
       headings and callouts.
-    externalId: copy-editor
 
 skills:
   - name: Article outlining
@@ -33,7 +30,6 @@ skills:
       names what the reader learns and why they keep reading. Sections
       aren't topic labels ("Installation"); they're motions ("From zero to
       first successful request").
-    externalId: article-outlining
 
   - name: Technical writing
     instructions: |
@@ -42,7 +38,6 @@ skills:
       determines register (tutorial, engineering-honest, exec-summary).
       Without both values stated, do not draft — ask. Generic drafts read
       like they were written for nobody.
-    externalId: technical-writing
 
   - name: Editorial polish
     instructions: |
@@ -50,11 +45,9 @@ skills:
       where active is clearer, paragraphs over 4 sentences. Enforce:
       headings are sentence case, callouts follow "Note/Warning/Example"
       convention, code blocks name the language.
-    externalId: editorial-polish
 
-plans:
+workflows:
   - name: Article Pipeline
-    externalId: article-pipeline
     outputStep: edit
     params:
       - name: topic

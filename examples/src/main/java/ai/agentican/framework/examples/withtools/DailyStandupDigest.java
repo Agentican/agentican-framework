@@ -15,15 +15,16 @@ public class DailyStandupDigest {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var standup = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var standup = agentican.workflow(PLAN_NAME)
                     .input(StandupRequest.class)
                     .output(StandupDigest.class)
                     .build();
 
-            var digest = standup.runAsync(request()).join();
+            var digest = standup.start(request()).future().join();
 
             print(digest);
         }

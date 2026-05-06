@@ -17,17 +17,18 @@ public class ContributorRecognition {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var recognition = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var recognition = agentican.workflow(PLAN_NAME)
                     .input(ActivityPeriod.class)
                     .output(RecognitionMessages.class)
                     .build();
 
-            var messages = recognition.runAsync(period()).join();
+            var messages = recognition.start(period()).future().join();
 
             print(messages);
         }

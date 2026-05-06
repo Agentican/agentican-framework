@@ -1,8 +1,8 @@
 package ai.agentican.quarkus.metrics;
 
 import ai.agentican.framework.Agentican;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 import ai.agentican.quarkus.test.MockLlmClient;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -34,12 +34,12 @@ class MetricsIntegrationTest {
 
         mockLlm.queueEndTurn("Test result");
 
-        var step = new PlanStepAgent("research", "researcher", "do something",
+        var step = new WorkflowStepAgent("research", "researcher", "do something",
                 List.of(), false, List.of(), List.of());
-        var task = Plan.builder("metrics-test").description("test").step(step).build();
+        var task = WorkflowDefinition.builder("metrics-test").description("test").step(step).build();
 
-        var handle = agentican.run(task);
-        handle.result();
+        var handle = agentican.workflow(task).raw().start(java.util.Map.of());
+        handle.await();
 
         given()
                 .when().get("/q/metrics")

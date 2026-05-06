@@ -29,8 +29,8 @@ public final class SseEventTypes {
     public static String nameFor(Object event) {
 
         return switch (event) {
-            case PlanStartedEvent ignored -> PLAN_STARTED;
-            case PlanCompletedEvent ignored -> PLAN_COMPLETED;
+            case WfRunStartedEvent ignored -> PLAN_STARTED;
+            case WfRunCompletedEvent ignored -> PLAN_COMPLETED;
             case TaskStartedEvent ignored -> TASK_STARTED;
             case TaskCompletedEvent ignored -> TASK_COMPLETED;
             case StepStartedEvent ignored -> STEP_STARTED;

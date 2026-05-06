@@ -30,7 +30,7 @@ public record ResumePlan(
 
     public static ResumePlan reap(ReapReason reason) {
 
-        return new ResumePlan(List.of(), Optional.empty(), Optional.empty(), Optional.empty(),
-                TurnResumeState.NONE, List.of(), true, reason);
+        return new ResumePlan(List.of(), Optional.empty(), Optional.empty(),
+                Optional.empty(), TurnResumeState.NONE, List.of(), true, reason);
     }
 }

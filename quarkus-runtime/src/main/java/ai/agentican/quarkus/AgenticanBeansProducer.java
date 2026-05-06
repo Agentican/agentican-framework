@@ -6,12 +6,12 @@ import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlNotifier;
 import ai.agentican.framework.store.KnowledgeStore;
 import ai.agentican.framework.store.KnowledgeStoreMemory;
-import ai.agentican.framework.registry.PlanRegistryMemory;
-import ai.agentican.framework.registry.PlanRegistry;
+import ai.agentican.framework.registry.WorkflowRegistryMemory;
+import ai.agentican.framework.registry.WorkflowRegistry;
 import ai.agentican.framework.registry.SkillRegistryMemory;
 import ai.agentican.framework.registry.SkillRegistry;
-import ai.agentican.framework.store.TaskStateStoreMemory;
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.store.WorkflowRunStoreMemory;
+import ai.agentican.framework.store.WorkflowRunStore;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -46,9 +46,9 @@ public class AgenticanBeansProducer {
     @Produces
     @ApplicationScoped
     @DefaultBean
-    public TaskStateStore defaultTaskStateStore() {
+    public WorkflowRunStore defaultTaskStateStore() {
 
-        return new TaskStateStoreMemory();
+        return new WorkflowRunStoreMemory();
     }
 
     @Produces
@@ -70,8 +70,8 @@ public class AgenticanBeansProducer {
     @Produces
     @ApplicationScoped
     @DefaultBean
-    public PlanRegistry defaultPlanRegistry() {
+    public WorkflowRegistry defaultPlanRegistry() {
 
-        return new PlanRegistryMemory();
+        return new WorkflowRegistryMemory();
     }
 }

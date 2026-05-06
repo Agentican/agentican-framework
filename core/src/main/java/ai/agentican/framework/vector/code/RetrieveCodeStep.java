@@ -2,7 +2,7 @@ package ai.agentican.framework.vector.code;
 
 import ai.agentican.framework.vector.VectorIndexRegistry;
 import ai.agentican.framework.orchestration.code.CodeStep;
-import ai.agentican.framework.orchestration.code.StepContext;
+import ai.agentican.framework.orchestration.code.CodeStepContext;
 
 import java.util.stream.Collectors;
 
@@ -26,7 +26,7 @@ public final class RetrieveCodeStep implements CodeStep<RetrieveQuery, RetrieveO
     }
 
     @Override
-    public RetrieveOutput execute(RetrieveQuery input, StepContext context) {
+    public RetrieveOutput execute(RetrieveQuery input, CodeStepContext context) {
 
         var kb = registry.get(input.vectorIndex());
 

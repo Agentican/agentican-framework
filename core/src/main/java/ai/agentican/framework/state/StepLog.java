@@ -3,7 +3,7 @@ package ai.agentican.framework.state;
 import ai.agentican.framework.hitl.HitlCheckpoint;
 import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.llm.TokenUsage;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 
 import java.time.Instant;
 import java.util.List;
@@ -19,7 +19,7 @@ public class StepLog {
 
     private volatile String output;
 
-    private volatile TaskStatus status;
+    private volatile WorkflowRunStatus status;
     private volatile HitlCheckpoint checkpoint;
     private volatile Instant completedAt;
     private volatile TokenUsage aggregateTokenUsage;
@@ -44,7 +44,7 @@ public class StepLog {
     public Instant completedAt() { return completedAt; }
     public String output() { return output; }
 
-    public TaskStatus status() { return status; }
+    public WorkflowRunStatus status() { return status; }
     public HitlCheckpoint checkpoint() { return checkpoint; }
 
     public TokenUsage tokenUsage() {
@@ -65,7 +65,7 @@ public class StepLog {
     public int runCount() { return runs.size(); }
 
     public void setOutput(String output) { this.output = output; }
-    public void setStatus(TaskStatus status) { this.status = status; }
+    public void setStatus(WorkflowRunStatus status) { this.status = status; }
     public void setCheckpoint(HitlCheckpoint checkpoint) { this.checkpoint = checkpoint; }
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
 

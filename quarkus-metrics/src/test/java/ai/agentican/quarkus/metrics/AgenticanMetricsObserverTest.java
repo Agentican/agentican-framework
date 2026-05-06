@@ -1,9 +1,9 @@
 package ai.agentican.quarkus.metrics;
 
 import ai.agentican.framework.hitl.HitlCheckpoint;
-import ai.agentican.framework.state.TaskLog;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.state.WorkflowRunLog;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.quarkus.event.HitlCheckpointEvent;
 import ai.agentican.quarkus.event.StepCompletedEvent;
 import ai.agentican.quarkus.event.TaskCompletedEvent;
@@ -43,7 +43,7 @@ class AgenticanMetricsObserverTest {
     void taskCompletedDecrementsActiveAndRecordsCounter() {
 
         observer.onTaskStarted(started("t1"));
-        observer.onTaskCompleted(completed("t1", TaskStatus.COMPLETED));
+        observer.onTaskCompleted(completed("t1", WorkflowRunStatus.COMPLETED));
 
         assertEquals(0.0, registry.get("agentican.tasks.active").gauge().value());
         assertEquals(1.0, registry.counter("agentican.tasks.completed", "status", "COMPLETED").count());
@@ -53,7 +53,7 @@ class AgenticanMetricsObserverTest {
     void taskCompletedRecordsDuration() {
 
         observer.onTaskStarted(started("t1"));
-        observer.onTaskCompleted(completed("t1", TaskStatus.COMPLETED));
+        observer.onTaskCompleted(completed("t1", WorkflowRunStatus.COMPLETED));
 
         var timer = registry.timer("agentican.tasks.duration", "status", "COMPLETED");
         assertEquals(1, timer.count());
@@ -64,8 +64,8 @@ class AgenticanMetricsObserverTest {
 
         observer.onTaskStarted(started("t1"));
         observer.onTaskStarted(started("t2"));
-        observer.onTaskCompleted(completed("t1", TaskStatus.COMPLETED));
-        observer.onTaskCompleted(completed("t2", TaskStatus.FAILED));
+        observer.onTaskCompleted(completed("t1", WorkflowRunStatus.COMPLETED));
+        observer.onTaskCompleted(completed("t2", WorkflowRunStatus.FAILED));
 
         assertEquals(1.0, registry.counter("agentican.tasks.completed", "status", "COMPLETED").count());
         assertEquals(1.0, registry.counter("agentican.tasks.completed", "status", "FAILED").count());
@@ -74,8 +74,8 @@ class AgenticanMetricsObserverTest {
     @Test
     void stepCompletedRecordsCounter() {
 
-        observer.onStepCompleted(new StepCompletedEvent(null, "t1", "s1", TaskStatus.COMPLETED));
-        observer.onStepCompleted(new StepCompletedEvent(null, "t1", "s2", TaskStatus.FAILED));
+        observer.onStepCompleted(new StepCompletedEvent(null, "t1", "s1", WorkflowRunStatus.COMPLETED));
+        observer.onStepCompleted(new StepCompletedEvent(null, "t1", "s2", WorkflowRunStatus.FAILED));
 
         assertEquals(1.0, registry.counter("agentican.steps.completed", "status", "COMPLETED").count());
         assertEquals(1.0, registry.counter("agentican.steps.completed", "status", "FAILED").count());
@@ -99,7 +99,7 @@ class AgenticanMetricsObserverTest {
 
         assertEquals(1.0, registry.get("agentican.hitl.checkpoints.pending").gauge().value());
 
-        observer.onTaskCompleted(completed("t1", TaskStatus.COMPLETED));
+        observer.onTaskCompleted(completed("t1", WorkflowRunStatus.COMPLETED));
 
         assertEquals(0.0, registry.get("agentican.hitl.checkpoints.pending").gauge().value());
     }
@@ -109,14 +109,14 @@ class AgenticanMetricsObserverTest {
         return new TaskStartedEvent(taskId, "demo", newLog(taskId));
     }
 
-    private static TaskCompletedEvent completed(String taskId, TaskStatus status) {
+    private static TaskCompletedEvent completed(String taskId, WorkflowRunStatus status) {
 
         return new TaskCompletedEvent(taskId, "demo", status, newLog(taskId));
     }
 
-    private static TaskLog newLog(String taskId) {
+    private static WorkflowRunLog newLog(String taskId) {
 
-        return new TaskLog(taskId, "demo",
-                Plan.builder("demo").description("d").step("s", "a", "i").build(), Map.of());
+        return new WorkflowRunLog(taskId, "demo",
+                WorkflowDefinition.builder("demo").description("d").step("s", "a", "i").build(), Map.of());
     }
 }

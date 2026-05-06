@@ -7,7 +7,6 @@ agents:
       Parses vendor data-processing agreements and flags provisions that
       deviate from internal policy. Grounds every flag in specific language
       from the DPA — clause and reason — not generic "unusual terms."
-    externalId: compliance-analyst
 
   - name: Legal Counsel
     role: |
@@ -15,7 +14,6 @@ agents:
       Anchors each position on concrete customer data practice, names the
       fallback position the business will accept, and refuses to escalate
       items the business has already accepted as standard.
-    externalId: legal-counsel
 
 skills:
   - name: DPA provisions
@@ -27,7 +25,6 @@ skills:
       mechanism: flag reliance on SCCs without DPF fallback. Liability cap:
       flag if capped below 12 months of fees. Always cite the clause number
       or the verbatim phrase.
-    externalId: dpa-provisions
 
   - name: Redline writing
     instructions: |
@@ -35,11 +32,9 @@ skills:
       edit (verbatim replacement text), the business rationale (one
       sentence), and the fallback the business will accept if pushed. No
       vague "strengthen this clause" — write the exact replacement text.
-    externalId: redline-writing
 
-plans:
+workflows:
   - name: DPA Review
-    externalId: dpa-review
     outputStep: positions
     params:
       - name: vendor_name

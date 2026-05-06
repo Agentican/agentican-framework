@@ -72,7 +72,7 @@ public class AgenticanWebSocket {
 
         var handle = taskService.submit(message.description());
 
-        return WsResponse.taskSubmitted(handle.taskId());
+        return WsResponse.taskSubmitted(handle.id());
     }
 
     private WsResponse handleSubmitTask(WsMessage message) {
@@ -83,7 +83,7 @@ public class AgenticanWebSocket {
         var inputs = message.inputs() != null ? message.inputs() : Map.<String, String>of();
         var handle = taskService.submit(message.task(), inputs);
 
-        return WsResponse.taskSubmitted(handle.taskId());
+        return WsResponse.taskSubmitted(handle.id());
     }
 
     private WsResponse handleRespond(WsMessage message) {

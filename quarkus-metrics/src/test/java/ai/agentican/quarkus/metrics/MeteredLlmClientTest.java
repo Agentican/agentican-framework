@@ -108,6 +108,6 @@ class MeteredLlmClientTest {
 
     private static LlmRequest dummyRequest() {
 
-        return new LlmRequest("system prompt", null, "user message", List.of(), 0, null, null, null);
+        return new LlmRequest("system prompt", null, "user message", List.of(), 0, null, null, null, null, java.util.List.of());
     }
 }

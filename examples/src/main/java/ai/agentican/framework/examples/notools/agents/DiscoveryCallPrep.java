@@ -24,17 +24,19 @@ public class DiscoveryCallPrep {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var coach = agentican.agentTask(TASK_NAME)
+            var coach = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(Prospect.class)
-                    .output(QuestionSet.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(Prospect.class)
+                    .output(QuestionSet.class)
                     .build();
 
-            var set = coach.runAsync(prospect()).join();
+            var set = coach.start(prospect()).future().join();
 
             print(set);
         }

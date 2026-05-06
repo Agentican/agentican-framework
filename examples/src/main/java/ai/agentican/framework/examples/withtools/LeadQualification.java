@@ -14,15 +14,16 @@ public class LeadQualification {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var qualification = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var qualification = agentican.workflow(PLAN_NAME)
                     .input(Lead.class)
                     .output(LeadAssessment.class)
                     .build();
 
-            var assessment = qualification.runAsync(lead()).join();
+            var assessment = qualification.start(lead()).future().join();
 
             print(assessment);
         }

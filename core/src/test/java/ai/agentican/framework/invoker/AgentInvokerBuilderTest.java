@@ -1,10 +1,10 @@
-package ai.agentican.framework.invoker;
+package ai.agentican.framework;
 
 import ai.agentican.framework.Agentican;
 import ai.agentican.framework.MockLlmClient;
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.LlmConfig;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 
 import org.junit.jupiter.api.Test;
 
@@ -20,11 +20,15 @@ class AgentInvokerBuilderTest {
     private static Agentican.Builder baseRuntime(MockLlmClient llm) {
 
         return Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", llm.toLlmClient())
-                .agent(AgentConfig.builder()
-                        .externalId("agent.analyst.v1").name("Analyst")
-                        .role("Competitive research analyst").llm("default").build());
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                            .name("Analyst")
+                            .role("Competitive research analyst").llm("default").build())
+                    .end();
     }
 
     @Test
@@ -36,13 +40,13 @@ class AgentInvokerBuilderTest {
 
         try (var runtime = baseRuntime(llm).build()) {
 
-            var analyst = runtime.agentTask("test").agent("Analyst")
+            var analyst = runtime.task("test").agent("Analyst")
+                    .instructions("Research {{param.name}} in {{param.industry}}")
                     .input(CompetitorQuery.class)
                     .output(CompetitorBrief.class)
-                    .instructions("Research {{param.name}} in {{param.industry}}")
                     .build();
 
-            var brief = analyst.runAndAwait(new CompetitorQuery("Stripe", "payments"));
+            var brief = analyst.start(new CompetitorQuery("Stripe", "payments")).await();
 
             assertEquals("leading payments platform", brief.summary());
             assertEquals("HIGH", brief.threatLevel());
@@ -60,13 +64,13 @@ class AgentInvokerBuilderTest {
 
         try (var runtime = baseRuntime(llm).build()) {
 
-            var invoker = runtime.agentTask("test").agent("Analyst")
+            var invoker = runtime.task("test").agent("Analyst")
+                    .instructions("Look up {{param.name}} in {{param.address.city}}")
                     .input(UserQuery.class)
                     .output(CompetitorBrief.class)
-                    .instructions("Look up {{param.name}} in {{param.address.city}}")
                     .build();
 
-            var out = invoker.runAndAwait(new UserQuery("Alice", new Address("Austin")));
+            var out = invoker.start(new UserQuery("Alice", new Address("Austin"))).await();
 
             assertEquals("ok", out.summary());
         }
@@ -78,10 +82,10 @@ class AgentInvokerBuilderTest {
         try (var runtime = baseRuntime(new MockLlmClient()).build()) {
 
             assertThrows(IllegalStateException.class, () -> runtime
-                    .agentTask("test").agent("NoSuchAgent")
+                    .task("test").agent("NoSuchAgent")
+                    .instructions("irrelevant")
                     .input(CompetitorQuery.class)
                     .output(CompetitorBrief.class)
-                    .instructions("irrelevant")
                     .build());
         }
     }
@@ -92,7 +96,7 @@ class AgentInvokerBuilderTest {
         try (var runtime = baseRuntime(new MockLlmClient()).build()) {
 
             assertThrows(IllegalStateException.class, () -> runtime
-                    .agentTask("test").agent("Analyst")
+                    .task("test").agent("Analyst")
                     .input(CompetitorQuery.class)
                     .output(CompetitorBrief.class)
                     .build());
@@ -108,13 +112,13 @@ class AgentInvokerBuilderTest {
 
         try (var runtime = baseRuntime(llm).build()) {
 
-            var invoker = runtime.agentTask("test").agent("Analyst")
+            var invoker = runtime.task("test").agent("Analyst")
+                    .instructions("Summarize today")
                     .input(Void.class)
                     .output(CompetitorBrief.class)
-                    .instructions("Summarize today")
                     .build();
 
-            var brief = invoker.runAndAwait();
+            var brief = invoker.start().await();
             assertEquals("a summary", brief.summary());
         }
     }
@@ -126,13 +130,13 @@ class AgentInvokerBuilderTest {
 
         try (var runtime = baseRuntime(llm).build()) {
 
-            var invoker = runtime.agentTask("test").agent("Analyst")
+            var invoker = runtime.task("test").agent("Analyst")
+                    .instructions("Write a note")
                     .input(Void.class)
                     .output(String.class)
-                    .instructions("Write a note")
                     .build();
 
-            assertEquals("free-form response text", invoker.runAndAwait());
+            assertEquals("free-form response text", invoker.start().await());
         }
     }
 
@@ -143,14 +147,14 @@ class AgentInvokerBuilderTest {
 
         try (var runtime = baseRuntime(llm).build()) {
 
-            var invoker = runtime.agentTask("test").agent("Analyst")
+            var invoker = runtime.task("test").agent("Analyst")
+                    .instructions("Do something")
                     .input(Void.class)
                     .output(Void.class)
-                    .instructions("Do something")
                     .build();
 
-            var result = invoker.awaitTaskResult();
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            var result = invoker.start().untypedResult();
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         }
     }
 
@@ -161,15 +165,15 @@ class AgentInvokerBuilderTest {
 
         try (var runtime = baseRuntime(llm).build()) {
 
-            runtime.agentTask("analyst-oneshot").agent("Analyst")
-                    .input(Void.class)
-                    .output(Void.class)
+            runtime.task("analyst-oneshot").agent("Analyst")
                     .instructions("noop")
                     .persist()
+                    .input(Void.class)
+                    .output(Void.class)
                     .build();
 
-            assertNotNull(runtime.registry().plans().get("analyst-oneshot"),
-                    "Plan should be visible in the plan registry after persist()");
+            assertNotNull(runtime.registry().workflows().byName("analyst-oneshot"),
+                    "WorkflowDefinition should be visible in the definition registry after persist()");
         }
     }
 
@@ -184,20 +188,25 @@ class AgentInvokerBuilderTest {
         };
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", llm)
-                .agent(AgentConfig.builder()
-                        .externalId("agent.analyst.v1").name("Analyst")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("Analyst")
                         .role("Analyst").llm("default").build())
+                    .end()
                 .build()) {
 
-            var invoker = runtime.agentTask("test").agent("Analyst")
+            var invoker = runtime.task("test").agent("Analyst")
+                    .instructions("Do it")
                     .input(Void.class)
                     .output(CompetitorBrief.class)
-                    .instructions("Do it")
                     .build();
 
-            invoker.runAndAwait();
+            invoker.start().await();
 
             assertFalse(capturedSystemPrompts.isEmpty());
             assertTrue(capturedSystemPrompts.getFirst().contains("MUST be valid JSON"),
@@ -212,16 +221,16 @@ class AgentInvokerBuilderTest {
 
         try (var runtime = baseRuntime(llm).build()) {
 
-            var invoker = runtime.agentTask("analyst-with-tools").agent("Analyst")
-                    .input(Void.class)
-                    .output(CompetitorBrief.class)
+            var invoker = runtime.task("analyst-with-tools").agent("Analyst")
                     .instructions("Look it up")
                     .tools("search_web", "fetch_url")
                     .persist()
+                    .input(Void.class)
+                    .output(CompetitorBrief.class)
                     .build();
 
-            var plan = runtime.registry().plans().get("analyst-with-tools");
-            var step = (ai.agentican.framework.orchestration.model.PlanStepAgent) plan.steps().getFirst();
+            var plan = runtime.registry().workflows().byName("analyst-with-tools");
+            var step = (ai.agentican.framework.orchestration.model.WorkflowStepAgent) plan.steps().getFirst();
 
             assertEquals(java.util.List.of("search_web", "fetch_url"), step.tools());
         }
@@ -233,25 +242,30 @@ class AgentInvokerBuilderTest {
         var llm = new MockLlmClient().onSend("Do", "{\"summary\":\"ok\",\"threatLevel\":\"LOW\"}");
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", llm.toLlmClient())
-                .agent(AgentConfig.builder()
-                        .externalId("agent.analyst.v1").name("Analyst")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("Analyst")
                         .role("Analyst").llm("default").build())
-                .skill(ai.agentican.framework.config.SkillConfig.builder()
-                        .externalId("skill.tone.v1").name("Tone").instructions("Be terse").build())
+                    .skill(ai.agentican.framework.config.SkillConfig.builder()
+                        .name("Tone").instructions("Be terse").build())
+                    .end()
                 .build()) {
 
-            var invoker = runtime.agentTask("analyst-with-skills").agent("Analyst")
-                    .input(Void.class)
-                    .output(CompetitorBrief.class)
+            var invoker = runtime.task("analyst-with-skills").agent("Analyst")
                     .instructions("Do")
                     .skills("Tone")
                     .persist()
+                    .input(Void.class)
+                    .output(CompetitorBrief.class)
                     .build();
 
-            var plan = runtime.registry().plans().get("analyst-with-skills");
-            var step = (ai.agentican.framework.orchestration.model.PlanStepAgent) plan.steps().getFirst();
+            var plan = runtime.registry().workflows().byName("analyst-with-skills");
+            var step = (ai.agentican.framework.orchestration.model.WorkflowStepAgent) plan.steps().getFirst();
 
             assertEquals(java.util.List.of("Tone"), step.skills());
         }

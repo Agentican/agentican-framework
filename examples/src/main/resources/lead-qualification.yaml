@@ -13,7 +13,6 @@ agents:
       hires, news mentions — identifies likely decision-makers and champions, and notes
       competitive or complementary vendor relationships. Produces structured profiles as
       bullet points grouped by category, not narrative.
-    externalId: sales-development-representative
 
   - name: Account Executive
     role: |
@@ -21,7 +20,6 @@ agents:
       BANT (Budget, Authority, Need, Timeline), assigns composite scores with per-dimension
       breakdowns, and recommends advance / nurture / disqualify with the specific rationale
       a sales manager needs to agree or disagree. Never advances a lead on optimism alone.
-    externalId: account-executive
 
   - name: Sales Manager
     role: |
@@ -30,7 +28,6 @@ agents:
       recent company events — emails under 150 words, opening with insight rather than
       pitch, closing with a single clear ask like a 15-minute call. Avoids superlatives,
       buzzwords and template phrasing.
-    externalId: sales-manager
 
 skills:
   - name: Sales playbook
@@ -41,11 +38,9 @@ skills:
       evaluation with timeline under 6 months, executive sponsor identified. Disqualification
       signals: no technical team, currently mid-contract with a competitor (>12 months left),
       or company in active downsizing.
-    externalId: sales-playbook
 
-plans:
+workflows:
   - name: Lead Qualification Pipeline
-    externalId: lead-qualification
     outputStep: qualify
     params:
       - name: company

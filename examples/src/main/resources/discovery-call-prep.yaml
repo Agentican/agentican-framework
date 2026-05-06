@@ -10,7 +10,6 @@ agents:
       constraint and decision criteria — skips the generic qualifiers (company size,
       headcount) that desk research already answers. Every question has a goal and a
       follow-up for when the answer is vague.
-    externalId: sales-development-representative
 
 skills:
   - name: BANT framework
@@ -22,4 +21,3 @@ skills:
       6 months. Every question is tied to one pillar and has an explicit goal (what the
       rep learns). Follow-ups for vague answers: "can you put a number on that?" or
       "what happens if you don't solve this in the next 6 months?"
-    externalId: bant-framework

@@ -6,5 +6,4 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public record RestSkillView(
         String id,
         String name,
-        String instructions,
-        String externalId) {}
+        String instructions) {}

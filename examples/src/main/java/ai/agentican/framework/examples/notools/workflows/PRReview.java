@@ -15,15 +15,16 @@ public class PRReview {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var review = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var review = agentican.workflow(PLAN_NAME)
                     .input(PullRequest.class)
                     .output(ReviewSummary.class)
                     .build();
 
-            var summary = review.runAsync(pr()).join();
+            var summary = review.start(pr()).future().join();
 
             print(summary);
         }

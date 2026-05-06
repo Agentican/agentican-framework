@@ -2,16 +2,13 @@ package ai.agentican.framework;
 
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.LlmConfig;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanParam;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.invoker.AgenticanTask;
-import ai.agentican.framework.invoker.OutputParseException;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowParam;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Map;
 
 import static ai.agentican.framework.MockLlmClient.endTurn;
@@ -28,27 +25,32 @@ class AgenticanTypedTest {
                 .onSend("Triage customer cust-42 priority HIGH", "Triaged");
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
-                .agent(AgentConfig.builder()
-                        .externalId("agent.triage.v1").name("triage")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("triage")
                         .role("Triage agent").llm("default").build())
+                    .end()
                 .build()) {
 
-            var plan = Plan.builder("triage")
-                    .param(new PlanParam("customer_id", "Customer ID", null, true))
-                    .param(new PlanParam("priority", "Priority", "NORMAL", false))
-                    .step(PlanStepAgent.builder("classify")
+            var plan = WorkflowDefinition.builder("triage")
+                    .param(new WorkflowParam("customer_id", "Customer ID", null, true))
+                    .param(new WorkflowParam("priority", "Priority", "NORMAL", false))
+                    .step(WorkflowStepAgent.builder("classify")
                             .agent("triage")
                             .instructions("Triage customer {{param.customer_id}} priority {{param.priority}}")
                             .build())
                     .build();
 
-            AgenticanTask<TriageParams, Void> triage = runtime.workflowTask("test").plan(plan).input(TriageParams.class).build();
+            Workflow<TriageParams, Void> triage = runtime.workflow(plan).input(TriageParams.class).build();
 
-            var result = triage.awaitTaskResult(new TriageParams("cust-42", "HIGH"));
+            var result = triage.start(new TriageParams("cust-42", "HIGH")).untypedResult();
 
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         }
     }
 
@@ -59,28 +61,33 @@ class AgenticanTypedTest {
                 .onSend("Triage cust-99 priority NORMAL", "OK");
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
-                .agent(AgentConfig.builder()
-                        .externalId("agent.triage.v1").name("triage")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("triage")
                         .role("Triage agent").llm("default").build())
+                    .end()
                 .build()) {
 
-            var plan = Plan.builder("triage-by-name")
-                    .param(new PlanParam("customer_id", "Customer ID", null, true))
-                    .param(new PlanParam("priority", "Priority", "NORMAL", false))
-                    .step(PlanStepAgent.builder("classify")
+            var plan = WorkflowDefinition.builder("triage-by-name")
+                    .param(new WorkflowParam("customer_id", "Customer ID", null, true))
+                    .param(new WorkflowParam("priority", "Priority", "NORMAL", false))
+                    .step(WorkflowStepAgent.builder("classify")
                             .agent("triage")
                             .instructions("Triage {{param.customer_id}} priority {{param.priority}}")
                             .build())
                     .build();
 
-            runtime.registry().plans().register(plan);
+            runtime.registry().workflows().register(plan);
 
-            AgenticanTask<TriageParams, Void> triage = runtime.workflowTask("test").plan("triage-by-name").input(TriageParams.class).build();
+            Workflow<TriageParams, Void> triage = runtime.workflow("triage-by-name").input(TriageParams.class).build();
 
-            var result = triage.awaitTaskResult(new TriageParams("cust-99", "NORMAL"));
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            var result = triage.start(new TriageParams("cust-99", "NORMAL")).untypedResult();
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         }
     }
 
@@ -88,14 +95,15 @@ class AgenticanTypedTest {
     void resolvingAgenticanFailsWhenPlanMissing() {
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
                 .build()) {
 
-            AgenticanTask<TriageParams, Void> triage = runtime.workflowTask("test").plan("nonexistent").input(TriageParams.class).build();
-
             assertThrows(IllegalStateException.class,
-                    () -> triage.run(new TriageParams("cust-1", "NORMAL")));
+                    () -> runtime.workflow("nonexistent").input(TriageParams.class).build());
         }
     }
 
@@ -106,28 +114,33 @@ class AgenticanTypedTest {
                 .onSend("Late-registered run with cust-7", "OK");
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
-                .agent(AgentConfig.builder()
-                        .externalId("agent.triage.v1").name("triage")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("triage")
                         .role("Triage agent").llm("default").build())
+                    .end()
                 .build()) {
 
-            AgenticanTask<TriageParams, Void> triage = runtime.workflowTask("test").plan("late-plan").input(TriageParams.class).build();
-
-            var plan = Plan.builder("late-plan")
-                    .param(new PlanParam("customer_id", "Customer ID", null, true))
-                    .param(new PlanParam("priority", "Priority", "NORMAL", false))
-                    .step(PlanStepAgent.builder("classify")
+            var plan = WorkflowDefinition.builder("late-definition")
+                    .param(new WorkflowParam("customer_id", "Customer ID", null, true))
+                    .param(new WorkflowParam("priority", "Priority", "NORMAL", false))
+                    .step(WorkflowStepAgent.builder("classify")
                             .agent("triage")
                             .instructions("Late-registered run with {{param.customer_id}}")
                             .build())
                     .build();
 
-            runtime.registry().plans().register(plan);
+            runtime.registry().workflows().register(plan);
 
-            var result = triage.awaitTaskResult(new TriageParams("cust-7", "NORMAL"));
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            Workflow<TriageParams, Void> triage = runtime.workflow("late-definition").input(TriageParams.class).build();
+
+            var result = triage.start(new TriageParams("cust-7", "NORMAL")).untypedResult();
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         }
     }
 
@@ -137,24 +150,29 @@ class AgenticanTypedTest {
         var mockLlm = new MockLlmClient().onSend("Run without params", "OK");
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
-                .agent(AgentConfig.builder()
-                        .externalId("agent.noparam.v1").name("noparam")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("noparam")
                         .role("Agent").llm("default").build())
+                    .end()
                 .build()) {
 
-            var plan = Plan.builder("no-params")
-                    .step(PlanStepAgent.builder("do")
+            var plan = WorkflowDefinition.builder("no-params")
+                    .step(WorkflowStepAgent.builder("do")
                             .agent("noparam")
                             .instructions("Run without params")
                             .build())
                     .build();
 
-            AgenticanTask<Void, Void> invoker = runtime.workflowTask("test").plan(plan).input(Void.class).build();
+            Workflow<Void, Void> invoker = runtime.workflow(plan).input(Void.class).build();
 
-            var result = invoker.awaitTaskResult();
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            var result = invoker.start().untypedResult();
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         }
     }
 
@@ -164,26 +182,31 @@ class AgenticanTypedTest {
         var mockLlm = new MockLlmClient().onSend("Map-based cust-m1", "OK");
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
-                .agent(AgentConfig.builder()
-                        .externalId("agent.triage.v1").name("triage")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("triage")
                         .role("Agent").llm("default").build())
+                    .end()
                 .build()) {
 
-            var plan = Plan.builder("map-plan")
-                    .param(new PlanParam("customer_id", "Customer ID", null, true))
-                    .step(PlanStepAgent.builder("do")
+            var plan = WorkflowDefinition.builder("map-definition")
+                    .param(new WorkflowParam("customer_id", "Customer ID", null, true))
+                    .step(WorkflowStepAgent.builder("do")
                             .agent("triage")
                             .instructions("Map-based {{param.customer_id}}")
                             .build())
                     .build();
 
             @SuppressWarnings({"rawtypes", "unchecked"})
-            AgenticanTask<Map, Void> invoker = (AgenticanTask<Map, Void>) (AgenticanTask) runtime.workflowTask("test").plan(plan).input(Map.class).build();
+            Workflow<Map, Void> invoker = (Workflow<Map, Void>) (Workflow) runtime.workflow(plan).input(Map.class).build();
 
-            var result = invoker.awaitTaskResult(Map.of("customer_id", "cust-m1"));
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            var result = invoker.start(Map.of("customer_id", "cust-m1")).untypedResult();
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         }
     }
 
@@ -193,27 +216,32 @@ class AgenticanTypedTest {
         var mockLlm = new MockLlmClient().onSend("Snake params account-7", "OK");
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
-                .agent(AgentConfig.builder()
-                        .externalId("agent.acct.v1").name("acct")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("acct")
                         .role("Agent").llm("default").build())
+                    .end()
                 .build()) {
 
             record AccountParams(String accountId) {}
 
-            var plan = Plan.builder("acct-plan")
-                    .param(new PlanParam("account_id", "Account ID", null, true))
-                    .step(PlanStepAgent.builder("do")
+            var plan = WorkflowDefinition.builder("acct-definition")
+                    .param(new WorkflowParam("account_id", "Account ID", null, true))
+                    .step(WorkflowStepAgent.builder("do")
                             .agent("acct")
                             .instructions("Snake params {{param.account_id}}")
                             .build())
                     .build();
 
-            AgenticanTask<AccountParams, Void> invoker = runtime.workflowTask("test").plan(plan).input(AccountParams.class).build();
+            Workflow<AccountParams, Void> invoker = runtime.workflow(plan).input(AccountParams.class).build();
 
-            var result = invoker.awaitTaskResult(new AccountParams("account-7"));
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            var result = invoker.start(new AccountParams("account-7")).untypedResult();
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         }
     }
 
@@ -227,25 +255,30 @@ class AgenticanTypedTest {
                         "{\"classification\":\"refund\",\"reason\":\"order arrived broken\"}");
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
-                .agent(AgentConfig.builder()
-                        .externalId("agent.triage.v1").name("triage")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("triage")
                         .role("Triage agent").llm("default").build())
+                    .end()
                 .build()) {
 
-            var plan = Plan.builder("typed-triage")
-                    .param(new PlanParam("customer_id", "Customer ID", null, true))
-                    .step(PlanStepAgent.builder("classify")
+            var plan = WorkflowDefinition.builder("typed-triage")
+                    .param(new WorkflowParam("customer_id", "Customer ID", null, true))
+                    .step(WorkflowStepAgent.builder("classify")
                             .agent("triage")
                             .instructions("Respond JSON for {{param.customer_id}}")
                             .build())
                     .build();
 
-            AgenticanTask<TriageParams, TriageOutput> triage =
-                    runtime.workflowTask("test").plan(plan).input(TriageParams.class).output(TriageOutput.class).build();
+            Workflow<TriageParams, TriageOutput> triage =
+                    runtime.workflow(plan).input(TriageParams.class).output(TriageOutput.class).build();
 
-            TriageOutput out = triage.runAndAwait(new TriageParams("cust-99", "NORMAL"));
+            TriageOutput out = triage.start(new TriageParams("cust-99", "NORMAL")).await();
 
             assertEquals("refund", out.classification());
             assertEquals("order arrived broken", out.reason());
@@ -259,24 +292,29 @@ class AgenticanTypedTest {
                 .onSend("respond", "this is not JSON");
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
-                .agent(AgentConfig.builder()
-                        .externalId("agent.triage.v1").name("triage")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("triage")
                         .role("Agent").llm("default").build())
+                    .end()
                 .build()) {
 
-            var plan = Plan.builder("bad-output")
-                    .step(PlanStepAgent.builder("classify")
+            var plan = WorkflowDefinition.builder("bad-output")
+                    .step(WorkflowStepAgent.builder("classify")
                             .agent("triage")
                             .instructions("respond")
                             .build())
                     .build();
 
-            AgenticanTask<Void, TriageOutput> triage =
-                    runtime.workflowTask("test").plan(plan).input(Void.class).output(TriageOutput.class).build();
+            Workflow<Void, TriageOutput> triage =
+                    runtime.workflow(plan).input(Void.class).output(TriageOutput.class).build();
 
-            assertThrows(OutputParseException.class, triage::runAndAwait);
+            assertThrows(WorkflowOutputException.class, () -> triage.start().await());
         }
     }
 
@@ -284,21 +322,26 @@ class AgenticanTypedTest {
     void multiStepPlanWithoutOutputStepFailsAtConstruction() {
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
-                .agent(AgentConfig.builder()
-                        .externalId("agent.triage.v1").name("triage")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("triage")
                         .role("Agent").llm("default").build())
+                    .end()
                 .build()) {
 
-            var plan = Plan.builder("multi")
-                    .step(PlanStepAgent.builder("a").agent("triage").instructions("a").build())
-                    .step(PlanStepAgent.builder("b").agent("triage").instructions("b")
+            var plan = WorkflowDefinition.builder("multi")
+                    .step(WorkflowStepAgent.builder("a").agent("triage").instructions("a").build())
+                    .step(WorkflowStepAgent.builder("b").agent("triage").instructions("b")
                             .dependencies(java.util.List.of("a")).build())
                     .build();
 
             assertThrows(IllegalStateException.class,
-                    () -> runtime.workflowTask("test").plan(plan).input(Void.class).output(TriageOutput.class).build());
+                    () -> runtime.workflow(plan).input(Void.class).output(TriageOutput.class).build());
         }
     }
 
@@ -313,24 +356,29 @@ class AgenticanTypedTest {
         };
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", llmClient)
-                .agent(AgentConfig.builder()
-                        .externalId("agent.triage.v1").name("triage")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("triage")
                         .role("Triage agent").llm("default").build())
+                    .end()
                 .build()) {
 
-            var plan = Plan.builder("schema-injection")
-                    .step(PlanStepAgent.builder("classify")
+            var plan = WorkflowDefinition.builder("schema-injection")
+                    .step(WorkflowStepAgent.builder("classify")
                             .agent("triage")
                             .instructions("Classify this")
                             .build())
                     .build();
 
-            AgenticanTask<Void, TriageOutput> triage =
-                    runtime.workflowTask("test").plan(plan).input(Void.class).output(TriageOutput.class).build();
+            Workflow<Void, TriageOutput> triage =
+                    runtime.workflow(plan).input(Void.class).output(TriageOutput.class).build();
 
-            triage.runAndAwait();
+            triage.start().await();
 
             assertFalse(capturedSystemPrompts.isEmpty());
             var prompt = capturedSystemPrompts.getFirst();
@@ -352,24 +400,29 @@ class AgenticanTypedTest {
         };
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", llmClient)
-                .agent(AgentConfig.builder()
-                        .externalId("agent.triage.v1").name("triage")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("triage")
                         .role("Agent").llm("default").build())
+                    .end()
                 .build()) {
 
-            var plan = Plan.builder("no-schema")
-                    .step(PlanStepAgent.builder("do").agent("triage").instructions("go").build())
+            var plan = WorkflowDefinition.builder("no-schema")
+                    .step(WorkflowStepAgent.builder("do").agent("triage").instructions("go").build())
                     .build();
 
-            AgenticanTask<Void, Void> invoker = runtime.workflowTask("test").plan(plan).input(Void.class).output(Void.class).build();
-            invoker.run();
+            Workflow<Void, Void> invoker = runtime.workflow(plan).input(Void.class).output(Void.class).build();
+            invoker.start();
 
             Thread.yield();
 
-            var result = invoker.awaitTaskResult();
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            var result = invoker.start().untypedResult();
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
 
             var prompt = capturedSystemPrompts.getFirst();
             assertFalse(prompt.contains("MUST be valid JSON"),
@@ -385,24 +438,29 @@ class AgenticanTypedTest {
                 .onSend("b", "{\"classification\":\"x\",\"reason\":\"y\"}");
 
         try (var runtime = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
-                .agent(AgentConfig.builder()
-                        .externalId("agent.triage.v1").name("triage")
+                .registry().api()
+                    .agent(AgentConfig.builder()
+                        .name("triage")
                         .role("Agent").llm("default").build())
+                    .end()
                 .build()) {
 
-            var plan = Plan.builder("multi")
+            var plan = WorkflowDefinition.builder("multi")
                     .outputStep("b")
-                    .step(PlanStepAgent.builder("a").agent("triage").instructions("a").build())
-                    .step(PlanStepAgent.builder("b").agent("triage").instructions("b")
+                    .step(WorkflowStepAgent.builder("a").agent("triage").instructions("a").build())
+                    .step(WorkflowStepAgent.builder("b").agent("triage").instructions("b")
                             .dependencies(java.util.List.of("a")).build())
                     .build();
 
-            AgenticanTask<Void, TriageOutput> triage =
-                    runtime.workflowTask("test").plan(plan).input(Void.class).output(TriageOutput.class).build();
+            Workflow<Void, TriageOutput> triage =
+                    runtime.workflow(plan).input(Void.class).output(TriageOutput.class).build();
 
-            TriageOutput out = triage.runAndAwait();
+            TriageOutput out = triage.start().await();
             assertEquals("x", out.classification());
         }
     }

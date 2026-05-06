@@ -1,8 +1,8 @@
 package ai.agentican.quarkus.it;
 
 import ai.agentican.framework.Agentican;
-import ai.agentican.framework.orchestration.execution.TaskListener;
-import ai.agentican.framework.orchestration.execution.TaskDecorator;
+import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
+import ai.agentican.framework.orchestration.execution.WorkflowRunDecorator;
 import ai.agentican.framework.llm.LlmClientDecorator;
 import ai.agentican.quarkus.test.MockLlmClient;
 import ai.agentican.quarkus.test.TestTaskBuilder;
@@ -36,10 +36,10 @@ class MultiModuleCompositionTest {
     Instance<LlmClientDecorator> llmDecorators;
 
     @Inject
-    Instance<TaskDecorator> taskDecorators;
+    Instance<WorkflowRunDecorator> taskDecorators;
 
     @Inject
-    Instance<TaskListener> stepListeners;
+    Instance<WorkflowRunListener> stepListeners;
 
     @BeforeEach
     void reset() {
@@ -62,7 +62,7 @@ class MultiModuleCompositionTest {
         var count = taskDecorators.stream().count();
 
         assertTrue(count >= 1,
-                "Should have at least 1 TaskDecorator (otel). Got: " + count);
+                "Should have at least 1 WorkflowRunDecorator (otel). Got: " + count);
     }
 
     @Test
@@ -81,8 +81,8 @@ class MultiModuleCompositionTest {
 
         var task = TestTaskBuilder.singleStep("composition-test", "researcher", "do work");
 
-        var handle = agentican.run(task);
-        var result = handle.result();
+        var handle = agentican.workflow(task).raw().start(java.util.Map.of());
+        var result = handle.await();
 
         assertEquals("COMPLETED", result.status().name(),
                 "Task should complete with all modules. Got: " + result.status());
@@ -100,7 +100,8 @@ class MultiModuleCompositionTest {
 
         mockLlm.queueEndTurn("Metrics test");
 
-        agentican.run(TestTaskBuilder.singleStep("metrics-composition", "researcher", "do work")).result();
+        agentican.workflow(TestTaskBuilder.singleStep("metrics-composition", "researcher", "do work"))
+                .raw().start(java.util.Map.of()).await();
 
         given().when().get("/q/metrics")
                 .then().statusCode(200).body(containsString("agentican_tasks_completed_total"));
@@ -115,7 +116,7 @@ class MultiModuleCompositionTest {
                 .contentType("application/json")
                 .body("{\"task\": {\"name\": \"rest-compose\", \"description\": \"d\", " +
                       "\"steps\": [{\"type\": \"agent\", \"name\": \"s\", " +
-                      "\"agentId\": \"researcher\", \"instructions\": \"do it\"}]}}")
+                      "\"agentName\": \"researcher\", \"instructions\": \"do it\"}]}}")
                 .when().post("/agentican/tasks")
                 .then().statusCode(201).body("taskId", notNullValue())
                 .extract().jsonPath().getString("taskId");

@@ -15,15 +15,16 @@ public class IncidentResponse {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var incident = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var incident = agentican.workflow(PLAN_NAME)
                     .input(Alert.class)
                     .output(TriageReport.class)
                     .build();
 
-            var report = incident.runAsync(alert()).join();
+            var report = incident.start(alert()).future().join();
 
             print(report);
         }

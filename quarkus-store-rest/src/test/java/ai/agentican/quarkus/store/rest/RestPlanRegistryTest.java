@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.store.rest;
 
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RestPlanRegistryTest {
 
-    private static String plansArrayJson(Plan... plans) throws Exception {
+    private static String plansArrayJson(WorkflowDefinition... plans) throws Exception {
 
         var mapper = ai.agentican.framework.util.Json.mapper();
         var arr = mapper.createArrayNode();
@@ -22,7 +22,7 @@ class RestPlanRegistryTest {
             view.put("planId", p.id());
             view.put("name", p.name());
             view.put("description", p.description());
-            view.set("plan", mapper.valueToTree(p));
+            view.set("definition", mapper.valueToTree(p));
 
             arr.add(view);
         }
@@ -30,11 +30,10 @@ class RestPlanRegistryTest {
         return mapper.writeValueAsString(arr);
     }
 
-    private static Plan samplePlan(String name, String externalId) {
+    private static WorkflowDefinition samplePlan(String name) {
 
-        return Plan.builder(name)
-                .externalId(externalId)
-                .step(PlanStepAgent.builder("do")
+        return WorkflowDefinition.builder(name)
+                .step(WorkflowStepAgent.builder("do")
                         .agent("analyst")
                         .instructions("do the thing")
                         .build())
@@ -51,18 +50,18 @@ class RestPlanRegistryTest {
     @Test
     void seedPopulatesCacheFromCatalog() throws Exception {
 
-        var p1 = samplePlan("alpha", "ext.alpha");
-        var p2 = samplePlan("beta", null);
+        var p1 = samplePlan("alpha");
+        var p2 = samplePlan("beta");
 
         var client = new FakeRestCatalogClient(plansArrayJson(p1, p2), List.of(), List.of());
         var registry = registryWith(client);
 
         registry.seed();
 
-        assertEquals(2, registry.getAll().size());
-        assertNotNull(registry.get("alpha"));
-        assertNotNull(registry.get("beta"));
-        assertEquals("alpha", registry.get("alpha").name());
+        assertEquals(2, registry.list().size());
+        assertNotNull(registry.byName("alpha"));
+        assertNotNull(registry.byName("beta"));
+        assertEquals("alpha", registry.byName("alpha").name());
     }
 
     @Test
@@ -84,30 +83,28 @@ class RestPlanRegistryTest {
         var registry = registryWith(client);
         registry.seed();
 
-        var local = samplePlan("local-one", "ext.local");
+        var local = samplePlan("local-one");
 
         registry.register(local);
 
-        assertEquals(local, registry.get("local-one"));
-        assertEquals(local, registry.getById(local.id()));
+        assertEquals(local, registry.byName("local-one"));
+        assertEquals(local, registry.byId(local.id()));
     }
 
     @Test
-    void registerIfAbsentDedupesByExternalId() throws Exception {
+    void registerIfAbsentReturnsExistingEntryById() throws Exception {
 
-        var first = samplePlan("shared", "ext.shared");
+        var first = samplePlan("shared");
 
         var client = new FakeRestCatalogClient(plansArrayJson(first), List.of(), List.of());
         var registry = registryWith(client);
 
         registry.seed();
 
-        var duplicate = samplePlan("shared-variant", "ext.shared");
+        var returned = registry.registerIfAbsent(first);
 
-        var returned = registry.registerIfAbsent(duplicate);
-
-        assertEquals(first.id(), returned.id(), "Existing entry returned when externalId matches");
-        assertEquals(1, registry.getAll().size());
+        assertEquals(first.id(), returned.id(), "Existing entry returned when id matches");
+        assertEquals(1, registry.list().size());
     }
 
     @Test
@@ -117,9 +114,9 @@ class RestPlanRegistryTest {
         var registry = registryWith(client);
         registry.seed();
 
-        var fresh = samplePlan("fresh", "ext.fresh");
+        var fresh = samplePlan("fresh");
 
         assertSame(fresh, registry.registerIfAbsent(fresh));
-        assertEquals(fresh, registry.get("fresh"));
+        assertEquals(fresh, registry.byName("fresh"));
     }
 }

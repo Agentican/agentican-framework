@@ -12,19 +12,17 @@
 -- decomposition; cross-registry "which plans use agent X" queries are out of
 -- scope for this phase.
 --
--- Plan identity survives config reloads: plan rows are overwritten when the
--- same plan id is re-registered. For historical fidelity a task carries a
--- plan_snapshot_json column so its plan shape is preserved even if the plan
+-- Plan identity survives config reloads: definition rows are overwritten when the
+-- same definition id is re-registered. For historical fidelity a task carries a
+-- plan_snapshot_json column so its definition shape is preserved even if the definition
 -- row later changes.
 
 -- ============================================================
 -- Catalog
 -- ============================================================
 
--- external_id: stable, human-readable business key used to map config/fluent-declared entries
--- to their DB rows across deploys. Nullable because planner-sourced entries don't carry one.
--- UNIQUE constraint is enforced only when present (partial unique is ANSI-correct: two NULLs
--- compare UNEQUAL so multiple NULL rows are permitted).
+-- Note: the external_id columns added here are dropped in V6 once source-mode
+-- exclusivity (yaml | builder | database) made the cross-source sync key obsolete.
 
 CREATE TABLE agents (
     id            VARCHAR(255) PRIMARY KEY,
@@ -87,7 +85,7 @@ CREATE TABLE tasks (
     iteration_index     INT          NOT NULL DEFAULT 0,
     status              VARCHAR(32),
     params_json         TEXT,
-    plan_snapshot_json  TEXT,                                 -- frozen plan shape at dispatch time
+    plan_snapshot_json  TEXT,                                 -- frozen definition shape at dispatch time
     created_at          TIMESTAMP    NOT NULL,
     completed_at        TIMESTAMP,
     version             BIGINT       NOT NULL DEFAULT 0
@@ -100,7 +98,7 @@ CREATE INDEX idx_tasks_created_at ON tasks (created_at);
 CREATE TABLE task_steps (
     id                           VARCHAR(255) PRIMARY KEY,
     task_id                      VARCHAR(255) NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
-    plan_step_id                 VARCHAR(255),           -- soft ref into the plan's definition_json
+    plan_step_id                 VARCHAR(255),           -- soft ref into the definition's definition_json
     step_name                    VARCHAR(255),
     status                       VARCHAR(32),
     output                       TEXT,

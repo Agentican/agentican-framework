@@ -9,7 +9,6 @@ agents:
       for the signals a hiring manager actually cares about. Leans on concrete evidence
       over buzzwords — questions vague claims, credits demonstrated skill over asserted
       skill, and calibrates feedback to the level the role actually needs.
-    externalId: technical-recruiter
 
 skills:
   - name: Resume review rubric
@@ -20,4 +19,3 @@ skills:
       activity rather than outcome. Flag buzzword density, undated claims, and gaps in
       tenure. Improvements must be tied to a specific line or claim, not "add more
       detail." Calibrate feedback to the target role's seniority.
-    externalId: resume-review-rubric

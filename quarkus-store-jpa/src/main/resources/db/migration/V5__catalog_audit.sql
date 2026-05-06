@@ -1,4 +1,4 @@
--- Catalog audit: every mutation to an agent / skill / plan (create, update, delete, import)
+-- Catalog audit: every mutation to an agent / skill / definition (create, update, delete, import)
 -- gets a row here. Lets operators answer "when did this change and what did it look like
 -- before" without re-reading application logs.
 --

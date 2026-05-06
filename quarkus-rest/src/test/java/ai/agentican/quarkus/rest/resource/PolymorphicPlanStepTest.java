@@ -1,10 +1,10 @@
 package ai.agentican.quarkus.rest.resource;
 
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanStep;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.orchestration.model.PlanStepBranch;
-import ai.agentican.framework.orchestration.model.PlanStepLoop;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowStep;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
+import ai.agentican.framework.orchestration.model.WorkflowStepBranch;
+import ai.agentican.framework.orchestration.model.WorkflowStepLoop;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -26,51 +26,51 @@ class PolymorphicPlanStepTest {
     @Test
     void agentStepRoundTrips() throws Exception {
 
-        var step = new PlanStepAgent("s1", "researcher", "do research", List.of(), false, List.of(), List.of());
+        var step = new WorkflowStepAgent("s1", "researcher", "do research", List.of(), false, List.of(), List.of());
         var json = objectMapper.writeValueAsString(step);
-        var deserialized = objectMapper.readValue(json, PlanStep.class);
+        var deserialized = objectMapper.readValue(json, WorkflowStep.class);
 
-        assertInstanceOf(PlanStepAgent.class, deserialized);
+        assertInstanceOf(WorkflowStepAgent.class, deserialized);
 
-        var agent = (PlanStepAgent) deserialized;
+        var agent = (WorkflowStepAgent) deserialized;
         assertEquals("s1", agent.name());
-        assertEquals("researcher", agent.agentId());
+        assertEquals("researcher", agent.agentName());
     }
 
     @Test
     void loopStepRoundTrips() throws Exception {
 
-        var body = new PlanStepAgent("body", "worker", "process item", List.of(), false, List.of(), List.of());
-        var loop = new PlanStepLoop("loop1", "producer", List.of(body), List.of(), false);
+        var body = new WorkflowStepAgent("body", "worker", "process item", List.of(), false, List.of(), List.of());
+        var loop = new WorkflowStepLoop("loop1", "producer", List.of(body), List.of(), false);
 
         var json = objectMapper.writeValueAsString(loop);
-        var deserialized = objectMapper.readValue(json, PlanStep.class);
+        var deserialized = objectMapper.readValue(json, WorkflowStep.class);
 
-        assertInstanceOf(PlanStepLoop.class, deserialized);
+        assertInstanceOf(WorkflowStepLoop.class, deserialized);
 
-        var loopStep = (PlanStepLoop) deserialized;
+        var loopStep = (WorkflowStepLoop) deserialized;
         assertEquals("loop1", loopStep.name());
         assertEquals("producer", loopStep.over());
         assertEquals(1, loopStep.body().size());
-        assertInstanceOf(PlanStepAgent.class, loopStep.body().getFirst());
+        assertInstanceOf(WorkflowStepAgent.class, loopStep.body().getFirst());
     }
 
     @Test
     void branchStepRoundTrips() throws Exception {
 
-        var pathA = new PlanStepBranch.Path("yes", List.of(
-                new PlanStepAgent("a1", "researcher", "investigate", List.of(), false, List.of(), List.of())));
-        var pathB = new PlanStepBranch.Path("no", List.of(
-                new PlanStepAgent("b1", "writer", "skip", List.of(), false, List.of(), List.of())));
+        var pathA = new WorkflowStepBranch.Path("yes", List.of(
+                new WorkflowStepAgent("a1", "researcher", "investigate", List.of(), false, List.of(), List.of())));
+        var pathB = new WorkflowStepBranch.Path("no", List.of(
+                new WorkflowStepAgent("b1", "writer", "skip", List.of(), false, List.of(), List.of())));
 
-        var branch = new PlanStepBranch("branch1", "classifier", List.of(pathA, pathB), "no", List.of(), false);
+        var branch = new WorkflowStepBranch("branch1", "classifier", List.of(pathA, pathB), "no", List.of(), false);
 
         var json = objectMapper.writeValueAsString(branch);
-        var deserialized = objectMapper.readValue(json, PlanStep.class);
+        var deserialized = objectMapper.readValue(json, WorkflowStep.class);
 
-        assertInstanceOf(PlanStepBranch.class, deserialized);
+        assertInstanceOf(WorkflowStepBranch.class, deserialized);
 
-        var branchStep = (PlanStepBranch) deserialized;
+        var branchStep = (WorkflowStepBranch) deserialized;
         assertEquals("branch1", branchStep.name());
         assertEquals("classifier", branchStep.from());
         assertEquals(2, branchStep.paths().size());
@@ -79,29 +79,29 @@ class PolymorphicPlanStepTest {
     @Test
     void fullTaskWithMixedStepsRoundTrips() throws Exception {
 
-        var producer = new PlanStepAgent("produce", "researcher", "find items", List.of(), false, List.of(), List.of());
-        var loopBody = new PlanStepAgent("process", "worker", "handle item", List.of(), false, List.of(), List.of());
-        var loop = new PlanStepLoop("loop", "produce", List.of(loopBody), List.of(), false);
+        var producer = new WorkflowStepAgent("produce", "researcher", "find items", List.of(), false, List.of(), List.of());
+        var loopBody = new WorkflowStepAgent("process", "worker", "handle item", List.of(), false, List.of(), List.of());
+        var loop = new WorkflowStepLoop("loop", "produce", List.of(loopBody), List.of(), false);
 
-        var task = Plan.builder("mixed-task").description("test").steps(List.of(producer, loop)).build();
+        var task = WorkflowDefinition.builder("mixed-task").description("test").steps(List.of(producer, loop)).build();
 
         var json = objectMapper.writeValueAsString(task);
-        var deserialized = objectMapper.readValue(json, Plan.class);
+        var deserialized = objectMapper.readValue(json, WorkflowDefinition.class);
 
         assertEquals("mixed-task", deserialized.name());
         assertEquals(2, deserialized.steps().size());
-        assertInstanceOf(PlanStepAgent.class, deserialized.steps().get(0));
-        assertInstanceOf(PlanStepLoop.class, deserialized.steps().get(1));
+        assertInstanceOf(WorkflowStepAgent.class, deserialized.steps().get(0));
+        assertInstanceOf(WorkflowStepLoop.class, deserialized.steps().get(1));
     }
 
     @Test
     void submitTaskWithLoopStepViaRest() throws Exception {
 
-        var producer = new PlanStepAgent("produce", "researcher", "find items", List.of(), false, List.of(), List.of());
-        var loopBody = new PlanStepAgent("process", "researcher", "handle item", List.of(), false, List.of(), List.of());
-        var loop = new PlanStepLoop("loop", "produce", List.of(loopBody), List.of(), false);
+        var producer = new WorkflowStepAgent("produce", "researcher", "find items", List.of(), false, List.of(), List.of());
+        var loopBody = new WorkflowStepAgent("process", "researcher", "handle item", List.of(), false, List.of(), List.of());
+        var loop = new WorkflowStepLoop("loop", "produce", List.of(loopBody), List.of(), false);
 
-        var task = Plan.builder("rest-loop-task").description("test with loop").steps(List.of(producer, loop)).build();
+        var task = WorkflowDefinition.builder("rest-loop-task").description("test with loop").steps(List.of(producer, loop)).build();
 
         var taskJson = objectMapper.writeValueAsString(task);
 

@@ -10,7 +10,6 @@ agents:
       Refuses to use euphemisms ("brief disruption"), vague remediations ("we're
       reviewing our processes"), or language that downplays actual impact. Short subject
       lines, no blame on individuals.
-    externalId: incident-communications-lead
 
 skills:
   - name: Postmortem writing
@@ -23,4 +22,3 @@ skills:
       "minor", "issue", "glitch", "experience". Always use: "outage", "incident",
       "unavailable", the actual duration. If the company caused a downstream customer
       incident, acknowledge that explicitly.
-    externalId: postmortem-writing

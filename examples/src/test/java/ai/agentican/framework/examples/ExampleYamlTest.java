@@ -43,13 +43,13 @@ class ExampleYamlTest {
 
         var config = loadConfig(resourceName);
 
-        assertFalse(config.plans().isEmpty(), resourceName + ": expected at least one plan");
+        assertFalse(config.workflows().isEmpty(), resourceName + ": expected at least one definition");
 
-        var plan = config.plans().getFirst().toPlan();
+        var plan = config.workflows().getFirst().toDefinition();
 
         assertNotNull(plan.id());
         assertNotNull(plan.name());
-        assertFalse(plan.steps().isEmpty(), resourceName + ": plan has no steps");
+        assertFalse(plan.steps().isEmpty(), resourceName + ": definition has no steps");
     }
 
     @org.junit.jupiter.api.Test
@@ -59,7 +59,7 @@ class ExampleYamlTest {
 
         assertFalse(config.llm().isEmpty(), "quick-task.yaml: expected at least one llm entry");
         assertTrue(config.agents().isEmpty(), "quick-task.yaml: planner-only, no agents expected");
-        assertTrue(config.plans().isEmpty(), "quick-task.yaml: planner-only, no plans expected");
+        assertTrue(config.workflows().isEmpty(), "quick-task.yaml: planner-only, no plans expected");
     }
 
     @ParameterizedTest
@@ -91,7 +91,6 @@ class ExampleYamlTest {
 
         assertNotNull(agent.name());
         assertNotNull(agent.role());
-        assertNotNull(agent.externalId());
     }
 
     private static RuntimeConfig loadConfig(String resourceName) throws Exception {

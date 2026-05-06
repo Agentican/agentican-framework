@@ -27,9 +27,9 @@ public class AgentProducer {
                 .orElseThrow(() -> new IllegalStateException(
                         "@AgenticanAgent qualifier missing on injection point: " + injectionPoint));
 
-        var agent = agentican.registry().agents().get(ref);
+        var agent = agentican.registry().agents().byId(ref);
 
-        if (agent == null) agent = agentican.registry().agents().getByName(ref);
+        if (agent == null) agent = agentican.registry().agents().byName(ref);
 
         if (agent == null)
             throw new IllegalStateException(

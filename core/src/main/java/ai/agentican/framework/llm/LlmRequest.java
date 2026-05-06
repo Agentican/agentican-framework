@@ -13,30 +13,30 @@ public record LlmRequest(
         String llmName,
         String provider,
         String model,
-        StructuredOutput structuredOutput) {
-
-    public LlmRequest(
-            String systemPrompt, String userTask, String userMessage,
-            List<ToolDefinition> tools, int iteration,
-            String llmName, String provider, String model) {
-
-        this(systemPrompt, userTask, userMessage, tools, iteration, llmName, provider, model, null);
-    }
+        StructuredOutput structuredOutput,
+        List<Message> messages) {
 
     public LlmRequest {
 
         if (systemPrompt == null || systemPrompt.isBlank())
             throw new IllegalArgumentException("System prompt is required");
 
+        var hasMessages = messages != null && !messages.isEmpty();
+
         var hasUserContent = (userMessage != null && !userMessage.isBlank())
                 || (userTask != null && !userTask.isBlank());
 
-        if (!hasUserContent)
-            throw new IllegalArgumentException("User task or user message is required");
+        if (!hasMessages && !hasUserContent)
+            throw new IllegalArgumentException("Either messages or userTask/userMessage is required");
 
         if (userMessage == null) userMessage = "";
 
         if (tools == null)
             tools = List.of();
+
+        if (messages == null)
+            messages = List.of();
+        else
+            messages = List.copyOf(messages);
     }
 }

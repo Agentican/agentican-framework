@@ -16,17 +16,18 @@ public class VendorSelection {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var selection = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var selection = agentican.workflow(PLAN_NAME)
                     .input(VendorProposals.class)
                     .output(SelectionMemo.class)
                     .build();
 
-            var memo = selection.runAsync(proposals()).join();
+            var memo = selection.start(proposals()).future().join();
 
             print(memo);
         }

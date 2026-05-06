@@ -10,19 +10,19 @@ import jakarta.persistence.Version;
 import java.time.Instant;
 
 @Entity
-@Table(name = "tasks")
+@Table(name = "workflow_runs")
 public class TaskEntity extends PanacheEntityBase {
 
     @Id
     public String id;
 
-    @Column(name = "plan_id")
+    @Column(name = "workflow_id")
     public String planId;
 
-    @Column(name = "task_name")
+    @Column(name = "workflow_run_name")
     public String taskName;
 
-    @Column(name = "parent_task_id")
+    @Column(name = "parent_workflow_run_id")
     public String parentTaskId;
 
     @Column(name = "parent_step_id")
@@ -36,7 +36,7 @@ public class TaskEntity extends PanacheEntityBase {
     @Column(name = "params_json", columnDefinition = "TEXT")
     public String paramsJson;
 
-    @Column(name = "plan_snapshot_json", columnDefinition = "TEXT")
+    @Column(name = "workflow_snapshot_json", columnDefinition = "TEXT")
     public String planSnapshotJson;
 
     @Column(name = "created_at", nullable = false)

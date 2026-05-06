@@ -17,17 +17,18 @@ public class DpaReview {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var review = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var review = agentican.workflow(PLAN_NAME)
                     .input(VendorDpa.class)
                     .output(RedlinePositions.class)
                     .build();
 
-            var positions = review.runAsync(vendor()).join();
+            var positions = review.start(vendor()).future().join();
 
             print(positions);
         }

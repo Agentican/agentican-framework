@@ -79,7 +79,7 @@ class AgenticanWebSocketTest {
 
         ws.sendText("{\"action\":\"submit_task\",\"task\":{\"name\":\"ws-test\"," +
                 "\"description\":\"d\",\"steps\":[{\"type\":\"agent\",\"name\":\"s\"," +
-                "\"agentId\":\"researcher\",\"instructions\":\"do it\"}]}}", true)
+                "\"agentName\":\"researcher\",\"instructions\":\"do it\"}]}}", true)
                 .get(5, TimeUnit.SECONDS);
 
         assertTrue(latch.await(5, TimeUnit.SECONDS),

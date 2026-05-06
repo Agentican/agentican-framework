@@ -14,15 +14,16 @@ public class CustomerOnboarding {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var onboarding = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var onboarding = agentican.workflow(PLAN_NAME)
                     .input(Customer.class)
                     .output(RiskAssessment.class)
                     .build();
 
-            var risk = onboarding.runAsync(customer()).join();
+            var risk = onboarding.start(customer()).future().join();
 
             print(risk);
         }

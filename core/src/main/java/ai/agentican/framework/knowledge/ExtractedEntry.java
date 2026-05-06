@@ -12,6 +12,7 @@ public record ExtractedEntry(
     public ExtractedEntry {
 
         if (action == null) throw new IllegalArgumentException("action is required");
+
         if (action == Action.UPDATE && (existingEntryId == null || existingEntryId.isBlank()))
             throw new IllegalArgumentException("existingEntryId is required for UPDATE");
 
@@ -26,6 +27,7 @@ public record ExtractedEntry(
         public static Action parse(String s) {
 
             if (s == null) return CREATE;
+
             return "update".equalsIgnoreCase(s.trim()) ? UPDATE : CREATE;
         }
     }

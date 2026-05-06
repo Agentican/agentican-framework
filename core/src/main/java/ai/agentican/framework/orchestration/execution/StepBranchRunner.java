@@ -1,7 +1,7 @@
 package ai.agentican.framework.orchestration.execution;
 
 import ai.agentican.framework.orchestration.model.*;
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.store.WorkflowRunStore;
 
 import ai.agentican.framework.util.Json;
 
@@ -19,15 +19,15 @@ class StepBranchRunner {
     private static final Logger LOG = LoggerFactory.getLogger(StepBranchRunner.class);
 
     private final StepLoopRunner.SubPlanRunner subPlanRunner;
-    private final TaskStateStore taskStateStore;
+    private final WorkflowRunStore workflowRunStore;
 
-    StepBranchRunner(StepLoopRunner.SubPlanRunner subPlanRunner, TaskStateStore taskStateStore) {
+    StepBranchRunner(StepLoopRunner.SubPlanRunner subPlanRunner, WorkflowRunStore workflowRunStore) {
 
         this.subPlanRunner = subPlanRunner;
-        this.taskStateStore = taskStateStore;
+        this.workflowRunStore = workflowRunStore;
     }
 
-    TaskStepResult run(PlanStepBranch step, Map<String, String> outputs, Map<String, String> params,
+    WorkflowStepResult run(WorkflowStepBranch step, Map<String, String> outputs, Map<String, String> params,
                        AtomicBoolean cancelled, String parentTaskId, String parentStepId) {
 
         var upstreamOutput = outputs.get(step.from());
@@ -36,7 +36,7 @@ class StepBranchRunner {
 
         if (upstreamOutput == null) {
 
-            return new TaskStepResult(step.name(), TaskStatus.FAILED,
+            return new WorkflowStepResult(step.name(), WorkflowRunStatus.FAILED,
                     "No output or param found for '" + step.from() + "' (branch step '" + step.name() + "')",
                     List.of());
         }
@@ -45,48 +45,42 @@ class StepBranchRunner {
 
         if (selectedPath == null) {
 
-            return new TaskStepResult(step.name(), TaskStatus.FAILED,
+            return new WorkflowStepResult(step.name(), WorkflowRunStatus.FAILED,
                     "No matching path found in branch '" + step.name() + "'", List.of());
         }
 
         LOG.info("Branch step '{}': selected path '{}'", step.name(), selectedPath.pathName());
 
-        taskStateStore.branchPathChosen(parentTaskId, parentStepId, selectedPath.pathName());
+        workflowRunStore.branchPathChosen(parentTaskId, parentStepId, selectedPath.pathName());
 
-        var subPlan = Plan.builder(step.name() + "-" + selectedPath.pathName())
+        var subPlan = WorkflowDefinition.builder(step.name() + "-" + selectedPath.pathName())
                 .description("")
                 .steps(selectedPath.body())
                 .build();
 
-        var subResult = subPlanRunner.run(subPlan, params, cancelled, outputs,
-                parentTaskId, parentStepId, 0);
+        var subResult = subPlanRunner.run(subPlan, params, cancelled, outputs, parentTaskId, parentStepId, 0);
 
         var allAgentResults = subResult.stepResults().stream()
                 .flatMap(sr -> sr.agentResults().stream())
                 .toList();
 
-        var lastOutput = subResult.stepResults().isEmpty() ? ""
-                : subResult.stepResults().getLast().output();
+        var lastOutput = subResult.stepResults().isEmpty() ? "" : subResult.stepResults().getLast().output();
 
-        return new TaskStepResult(step.name(), subResult.status(),
-                lastOutput != null ? lastOutput : "", allAgentResults);
+        return new WorkflowStepResult(step.name(), subResult.status(), lastOutput != null ? lastOutput : "",
+                allAgentResults);
     }
 
-    private PlanStepBranch.Path selectBranch(PlanStepBranch step, String upstreamOutput) {
+    private WorkflowStepBranch.Path selectBranch(WorkflowStepBranch step, String upstreamOutput) {
 
         var trimmed = upstreamOutput.strip().toLowerCase();
 
-        for (var path : step.paths()) {
-
+        for (var path : step.paths())
             if (trimmed.equals(path.pathName().toLowerCase()))
                 return path;
-        }
 
-        for (var path : step.paths()) {
-
+        for (var path : step.paths())
             if (trimmed.contains(path.pathName().toLowerCase()))
                 return path;
-        }
 
         try {
 
@@ -96,17 +90,16 @@ class StepBranchRunner {
             if (start >= 0 && end > start) {
 
                 var jsonPart = upstreamOutput.substring(start, end + 1);
+
                 List<String> parsed = Json.mapper().readValue(jsonPart, new TypeReference<>() {});
 
                 if (!parsed.isEmpty()) {
 
                     var first = parsed.getFirst().strip().toLowerCase();
 
-                    for (var path : step.paths()) {
-
+                    for (var path : step.paths())
                         if (first.equals(path.pathName().toLowerCase()))
                             return path;
-                    }
                 }
             }
         }
@@ -114,11 +107,9 @@ class StepBranchRunner {
 
         if (step.defaultPath() != null) {
 
-            for (var path : step.paths()) {
-
+            for (var path : step.paths())
                 if (path.pathName().equals(step.defaultPath()))
                     return path;
-            }
         }
 
         return null;

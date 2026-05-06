@@ -1,12 +1,12 @@
 package ai.agentican.quarkus.event;
 
 import ai.agentican.framework.Agentican;
-import ai.agentican.framework.orchestration.execution.TaskListener;
+import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
 import ai.agentican.framework.agent.AgentStatus;
 import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.state.StepLog;
-import ai.agentican.framework.store.TaskStateStore;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.store.WorkflowRunStore;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.util.Ids;
 import ai.agentican.framework.hitl.HitlCheckpoint;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -15,16 +15,16 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 @ApplicationScoped
-public class CdiEventBridge implements TaskListener {
+public class CdiEventBridge implements WorkflowRunListener {
 
-    @Inject TaskStateStore taskStateStore;
+    @Inject WorkflowRunStore workflowRunStore;
 
     @Inject Instance<Agentican> agentican;
 
     private final java.util.concurrent.ConcurrentHashMap<String, String> toolCallIds = new java.util.concurrent.ConcurrentHashMap<>();
 
-    @Inject Event<PlanStartedEvent> planStartedEvents;
-    @Inject Event<PlanCompletedEvent> planCompletedEvents;
+    @Inject Event<WfRunStartedEvent> planStartedEvents;
+    @Inject Event<WfRunCompletedEvent> planCompletedEvents;
     @Inject Event<TaskStartedEvent> taskStartedEvents;
     @Inject Event<TaskCompletedEvent> taskCompletedEvents;
     @Inject Event<StepStartedEvent> stepStartedEvents;
@@ -46,29 +46,29 @@ public class CdiEventBridge implements TaskListener {
     @Override
     public void onPlanStarted(String taskId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var taskDescription = taskLog != null ? taskLog.taskName() : null;
-        planStartedEvents.fire(new PlanStartedEvent(taskId, taskDescription));
+        planStartedEvents.fire(new WfRunStartedEvent(taskId, taskDescription));
     }
 
     @Override
     public void onPlanCompleted(String taskId, String planId) {
 
         var taskName = resolvePlanName(planId);
-        planCompletedEvents.fire(new PlanCompletedEvent(taskId, taskName, planId));
+        planCompletedEvents.fire(new WfRunCompletedEvent(taskId, taskName, planId));
     }
 
     private String resolvePlanName(String planId) {
 
         if (!agentican.isResolvable()) return null;
-        var plan = agentican.get().registry().plans().getById(planId);
+        var plan = agentican.get().registry().workflows().byId(planId);
         return plan != null ? plan.name() : null;
     }
 
     @Override
     public void onTaskStarted(String taskId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var taskName = taskLog != null ? taskLog.taskName() : null;
 
         taskStartedEvents.fire(new TaskStartedEvent(taskId, taskName, null));
@@ -85,9 +85,9 @@ public class CdiEventBridge implements TaskListener {
     }
 
     @Override
-    public void onTaskCompleted(String taskId, TaskStatus status) {
+    public void onTaskCompleted(String taskId, WorkflowRunStatus status) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var taskName = taskLog != null ? taskLog.taskName() : null;
 
         taskCompletedEvents.fire(new TaskCompletedEvent(taskId, taskName, status, null));
@@ -122,7 +122,7 @@ public class CdiEventBridge implements TaskListener {
     @Override
     public void onRunStarted(String taskId, String runId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var run = taskLog != null ? taskLog.findRunById(runId) : null;
         var agentName = run != null ? run.agentName() : null;
         var runIndex = run != null ? run.index() : 0;
@@ -134,7 +134,7 @@ public class CdiEventBridge implements TaskListener {
     @Override
     public void onRunCompleted(String taskId, String runId, AgentStatus status) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var run = taskLog != null ? taskLog.findRunById(runId) : null;
         var agentName = run != null ? run.agentName() : null;
         var runIndex = run != null ? run.index() : 0;
@@ -146,7 +146,7 @@ public class CdiEventBridge implements TaskListener {
     @Override
     public void onTurnStarted(String taskId, String turnId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
         var turn = turnLog != null ? turnLog.index() : 0;
 
@@ -172,7 +172,7 @@ public class CdiEventBridge implements TaskListener {
     @Override
     public void onTurnCompleted(String taskId, String turnId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
         var turn = turnLog != null ? turnLog.index() : 0;
 
@@ -198,7 +198,7 @@ public class CdiEventBridge implements TaskListener {
     @Override
     public void onMessageSent(String taskId, String turnId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
 
         var agentName = (String) null;
@@ -224,7 +224,7 @@ public class CdiEventBridge implements TaskListener {
     @Override
     public void onResponseReceived(String taskId, String turnId, StopReason stopReason) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
         var response = turnLog != null ? turnLog.response() : null;
 
@@ -258,7 +258,7 @@ public class CdiEventBridge implements TaskListener {
         var hexId = Ids.generate();
         toolCallIds.put(toolCallId, hexId);
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var toolName = resolveToolNameByCallId(taskLog, toolCallId);
         var turnId = resolveTurnIdForToolCall(taskLog, toolCallId);
 
@@ -271,7 +271,7 @@ public class CdiEventBridge implements TaskListener {
         var hexId = toolCallIds.remove(toolCallId);
         if (hexId == null) hexId = Ids.generate();
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         var toolResult = resolveToolResultByCallId(taskLog, toolCallId);
         var toolName = toolResult != null ? toolResult.toolName() : "unknown";
         var isError = toolResult != null && toolResult.isError();
@@ -283,7 +283,7 @@ public class CdiEventBridge implements TaskListener {
     @Override
     public void onHitlNotified(String taskId, String hitlId, HitlCheckpoint.Type type) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         String stepId = null;
         String stepName = null;
         ai.agentican.framework.hitl.HitlCheckpoint checkpoint = null;
@@ -315,11 +315,11 @@ public class CdiEventBridge implements TaskListener {
 
     private StepLog resolveStepById(String taskId, String stepId) {
 
-        var taskLog = taskStateStore.load(taskId);
+        var taskLog = workflowRunStore.load(taskId);
         return taskLog != null ? taskLog.findStepById(stepId) : null;
     }
 
-    private static String resolveStepIdForRun(ai.agentican.framework.state.TaskLog taskLog, String runId) {
+    private static String resolveStepIdForRun(ai.agentican.framework.state.WorkflowRunLog taskLog, String runId) {
 
         if (taskLog == null) return null;
 
@@ -331,7 +331,7 @@ public class CdiEventBridge implements TaskListener {
         return null;
     }
 
-    private static String resolveTurnIdForToolCall(ai.agentican.framework.state.TaskLog taskLog, String toolCallId) {
+    private static String resolveTurnIdForToolCall(ai.agentican.framework.state.WorkflowRunLog taskLog, String toolCallId) {
 
         if (taskLog == null) return null;
 
@@ -352,7 +352,7 @@ public class CdiEventBridge implements TaskListener {
         return null;
     }
 
-    private static String resolveToolNameByCallId(ai.agentican.framework.state.TaskLog taskLog, String toolCallId) {
+    private static String resolveToolNameByCallId(ai.agentican.framework.state.WorkflowRunLog taskLog, String toolCallId) {
 
         if (taskLog == null) return "unknown";
 
@@ -361,7 +361,7 @@ public class CdiEventBridge implements TaskListener {
                 for (var turn : run.turns()) {
                     if (turn.response() != null && turn.response().toolCalls() != null) {
                         for (var tc : turn.response().toolCalls()) {
-                            if (toolCallId.equals(tc.id())) return tc.toolName();
+                            if (toolCallId.equals(tc.id())) return tc.name();
                         }
                     }
                 }
@@ -371,7 +371,7 @@ public class CdiEventBridge implements TaskListener {
     }
 
     private static ai.agentican.framework.tools.ToolResult resolveToolResultByCallId(
-            ai.agentican.framework.state.TaskLog taskLog, String toolCallId) {
+            ai.agentican.framework.state.WorkflowRunLog taskLog, String toolCallId) {
 
         if (taskLog == null) return null;
 

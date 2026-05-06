@@ -25,20 +25,22 @@ public class PromotionPackage {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var draft = agentican.agentTask(TASK_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var draft = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(Engineer.class)
-                    .output(PromotionPlan.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
                     .hitl(true)
+                    .input(Engineer.class)
+                    .output(PromotionPlan.class)
                     .build();
 
-            var plan = draft.runAsync(engineer()).join();
+            var plan = draft.start(engineer()).future().join();
 
             print(plan);
         }

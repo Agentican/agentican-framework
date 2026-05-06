@@ -10,7 +10,7 @@ public record CatalogImportSummary(
 
         Counts skills,
 
-        Counts plans,
+        Counts workflows,
 
         List<String> errors) {
 

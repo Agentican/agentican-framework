@@ -1,13 +1,13 @@
 package ai.agentican.quarkus.event;
 
-import ai.agentican.framework.state.TaskLog;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.state.WorkflowRunLog;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
-public record TaskCompletedEvent(String taskId, String taskName, TaskStatus status, @JsonIgnore TaskLog log) {
+public record TaskCompletedEvent(String taskId, String taskName, WorkflowRunStatus status, @JsonIgnore WorkflowRunLog log) {
 
     public boolean succeeded() {
 
-        return status == TaskStatus.COMPLETED;
+        return status == WorkflowRunStatus.COMPLETED;
     }
 }

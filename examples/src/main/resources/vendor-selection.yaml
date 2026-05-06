@@ -7,7 +7,6 @@ agents:
       Normalizes vendor proposals into a common comparison structure. Extracts
       pricing, SLA, security posture, and integration cost into comparable
       fields. Flags omitted answers rather than inferring.
-    externalId: procurement-analyst
 
   - name: Procurement Lead
     role: |
@@ -15,7 +14,6 @@ agents:
       Writes a recommendation memo that names the runner-up and the single
       reason the winner edged them out. Refuses "best overall fit" language —
       names the decisive criterion.
-    externalId: procurement-lead
 
 skills:
   - name: Proposal parsing
@@ -25,7 +23,6 @@ skills:
       integration lift (weeks), and one-liner on support model. If any of
       these is absent from the proposal, record it as "not stated" — do not
       infer from marketing copy.
-    externalId: proposal-parsing
 
   - name: Evaluation matrix
     instructions: |
@@ -34,11 +31,9 @@ skills:
       a one-sentence justification. Ranking = weighted sum. The memo names
       the winner, the runner-up, and the single decisive criterion —
       refuses "best overall fit" framing.
-    externalId: evaluation-matrix
 
-plans:
+workflows:
   - name: Vendor Selection
-    externalId: vendor-selection
     outputStep: memo
     params:
       - name: rfp_title

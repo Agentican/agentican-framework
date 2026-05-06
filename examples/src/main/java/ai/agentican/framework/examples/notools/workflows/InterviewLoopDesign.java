@@ -15,15 +15,16 @@ public class InterviewLoopDesign {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var generator = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var generator = agentican.workflow(PLAN_NAME)
                     .input(Role.class)
                     .output(InterviewLoop.class)
                     .build();
 
-            var loop = generator.runAsync(role()).join();
+            var loop = generator.start(role()).future().join();
 
             print(loop);
         }

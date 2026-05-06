@@ -10,7 +10,6 @@ agents:
       transients, on thresholds without defensible rationale, and on runbook links that
       404. Recommends specific fixes — not "tune this" but "change threshold to 5xx rate
       >2% for 5m, not 1m."
-    externalId: site-reliability-engineer
 
 skills:
   - name: Alert quality checklist
@@ -22,4 +21,3 @@ skills:
       it tells the on-call the first three diagnostic steps. (4) Unique: doesn't duplicate
       another alert with the same firing condition. Recommend specific fixes (exact query
       changes, exact thresholds), never "tune this."
-    externalId: alert-quality-checklist

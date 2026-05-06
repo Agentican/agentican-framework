@@ -7,10 +7,10 @@ import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.agent.AgentResult;
 import ai.agentican.framework.agent.AgentStatus;
 import ai.agentican.framework.config.AgentConfig;
-import ai.agentican.framework.registry.PlanRegistryMemory;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanParam;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
+import ai.agentican.framework.registry.WorkflowRegistryMemory;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowParam;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 import ai.agentican.framework.registry.SkillRegistryMemory;
 import ai.agentican.framework.state.RunLog;
 import ai.agentican.framework.tools.ToolDefinition;
@@ -55,16 +55,16 @@ class PlannerAgentTest {
         var agentRegistry = new AgentRegistryMemory();
         var toolkitRegistry = new ToolkitRegistry();
 
-        var planner = new PlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
-                new SkillRegistryMemory(), new PlanRegistryMemory(), dummyAgentFactory());
+        var planner = new WorkflowPlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
+                new SkillRegistryMemory(), new WorkflowRegistryMemory(), dummyAgentFactory(), false);
 
         var result = planner.plan("Do a task");
-        var task = result.plan();
+        var task = result.definition();
 
         assertEquals("Test Task", task.name());
         assertEquals(1, task.steps().size());
         assertEquals("step-a", task.steps().getFirst().name());
-        assertTrue(agentRegistry.isRegisteredByName("test-agent"));
+        assertTrue(agentRegistry.hasByName("test-agent"));
         assertTrue(result.inputs().isEmpty(), "create path has no extracted inputs");
     }
 
@@ -95,7 +95,7 @@ class PlannerAgentTest {
 
         var mockLlm = new MockLlmClient()
                 .onSend("planning-process", endTurn(planJson))
-                .onSend("plan refiner", endTurn(refinedJson));
+                .onSend("definition refiner", endTurn(refinedJson));
 
         var agentRegistry = new AgentRegistryMemory();
 
@@ -104,12 +104,12 @@ class PlannerAgentTest {
                 new ToolDefinition("MY_TOOL", "A test tool", Map.of("q", Map.of("type", "string")))));
         toolkitRegistry.register("test-toolkit", toolkit);
 
-        var planner = new PlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
-                new SkillRegistryMemory(), new PlanRegistryMemory(), dummyAgentFactory());
+        var planner = new WorkflowPlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
+                new SkillRegistryMemory(), new WorkflowRegistryMemory(), dummyAgentFactory(), false);
 
-        var task = planner.plan("Do a task with tools").plan();
+        var task = planner.plan("Do a task with tools").definition();
 
-        var step = (PlanStepAgent) task.steps().getFirst();
+        var step = (WorkflowStepAgent) task.steps().getFirst();
         assertEquals("Refined: use MY_TOOL with param q", step.instructions());
     }
 
@@ -135,12 +135,12 @@ class PlannerAgentTest {
         var agentRegistry = new AgentRegistryMemory();
         var toolkitRegistry = new ToolkitRegistry();
 
-        var planner = new PlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
-                new SkillRegistryMemory(), new PlanRegistryMemory(), dummyAgentFactory());
+        var planner = new WorkflowPlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
+                new SkillRegistryMemory(), new WorkflowRegistryMemory(), dummyAgentFactory(), false);
 
-        var task = planner.plan("Think about something").plan();
+        var task = planner.plan("Think about something").definition();
 
-        var step = (PlanStepAgent) task.steps().getFirst();
+        var step = (WorkflowStepAgent) task.steps().getFirst();
         assertEquals("Just think", step.instructions());
     }
 
@@ -177,7 +177,7 @@ class PlannerAgentTest {
 
         var mockLlm = new MockLlmClient()
                 .onSend("planning-process", endTurn(planJson))
-                .onSend("plan refiner", endTurn(refinedJson));
+                .onSend("definition refiner", endTurn(refinedJson));
 
         var agentRegistry = new AgentRegistryMemory();
 
@@ -186,35 +186,35 @@ class PlannerAgentTest {
                 new ToolDefinition("MY_TOOL", "A test tool", Map.of())));
         toolkitRegistry.register("test-toolkit", toolkit);
 
-        var planner = new PlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
-                new SkillRegistryMemory(), new PlanRegistryMemory(), dummyAgentFactory());
+        var planner = new WorkflowPlannerAgent(mockLlm.toLlmClient(), agentRegistry, toolkitRegistry,
+                new SkillRegistryMemory(), new WorkflowRegistryMemory(), dummyAgentFactory(), false);
 
-        var task = planner.plan("Produce and process items").plan();
+        var task = planner.plan("Produce and process items").definition();
 
         assertEquals("Loop Task", task.name());
         assertTrue(task.steps().size() >= 2);
-        assertTrue(agentRegistry.isRegisteredByName("producer-agent"));
-        assertTrue(agentRegistry.isRegisteredByName("body-agent"));
+        assertTrue(agentRegistry.hasByName("producer-agent"));
+        assertTrue(agentRegistry.hasByName("body-agent"));
     }
 
     @Test
     void planReusesExistingPlanWhenLlmReturnsReuseDecision() {
 
-        var existing = Plan.builder("Research Plan")
-                .id("plan-cataloged-id")
+        var existing = WorkflowDefinition.builder("Research WorkflowDefinition")
+                .id("definition-cataloged-id")
                 .description("Research any topic")
-                .param(new PlanParam("topic", null, null, true))
-                .step(new PlanStepAgent("research", "researcher", "research {{param.topic}}",
+                .param(new WorkflowParam("topic", null, null, true))
+                .step(new WorkflowStepAgent("research", "researcher", "research {{param.topic}}",
                         List.of(), false, List.of(), List.of()))
                 .build();
 
-        var planRegistry = new PlanRegistryMemory();
-        planRegistry.register(existing);
+        var workflowRegistry = new WorkflowRegistryMemory();
+        workflowRegistry.register(existing);
 
         var reuseJson = """
                 {
                   "type": "reuse",
-                  "planRef": "plan-cataloged-id",
+                  "name": "Research WorkflowDefinition",
                   "inputs": {"topic": "quantum computing"}
                 }
                 """;
@@ -222,22 +222,22 @@ class PlannerAgentTest {
         var mockLlm = new MockLlmClient()
                 .onSend("planning-process", endTurn(reuseJson));
 
-        var planner = new PlannerAgent(mockLlm.toLlmClient(), new AgentRegistryMemory(),
-                new ToolkitRegistry(), new SkillRegistryMemory(), planRegistry, dummyAgentFactory());
+        var planner = new WorkflowPlannerAgent(mockLlm.toLlmClient(), new AgentRegistryMemory(),
+                new ToolkitRegistry(), new SkillRegistryMemory(), workflowRegistry, dummyAgentFactory(), false);
 
         var result = planner.plan("Research quantum computing");
 
-        assertSame(existing, result.plan(), "Reused plan should be the one returned from the catalog");
+        assertSame(existing, result.definition(), "Reused definition should be the one returned from the catalog");
         assertEquals(Map.of("topic", "quantum computing"), result.inputs());
     }
 
     @Test
     void planFallsBackToCreateWhenReuseRefIsUnknown() {
 
-        var planRegistry = new PlanRegistryMemory();
+        var workflowRegistry = new WorkflowRegistryMemory();
 
         var hallucinatedReuse = """
-                { "type": "reuse", "planRef": "does-not-exist", "inputs": {} }
+                { "type": "reuse", "name": "does-not-exist", "inputs": {} }
                 """;
 
         var fallbackCreate = """
@@ -257,12 +257,134 @@ class PlannerAgentTest {
                 .onSend("planning-process", endTurn(hallucinatedReuse))
                 .onSend("planning-process", endTurn(fallbackCreate));
 
-        var planner = new PlannerAgent(mockLlm.toLlmClient(), new AgentRegistryMemory(),
-                new ToolkitRegistry(), new SkillRegistryMemory(), planRegistry, dummyAgentFactory());
+        var planner = new WorkflowPlannerAgent(mockLlm.toLlmClient(), new AgentRegistryMemory(),
+                new ToolkitRegistry(), new SkillRegistryMemory(), workflowRegistry, dummyAgentFactory(), false);
 
         var result = planner.plan("novel task");
 
-        assertEquals("Fallback Task", result.plan().name());
+        assertEquals("Fallback Task", result.definition().name());
         assertTrue(result.inputs().isEmpty());
+    }
+
+    @Test
+    void strictModeFailsWhenPlannerProposesNewAgent() {
+
+        var planJson = """
+                {
+                  "type": "create",
+                  "name": "Strict Task",
+                  "description": "Should fail in strict mode",
+                  "agents": [{"id": "invented", "name": "invented-agent", "role": "Worker"}],
+                  "skills": [],
+                  "params": [],
+                  "steps": [
+                    {"name": "step-a", "type": "agent", "agent": "invented", "instructions": "do it"}
+                  ]
+                }
+                """;
+
+        var mockLlm = new MockLlmClient().onSend("planning-process", endTurn(planJson));
+
+        var planner = new WorkflowPlannerAgent(mockLlm.toLlmClient(), new AgentRegistryMemory(),
+                new ToolkitRegistry(), new SkillRegistryMemory(), new WorkflowRegistryMemory(),
+                dummyAgentFactory(), true);
+
+        var ex = assertThrows(StrictPlannerException.class, () -> planner.plan("Try to invent an agent"));
+        assertTrue(ex.getMessage().contains("invented"), "Should name the proposed agent in: " + ex.getMessage());
+    }
+
+    @Test
+    void strictModeFailsWhenPlannerProposesNewSkill() {
+
+        var planJson = """
+                {
+                  "type": "create",
+                  "name": "Strict Task",
+                  "description": "Should fail in strict mode",
+                  "agents": [],
+                  "skills": [{"id": "made-up", "name": "Made Up Skill", "instructions": "..."}],
+                  "params": [],
+                  "steps": [
+                    {"name": "step-a", "type": "agent", "agent": "existing-agent", "instructions": "do it"}
+                  ]
+                }
+                """;
+
+        var mockLlm = new MockLlmClient().onSend("planning-process", endTurn(planJson));
+
+        var agentRegistry = new AgentRegistryMemory();
+        var existing = dummyAgentFactory().apply(AgentConfig.builder()
+                .id("existing-agent").name("existing-agent").role("Existing").build());
+        agentRegistry.register(existing);
+
+        var planner = new WorkflowPlannerAgent(mockLlm.toLlmClient(), agentRegistry,
+                new ToolkitRegistry(), new SkillRegistryMemory(), new WorkflowRegistryMemory(),
+                dummyAgentFactory(), true);
+
+        var ex = assertThrows(StrictPlannerException.class, () -> planner.plan("Try to invent a skill"));
+        assertTrue(ex.getMessage().contains("Made Up Skill"),
+                "Should name the proposed skill in: " + ex.getMessage());
+    }
+
+    @Test
+    void strictModeFailsWhenStepReferencesUnknownAgent() {
+
+        var planJson = """
+                {
+                  "type": "create",
+                  "name": "Strict Task",
+                  "description": "References an unknown agent",
+                  "agents": [],
+                  "skills": [],
+                  "params": [],
+                  "steps": [
+                    {"name": "step-a", "type": "agent", "agent": "ghost-agent", "instructions": "do it"}
+                  ]
+                }
+                """;
+
+        var mockLlm = new MockLlmClient().onSend("planning-process", endTurn(planJson));
+
+        var planner = new WorkflowPlannerAgent(mockLlm.toLlmClient(), new AgentRegistryMemory(),
+                new ToolkitRegistry(), new SkillRegistryMemory(), new WorkflowRegistryMemory(),
+                dummyAgentFactory(), true);
+
+        var ex = assertThrows(StrictPlannerException.class, () -> planner.plan("Reference a missing agent"));
+        assertTrue(ex.getMessage().contains("ghost-agent"),
+                "Should name the unresolved agent in: " + ex.getMessage());
+    }
+
+    @Test
+    void strictModeSucceedsWhenPlanOnlyUsesExistingAgents() {
+
+        var planJson = """
+                {
+                  "type": "create",
+                  "name": "Strict OK",
+                  "description": "Uses only existing agents",
+                  "agents": [],
+                  "skills": [],
+                  "params": [],
+                  "steps": [
+                    {"name": "step-a", "type": "agent", "agent": "existing-agent", "instructions": "do it"}
+                  ]
+                }
+                """;
+
+        var mockLlm = new MockLlmClient().onSend("planning-process", endTurn(planJson));
+
+        var agentRegistry = new AgentRegistryMemory();
+        var existing = dummyAgentFactory().apply(AgentConfig.builder()
+                .id("existing-agent").name("existing-agent").role("Existing").build());
+        agentRegistry.register(existing);
+
+        var planner = new WorkflowPlannerAgent(mockLlm.toLlmClient(), agentRegistry,
+                new ToolkitRegistry(), new SkillRegistryMemory(), new WorkflowRegistryMemory(),
+                dummyAgentFactory(), true);
+
+        var result = planner.plan("Use the existing agent");
+
+        assertEquals("Strict OK", result.definition().name());
+        assertEquals("existing-agent", ((WorkflowStepAgent) result.definition().steps().getFirst()).agentName());
     }
 }

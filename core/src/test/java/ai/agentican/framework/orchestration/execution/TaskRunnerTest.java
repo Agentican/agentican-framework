@@ -6,11 +6,11 @@ import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.agent.SmacAgentRunner;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
-import ai.agentican.framework.store.TaskStateStoreMemory;
+import ai.agentican.framework.store.WorkflowRunStoreMemory;
 import ai.agentican.framework.llm.LlmClient;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanParam;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowParam;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 import ai.agentican.framework.registry.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -55,17 +55,17 @@ class TaskRunnerTest {
         var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm));
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("test-task")
+        var task = WorkflowDefinition.builder("test-task")
                 .step("step-a", "agent-a", "Do the thing")
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         assertEquals(1, result.stepResults().size());
         assertEquals("output text", result.stepResults().getFirst().output());
     }
@@ -83,19 +83,19 @@ class TaskRunnerTest {
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("dep-task")
+        var task = WorkflowDefinition.builder("dep-task")
                 .step("step-a", "agent-a", "Produce output")
-                .step(new PlanStepAgent("step-b", "agent-b",
+                .step(new WorkflowStepAgent("step-b", "agent-b",
                         "Use this: {{step.step-a.output}}", List.of("step-a"), false, null, null))
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         assertEquals(2, result.stepResults().size());
     }
 
@@ -112,18 +112,18 @@ class TaskRunnerTest {
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("parallel-task")
+        var task = WorkflowDefinition.builder("parallel-task")
                 .step("step-a", "agent-a", "Do A")
                 .step("step-b", "agent-b", "Do B")
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         assertEquals(2, result.stepResults().size());
     }
 
@@ -134,17 +134,17 @@ class TaskRunnerTest {
 
         var registry = new AgentRegistryMemory();
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("fail-task")
+        var task = WorkflowDefinition.builder("fail-task")
                 .step("step-a", "missing-agent", "This will fail")
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.FAILED, result.status());
+        assertEquals(WorkflowRunStatus.FAILED, result.status());
     }
 
     @Test
@@ -162,13 +162,13 @@ class TaskRunnerTest {
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("cancel-task")
+        var task = WorkflowDefinition.builder("cancel-task")
                 .step("step-a", "agent-a", "Do something")
-                .step(new PlanStepAgent("step-b", "agent-b", "Do more",
+                .step(new WorkflowStepAgent("step-b", "agent-b", "Do more",
                         List.of("step-a"), false, null, null))
                 .build();
 
@@ -179,8 +179,8 @@ class TaskRunnerTest {
 
         var result = runner.run(task, cancelled);
 
-        assertTrue(result.status() == TaskStatus.CANCELLED
-                        || (result.status() == TaskStatus.COMPLETED && result.stepResults().size() <= 2),
+        assertTrue(result.status() == WorkflowRunStatus.CANCELLED
+                        || (result.status() == WorkflowRunStatus.COMPLETED && result.stepResults().size() <= 2),
                 "Expected CANCELLED or partial COMPLETED but got " + result.status());
     }
 
@@ -193,17 +193,17 @@ class TaskRunnerTest {
         var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm));
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("hitl-task")
+        var task = WorkflowDefinition.builder("hitl-task")
                 .step("step-a", "agent-a", "Write a draft", true)
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         assertEquals("draft output", result.stepResults().getFirst().output());
     }
 
@@ -233,17 +233,17 @@ class TaskRunnerTest {
         var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm, hitlManager));
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new TaskRunner(registry, hitlManager, new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, hitlManager, new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("retry-task")
+        var task = WorkflowDefinition.builder("retry-task")
                 .step("step-a", "agent-a", "Write a draft", true)
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         assertEquals("revised draft", result.stepResults().getFirst().output());
     }
 
@@ -266,17 +266,17 @@ class TaskRunnerTest {
         var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm, hitlManager));
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new TaskRunner(registry, hitlManager, new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, hitlManager, new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("max-retry-task")
+        var task = WorkflowDefinition.builder("max-retry-task")
                 .step("step-a", "agent-a", "Write something", true)
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         assertEquals("attempt 2", result.stepResults().getFirst().output());
     }
 
@@ -288,13 +288,13 @@ class TaskRunnerTest {
         var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm));
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("cycle-task").description("Circular deps").steps(List.of(
-                new PlanStepAgent("step-a", "agent-a", "Do A", List.of("step-b"), false, null, null),
-                new PlanStepAgent("step-b", "agent-a", "Do B", List.of("step-a"), false, null, null)))
+        var task = WorkflowDefinition.builder("cycle-task").description("Circular deps").steps(List.of(
+                new WorkflowStepAgent("step-a", "agent-a", "Do A", List.of("step-b"), false, null, null),
+                new WorkflowStepAgent("step-b", "agent-a", "Do B", List.of("step-a"), false, null, null)))
                 .build();
 
         assertThrows(IllegalStateException.class, () -> runner.run(task));
@@ -313,31 +313,31 @@ class TaskRunnerTest {
         registry.register(createAgent("agent-a", mockLlmA));
         registry.register(createAgent("agent-b", mockLlmB));
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("log-task")
+        var task = WorkflowDefinition.builder("log-task")
                 .step("step-a", "agent-a", "First step")
-                .step(new PlanStepAgent("step-b", "agent-b",
+                .step(new WorkflowStepAgent("step-b", "agent-b",
                         "Use: {{step.step-a.output}}", List.of("step-a"), false, null, null))
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
 
-        var logs = taskStateStore.list();
+        var logs = workflowRunStore.list();
         assertEquals(1, logs.size());
 
         var taskLog = logs.getFirst();
-        assertEquals(TaskStatus.COMPLETED, taskLog.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, taskLog.status());
         assertEquals(2, taskLog.steps().size());
         assertTrue(taskLog.steps().containsKey("step-a"));
         assertTrue(taskLog.steps().containsKey("step-b"));
 
-        assertEquals(TaskStatus.COMPLETED, taskLog.steps().get("step-a").status());
-        assertEquals(TaskStatus.COMPLETED, taskLog.steps().get("step-b").status());
+        assertEquals(WorkflowRunStatus.COMPLETED, taskLog.steps().get("step-a").status());
+        assertEquals(WorkflowRunStatus.COMPLETED, taskLog.steps().get("step-b").status());
     }
 
     @Test
@@ -359,17 +359,17 @@ class TaskRunnerTest {
         var registry = new AgentRegistryMemory();
         registry.register(agent);
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var taskRunner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, Duration.ofMillis(50), 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var taskRunner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, Duration.ofMillis(50), 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("timeout-task")
+        var task = WorkflowDefinition.builder("timeout-task")
                 .step("step-a", "agent-a", "Do something slow")
                 .build();
 
         var result = taskRunner.run(task);
 
-        assertTrue(result.status() == TaskStatus.FAILED || result.status() == TaskStatus.COMPLETED,
+        assertTrue(result.status() == WorkflowRunStatus.FAILED || result.status() == WorkflowRunStatus.COMPLETED,
                 "Expected FAILED or COMPLETED but got " + result.status());
     }
 
@@ -382,18 +382,18 @@ class TaskRunnerTest {
         var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm));
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("default-param-task").description("Test defaults")
-                .param(new PlanParam("count", "Number of items", "5", false))
-                .step(new PlanStepAgent("step-a", "agent-a", "Process {{param.count}} items", List.of(), false, List.of(), List.of()))
+        var task = WorkflowDefinition.builder("default-param-task").description("Test defaults")
+                .param(new WorkflowParam("count", "Number of items", "5", false))
+                .step(new WorkflowStepAgent("step-a", "agent-a", "Process {{param.count}} items", List.of(), false, List.of(), List.of()))
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         assertEquals("processed", result.stepResults().getFirst().output());
     }
 
@@ -405,13 +405,13 @@ class TaskRunnerTest {
         var registry = new AgentRegistryMemory();
         registry.register(createAgent("agent-a", mockLlm));
 
-        var taskStateStore = new TaskStateStoreMemory();
+        var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var taskRunner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), taskStateStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var taskRunner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("required-param-task").description("Test required")
-                .param(new PlanParam("required_param", "desc", null, true))
-                .step(new PlanStepAgent("step-a", "agent-a", "Do {{param.required_param}}", List.of(), false, List.of(), List.of()))
+        var task = WorkflowDefinition.builder("required-param-task").description("Test required")
+                .param(new WorkflowParam("required_param", "desc", null, true))
+                .step(new WorkflowStepAgent("step-a", "agent-a", "Do {{param.required_param}}", List.of(), false, List.of(), List.of()))
                 .build();
 
         assertThrows(IllegalArgumentException.class, () -> taskRunner.run(task));

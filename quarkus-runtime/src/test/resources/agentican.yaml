@@ -1,0 +1,12 @@
+llm:
+  - name: default
+    apiKey: test-key
+    model: claude-sonnet-4-5
+
+agentRunner:
+  maxTurns: 15
+  timeout: PT10M
+
+agents:
+  - name: researcher
+    role: Expert at finding information

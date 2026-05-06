@@ -1,7 +1,7 @@
 package ai.agentican.framework.knowledge;
 
-import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.store.TaskStateStoreMemory;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
+import ai.agentican.framework.store.WorkflowRunStoreMemory;
 
 import ai.agentican.framework.store.KnowledgeStoreMemory;
 import org.junit.jupiter.api.Test;
@@ -79,11 +79,11 @@ class KnowledgeIngestorTest {
     @Test
     void skipsWhenStepFailed() {
 
-        var state = new TaskStateStoreMemory();
+        var state = new WorkflowRunStoreMemory();
         state.taskStarted("t", "demo", null, Map.of());
         state.stepStarted("t", "s", "failed-step");
         state.runStarted("t", "s", "r", "agent");
-        state.stepCompleted("t", "s", TaskStatus.FAILED, "some output");
+        state.stepCompleted("t", "s", WorkflowRunStatus.FAILED, "some output");
 
         var store = new KnowledgeStoreMemory();
 
@@ -99,11 +99,11 @@ class KnowledgeIngestorTest {
     @Test
     void skipsLoopOrBranchAggregates() {
 
-        var state = new TaskStateStoreMemory();
+        var state = new WorkflowRunStoreMemory();
         state.taskStarted("t", "demo", null, Map.of());
         state.stepStarted("t", "s", "loop-step");
 
-        state.stepCompleted("t", "s", TaskStatus.COMPLETED, "## Iteration 1\n\nfoo");
+        state.stepCompleted("t", "s", WorkflowRunStatus.COMPLETED, "## Iteration 1\n\nfoo");
 
         var store = new KnowledgeStoreMemory();
 
@@ -204,14 +204,14 @@ class KnowledgeIngestorTest {
                 "Actual content should be preserved");
     }
 
-    private static TaskStateStoreMemory newStateWithCompletedStep(String taskId, String stepId,
-                                                                  String stepName, String output) {
+    private static WorkflowRunStoreMemory newStateWithCompletedStep(String taskId, String stepId,
+                                                                    String stepName, String output) {
 
-        var state = new TaskStateStoreMemory();
+        var state = new WorkflowRunStoreMemory();
         state.taskStarted(taskId, "demo", null, Map.of());
         state.stepStarted(taskId, stepId, stepName);
         state.runStarted(taskId, stepId, "run-" + stepId, "agent");
-        state.stepCompleted(taskId, stepId, TaskStatus.COMPLETED, output);
+        state.stepCompleted(taskId, stepId, WorkflowRunStatus.COMPLETED, output);
         return state;
     }
 }

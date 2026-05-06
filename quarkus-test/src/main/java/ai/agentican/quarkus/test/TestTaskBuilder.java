@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.test;
 
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 
 import java.util.List;
 
@@ -9,22 +9,22 @@ public final class TestTaskBuilder {
 
     private TestTaskBuilder() {}
 
-    public static Plan singleStep(String taskName, String agentName, String instructions) {
+    public static WorkflowDefinition singleStep(String taskName, String agentName, String instructions) {
 
-        var step = new PlanStepAgent("step", agentName, instructions,
+        var step = new WorkflowStepAgent("step", agentName, instructions,
                 List.of(), false, List.of(), List.of());
 
-        return Plan.builder(taskName).description("test task").step(step).build();
+        return WorkflowDefinition.builder(taskName).description("test task").step(step).build();
     }
 
-    public static Plan twoStepSequential(String taskName, String agentName,
+    public static WorkflowDefinition twoStepSequential(String taskName, String agentName,
                                           String instructions1, String instructions2) {
 
-        var step1 = new PlanStepAgent("step1", agentName, instructions1,
+        var step1 = new WorkflowStepAgent("step1", agentName, instructions1,
                 List.of(), false, List.of(), List.of());
-        var step2 = new PlanStepAgent("step2", agentName, instructions2,
+        var step2 = new WorkflowStepAgent("step2", agentName, instructions2,
                 List.of("step1"), false, List.of(), List.of());
 
-        return Plan.builder(taskName).description("test task").steps(List.of(step1, step2)).build();
+        return WorkflowDefinition.builder(taskName).description("test task").steps(List.of(step1, step2)).build();
     }
 }

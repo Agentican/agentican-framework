@@ -1,0 +1,76 @@
+package ai.agentican.framework.orchestration.model;
+
+import ai.agentican.framework.orchestration.code.CodeStepRegistry;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+public class WfStepCodeDeserializer extends StdDeserializer<WorkflowStepCode<?>> {
+
+    public WfStepCodeDeserializer() {
+
+        super(WorkflowStepCode.class);
+    }
+
+    @Override
+    public WorkflowStepCode<?> deserialize(JsonParser parser, DeserializationContext ctxt) throws IOException {
+
+        var node = (JsonNode) parser.readValueAsTree();
+
+        var nameNode = node.get("name");
+        var slugNode = node.get("codeSlug");
+
+        if (nameNode == null || slugNode == null)
+            throw JsonMappingException.from(ctxt, "WorkflowStepCode requires 'name' and 'codeSlug' fields");
+
+        var name = nameNode.asText();
+        var slug = slugNode.asText();
+
+        List<String> dependencies = new ArrayList<>();
+        var depsNode = node.get("dependencies");
+
+        if (depsNode != null && depsNode.isArray())
+            for (var dep : depsNode)
+                dependencies.add(dep.asText());
+
+        var inputNode = node.get("input");
+
+        CodeStepRegistry registry;
+        try {
+            registry = (CodeStepRegistry) ctxt.findInjectableValue(
+                    CodeStepRegistry.class.getName(), null, null);
+        }
+        catch (JsonMappingException e) {
+            registry = null;
+        }
+
+        Object input;
+
+        if (registry != null) {
+
+            var registered = registry.get(slug);
+
+            if (registered == null)
+                throw JsonMappingException.from(ctxt, "Unknown code step slug: '" + slug + "'");
+
+            var inputType = registered.spec().inputType();
+
+            if (inputNode == null || inputNode.isNull() || inputType == Void.class)
+                input = null;
+            else
+                input = ctxt.readTreeAsValue(inputNode, inputType);
+        }
+        else {
+            input = inputNode != null && !inputNode.isNull() ? inputNode : null;
+        }
+
+        return new WorkflowStepCode<>(name, slug, input, dependencies);
+    }
+}

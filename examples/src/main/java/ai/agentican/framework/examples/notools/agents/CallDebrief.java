@@ -24,17 +24,19 @@ public class CallDebrief {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var summarizer = agentican.agentTask(TASK_NAME)
+            var summarizer = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(Call.class)
-                    .output(CallSummary.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(Call.class)
+                    .output(CallSummary.class)
                     .build();
 
-            var summary = summarizer.runAsync(call()).join();
+            var summary = summarizer.start(call()).future().join();
 
             print(summary);
         }

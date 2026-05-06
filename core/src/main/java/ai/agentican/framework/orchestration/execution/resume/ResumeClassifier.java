@@ -1,12 +1,12 @@
 package ai.agentican.framework.orchestration.execution.resume;
 
 import ai.agentican.framework.llm.ToolCall;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanStep;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowStep;
 import ai.agentican.framework.state.RunLog;
 import ai.agentican.framework.state.StepLog;
-import ai.agentican.framework.state.TaskLog;
+import ai.agentican.framework.state.WorkflowRunLog;
 import ai.agentican.framework.state.TurnLog;
 import ai.agentican.framework.tools.ToolResult;
 
@@ -20,7 +20,7 @@ public final class ResumeClassifier {
 
     private ResumeClassifier() {}
 
-    public static ResumePlan classify(TaskLog taskLog, Plan plan) {
+    public static ResumePlan classify(WorkflowRunLog taskLog, WorkflowDefinition plan) {
 
         if (taskLog == null)
             return ResumePlan.reap(ReapReason.TASK_LOG_MISSING);
@@ -37,7 +37,7 @@ public final class ResumeClassifier {
         for (var step : plan.steps()) {
             var log = taskLog.step(step.name());
             if (log == null) break;
-            if (log.status() == TaskStatus.COMPLETED) {
+            if (log.status() == WorkflowRunStatus.COMPLETED) {
                 completed.add(log);
                 continue;
             }

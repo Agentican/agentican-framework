@@ -8,8 +8,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public record SkillConfig(
         String id,
         String name,
-        String instructions,
-        String externalId) {
+        String instructions) {
 
     public SkillConfig {
 
@@ -21,9 +20,6 @@ public record SkillConfig(
 
         if (id == null || id.isBlank())
             id = Ids.generate();
-
-        if (externalId != null && externalId.isBlank())
-            externalId = null;
     }
 
     public static SkillConfigBuilder builder() {
@@ -36,16 +32,14 @@ public record SkillConfig(
         private String id;
         private String name;
         private String instructions;
-        private String externalId;
 
         public SkillConfigBuilder id(String id) { this.id = id; return this; }
         public SkillConfigBuilder name(String name) { this.name = name; return this; }
         public SkillConfigBuilder instructions(String instructions) { this.instructions = instructions; return this; }
-        public SkillConfigBuilder externalId(String externalId) { this.externalId = externalId; return this; }
 
         public SkillConfig build() {
 
-            return new SkillConfig(id, name, instructions, externalId);
+            return new SkillConfig(id, name, instructions);
         }
     }
 }

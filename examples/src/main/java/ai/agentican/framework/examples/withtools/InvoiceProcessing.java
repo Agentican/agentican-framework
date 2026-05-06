@@ -14,15 +14,16 @@ public class InvoiceProcessing {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var processing = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var processing = agentican.workflow(PLAN_NAME)
                     .input(InvoiceRequest.class)
                     .output(ValidationResult.class)
                     .build();
 
-            var result = processing.runAsync(request()).join();
+            var result = processing.start(request()).future().join();
 
             print(result);
         }

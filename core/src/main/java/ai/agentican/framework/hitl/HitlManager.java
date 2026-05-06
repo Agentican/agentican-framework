@@ -39,7 +39,7 @@ public class HitlManager {
 
     public HitlCheckpoint createToolApprovalCheckpoint(ToolCall call, String stepName) {
 
-        var description = "Tool call: " + call.toolName();
+        var description = "Tool call: " + call.name();
         var toolArgs = call.args().toString();
 
         return createCheckpoint(Ids.generate(), HitlCheckpoint.Type.TOOL_CALL, stepName, description, toolArgs);
@@ -140,6 +140,7 @@ public class HitlManager {
     public boolean hasPending(String checkpointId) {
 
         var future = pending.get(checkpointId);
+
         return future != null && !future.isDone();
     }
 

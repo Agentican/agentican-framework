@@ -13,7 +13,6 @@ agents:
       over news aggregators. Notes methodology and sample sizes when citing research.
       Organizes findings into themes rather than a raw list. Flags when data is older than
       12 months or when conflicting sources exist.
-    externalId: research-analyst
 
   - name: Content Writer
     role: |
@@ -22,7 +21,6 @@ agents:
       a hook that establishes why the reader should care. Uses short paragraphs and active
       voice. Adapts tone to the target audience — technical for engineers, strategic for
       executives. Avoids jargon unless the audience expects it.
-    externalId: content-writer
 
   - name: Copy Editor
     role: |
@@ -31,7 +29,6 @@ agents:
       language. Verifies all cited facts match their sources. Checks that headers follow
       a consistent hierarchy and that the introduction delivers on its promise. Returns
       specific line-level edits, not vague suggestions.
-    externalId: copy-editor
 
 skills:
   - name: Research standards
@@ -41,7 +38,6 @@ skills:
       and publication dates when referencing studies. Flag data older than 12 months
       unless it's explicitly historical. Surface conflicting sources rather than picking
       one. Every claim needs a citeable origin — no "it is widely believed" padding.
-    externalId: research-standards
 
   - name: Editorial style
     instructions: |
@@ -51,7 +47,6 @@ skills:
       who reads only H2/H3s should get the argument. Adapt register to audience: technical
       for engineers, strategic for executives, operational for practitioners. No jargon
       unless the audience expects it.
-    externalId: editorial-style
 
   - name: SEO optimization
     instructions: |
@@ -60,11 +55,9 @@ skills:
       actually searches for this topic. Ensure reading level is accessible (Flesch-Kincaid
       grade 8-10). Include the primary keyword in the first 100 words without forcing it.
       Add internal links to related content where relevant.
-    externalId: seo-optimization
 
-plans:
+workflows:
   - name: Content Pipeline
-    externalId: content-pipeline
     outputStep: publish
     params:
       - name: topic

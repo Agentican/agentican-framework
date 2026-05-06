@@ -9,13 +9,13 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 @Entity
-@Table(name = "runs")
+@Table(name = "agent_runs")
 public class RunEntity extends PanacheEntityBase {
 
     @Id
     public String id;
 
-    @Column(name = "task_step_id", nullable = false)
+    @Column(name = "workflow_run_step_id", nullable = false)
     public String taskStepId;
 
     @Column(name = "agent_id")

@@ -13,7 +13,6 @@ agents:
       with each attendee. Formats each brief as a concise one-pager with attendees, purpose,
       background context and three prioritized talking points. Flags meetings that lack a clear
       agenda so the user can follow up before the meeting starts.
-    externalId: executive-assistant
 
 skills:
   - name: Brief format
@@ -24,11 +23,9 @@ skills:
       three talking points prioritized by urgency and the user's interest. Flag meetings
       with no agenda or no attendees beyond the user — those need a follow-up before the
       meeting.
-    externalId: brief-format
 
-plans:
+workflows:
   - name: Meeting Prep Brief
-    externalId: meeting-prep-brief
     params:
       - name: date
         description: Date to prepare briefs for

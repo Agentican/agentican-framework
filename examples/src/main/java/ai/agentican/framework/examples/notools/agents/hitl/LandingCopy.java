@@ -25,19 +25,21 @@ public class LandingCopy {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var writer = agentican.agentTask(TASK_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var writer = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(LandingPageBrief.class)
-                    .output(HeroCopy.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(LandingPageBrief.class)
+                    .output(HeroCopy.class)
                     .build();
 
-            var copy = writer.runAsync(brief()).join();
+            var copy = writer.start(brief()).future().join();
 
             print(copy);
         }

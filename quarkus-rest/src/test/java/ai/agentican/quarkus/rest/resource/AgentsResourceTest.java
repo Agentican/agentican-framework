@@ -50,24 +50,23 @@ class AgentsResourceTest {
     @Test
     void createUpdateDeleteRoundTrip() {
 
-        var externalId = "test-agent-" + System.nanoTime();
+        var name = "test-agent-" + System.nanoTime();
 
         try {
 
             given()
                     .contentType("application/json")
                     .body("""
-                            {"externalId":"%s","name":"analyst","role":"Reviews data"}
-                            """.formatted(externalId))
+                            {"name":"%s","role":"Reviews data"}
+                            """.formatted(name))
                     .when().post("/agentican/agents")
                     .then()
                     .statusCode(201)
-                    .body("externalId", equalTo(externalId))
-                    .body("name", equalTo("analyst"))
+                    .body("name", equalTo(name))
                     .body("declaredInConfig", is(false));
 
             given()
-                    .when().get("/agentican/agents/" + externalId)
+                    .when().get("/agentican/agents/" + name)
                     .then()
                     .statusCode(200)
                     .body("role", equalTo("Reviews data"));
@@ -75,42 +74,42 @@ class AgentsResourceTest {
             given()
                     .contentType("application/json")
                     .body("""
-                            {"name":"analyst","role":"Reviews quarterly data"}
-                            """)
-                    .when().put("/agentican/agents/" + externalId)
+                            {"name":"%s","role":"Reviews quarterly data"}
+                            """.formatted(name))
+                    .when().put("/agentican/agents/" + name)
                     .then()
                     .statusCode(200)
                     .body("role", equalTo("Reviews quarterly data"));
         }
         finally {
 
-            given().when().delete("/agentican/agents/" + externalId).then().statusCode(204);
+            given().when().delete("/agentican/agents/" + name).then().statusCode(204);
         }
 
         given()
-                .when().get("/agentican/agents/" + externalId)
+                .when().get("/agentican/agents/" + name)
                 .then()
                 .statusCode(404);
     }
 
     @Test
-    void createDuplicateExternalIdReturns409() {
+    void createDuplicateNameReturns409() {
 
-        var externalId = "dup-agent-" + System.nanoTime();
+        var name = "dup-agent-" + System.nanoTime();
 
         try {
 
             given().contentType("application/json")
                     .body("""
-                            {"externalId":"%s","name":"first","role":"role"}
-                            """.formatted(externalId))
+                            {"name":"%s","role":"role"}
+                            """.formatted(name))
                     .when().post("/agentican/agents")
                     .then().statusCode(201);
 
             given().contentType("application/json")
                     .body("""
-                            {"externalId":"%s","name":"second","role":"role"}
-                            """.formatted(externalId))
+                            {"name":"%s","role":"role"}
+                            """.formatted(name))
                     .when().post("/agentican/agents")
                     .then()
                     .statusCode(409)
@@ -118,21 +117,8 @@ class AgentsResourceTest {
         }
         finally {
 
-            given().when().delete("/agentican/agents/" + externalId).then().statusCode(204);
+            given().when().delete("/agentican/agents/" + name).then().statusCode(204);
         }
-    }
-
-    @Test
-    void createCollidingWithPropertyDeclaredReturns409() {
-
-        given().contentType("application/json")
-                .body("""
-                        {"externalId":"researcher","name":"dup","role":"dup"}
-                        """)
-                .when().post("/agentican/agents")
-                .then()
-                .statusCode(409)
-                .body("code", equalTo("property_declared"));
     }
 
     @Test
@@ -140,34 +126,12 @@ class AgentsResourceTest {
 
         given().contentType("application/json")
                 .body("""
-                        {"externalId":"","name":"missing","role":"role"}
+                        {"name":"","role":"role"}
                         """)
                 .when().post("/agentican/agents")
                 .then()
                 .statusCode(400)
                 .body("message", notNullValue());
-    }
-
-    @Test
-    void updatePropertyDeclaredReturns409() {
-
-        given().contentType("application/json")
-                .body("""
-                        {"name":"researcher","role":"changed"}
-                        """)
-                .when().put("/agentican/agents/researcher")
-                .then()
-                .statusCode(409)
-                .body("code", equalTo("property_declared"));
-    }
-
-    @Test
-    void deletePropertyDeclaredReturns409() {
-
-        given().when().delete("/agentican/agents/researcher")
-                .then()
-                .statusCode(409)
-                .body("code", equalTo("property_declared"));
     }
 
     @Test

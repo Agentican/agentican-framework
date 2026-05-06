@@ -26,45 +26,30 @@ public class JpaSkillRegistry implements SkillRegistry {
 
     private final ConcurrentMap<String, SkillConfig> byId = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, String> idByName = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, String> idByExternalId = new ConcurrentHashMap<>();
 
     @Override
     @Transactional
     public SkillConfig register(SkillConfig skill) {
 
-        var canonical = persistAndAlign(skill);
+        persist(skill);
 
-        byId.put(canonical.id(), canonical);
-        idByName.put(canonical.name(), canonical.id());
-        if (canonical.externalId() != null)
-            idByExternalId.put(canonical.externalId(), canonical.id());
+        byId.put(skill.id(), skill);
+        idByName.put(skill.name(), skill.id());
 
-        return canonical;
+        return skill;
     }
 
     @Override
     @Transactional
     public SkillConfig registerIfAbsent(SkillConfig skill) {
 
-        if (skill.externalId() != null && idByExternalId.containsKey(skill.externalId()))
-            return byId.get(idByExternalId.get(skill.externalId()));
-
         var existing = byId.putIfAbsent(skill.id(), skill);
+        if (existing != null) return existing;
 
-        if (existing != null)
-            return existing;
+        persist(skill);
+        idByName.putIfAbsent(skill.name(), skill.id());
 
-        var canonical = persistAndAlign(skill);
-
-        if (!canonical.id().equals(skill.id())) {
-            byId.remove(skill.id());
-            byId.put(canonical.id(), canonical);
-        }
-        idByName.putIfAbsent(canonical.name(), canonical.id());
-        if (canonical.externalId() != null)
-            idByExternalId.putIfAbsent(canonical.externalId(), canonical.id());
-
-        return canonical;
+        return skill;
     }
 
     @Override
@@ -74,41 +59,33 @@ public class JpaSkillRegistry implements SkillRegistry {
         java.util.List<SkillEntity> rows = SkillEntity.listAll();
 
         for (var row : rows) {
-            var cfg = new SkillConfig(row.id, row.name, row.instructions, row.externalId);
+            var cfg = new SkillConfig(row.id, row.name, row.instructions);
             byId.put(cfg.id(), cfg);
             idByName.put(cfg.name(), cfg.id());
-            if (row.externalId != null)
-                idByExternalId.put(row.externalId, cfg.id());
         }
 
         if (!rows.isEmpty())
             LOG.info("JpaSkillRegistry seeded {} skills from catalog", rows.size());
     }
 
-    public SkillConfig getByExternalId(String externalId) {
-
-        var id = idByExternalId.get(externalId);
-        return id != null ? byId.get(id) : null;
-    }
+    @Override
+    public boolean hasById(String id) { return byId.containsKey(id); }
 
     @Override
-    public boolean isRegistered(String id) { return byId.containsKey(id); }
+    public boolean hasByName(String name) { return idByName.containsKey(name); }
 
     @Override
-    public boolean isRegisteredByName(String name) { return idByName.containsKey(name); }
+    public SkillConfig byId(String id) { return byId.get(id); }
 
     @Override
-    public SkillConfig get(String id) { return byId.get(id); }
-
-    @Override
-    public SkillConfig getByName(String name) {
+    public SkillConfig byName(String name) {
 
         var id = idByName.get(name);
         return id != null ? byId.get(id) : null;
     }
 
     @Override
-    public Collection<SkillConfig> getAll() { return Collections.unmodifiableCollection(byId.values()); }
+    public Collection<SkillConfig> list() { return Collections.unmodifiableCollection(byId.values()); }
 
     @Override
     public Map<String, SkillConfig> asMap() { return Collections.unmodifiableMap(byId); }
@@ -124,58 +101,23 @@ public class JpaSkillRegistry implements SkillRegistry {
             return;
         }
 
-        if (skill.externalId() != null)
-            SkillEntity.delete("externalId", skill.externalId());
-        else
-            SkillEntity.deleteById(skill.id());
+        SkillEntity.deleteById(skill.id());
 
         byId.remove(skill.id());
         idByName.remove(skill.name());
-        if (skill.externalId() != null) idByExternalId.remove(skill.externalId());
 
-        LOG.info("Skill '{}' (externalId={}) deleted from catalog", skill.name(), skill.externalId());
+        LOG.info("Skill '{}' (id={}) deleted from catalog", skill.name(), skill.id());
     }
 
     private SkillConfig resolve(String ref) {
 
-        var byExternal = getByExternalId(ref);
-        if (byExternal != null) return byExternal;
-
         var byIdHit = byId.get(ref);
         if (byIdHit != null) return byIdHit;
 
-        return getByName(ref);
+        return byName(ref);
     }
 
-    private SkillConfig persistAndAlign(SkillConfig skill) {
-
-        if (skill.externalId() != null) {
-
-            var existing = (SkillEntity) SkillEntity.find("externalId", skill.externalId()).firstResult();
-
-            if (existing != null) {
-
-                existing.name = skill.name();
-                existing.instructions = skill.instructions();
-                existing.updatedAt = Instant.now();
-                existing.persist();
-
-                if (existing.id.equals(skill.id()))
-                    return skill;
-
-                return new SkillConfig(existing.id, skill.name(), skill.instructions(), skill.externalId());
-            }
-
-            var e = new SkillEntity();
-            e.id = skill.id();
-            e.externalId = skill.externalId();
-            e.name = skill.name();
-            e.instructions = skill.instructions();
-            e.createdAt = Instant.now();
-            e.updatedAt = e.createdAt;
-            e.persist();
-            return skill;
-        }
+    private void persist(SkillConfig skill) {
 
         var existing = (SkillEntity) SkillEntity.findById(skill.id());
         var e = existing != null ? existing : new SkillEntity();
@@ -190,6 +132,5 @@ public class JpaSkillRegistry implements SkillRegistry {
         e.updatedAt = Instant.now();
 
         e.persist();
-        return skill;
     }
 }

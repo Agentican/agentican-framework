@@ -10,7 +10,7 @@ public record ToolView(String name, String description, String schema) {
 
     public static ToolView from(ToolDefinition def) {
 
-        return new ToolView(def.name(), def.description(), formatSchema(def));
+        return new ToolView(def.name(), def.description(), getSchema(def));
     }
 
     public static List<ToolView> fromAll(List<ToolDefinition> defs) {
@@ -18,7 +18,7 @@ public record ToolView(String name, String description, String schema) {
         return defs.stream().map(ToolView::from).toList();
     }
 
-    private static String formatSchema(ToolDefinition def) {
+    private static String getSchema(ToolDefinition def) {
 
         try {
 

@@ -1,16 +1,14 @@
 package ai.agentican.framework;
 
-import ai.agentican.framework.agent.Agent;
 import ai.agentican.framework.agent.AgentFactory;
+import ai.agentican.framework.orchestration.execution.*;
 import ai.agentican.framework.registry.AgentRegistry;
-import ai.agentican.framework.invoker.AgentInvokerBuilder;
-import ai.agentican.framework.invoker.AgenticanBuilder;
 import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.ComposioConfig;
 import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.config.McpConfig;
-import ai.agentican.framework.config.PlanConfig;
+import ai.agentican.framework.config.WorkflowConfig;
 import ai.agentican.framework.config.RuntimeConfig;
 import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.config.WorkerConfig;
@@ -37,203 +35,88 @@ import ai.agentican.framework.llm.RetryingLlmClient;
 import ai.agentican.framework.orchestration.code.CodeStep;
 import ai.agentican.framework.orchestration.code.CodeStepRegistry;
 import ai.agentican.framework.orchestration.code.CodeStepSpec;
-import ai.agentican.framework.orchestration.execution.TaskResult;
-import ai.agentican.framework.orchestration.model.PlanStepCode;
-import ai.agentican.framework.store.TaskStateStoreMemory;
-import ai.agentican.framework.store.TaskStateStoreNotifying;
-import ai.agentican.framework.store.TaskStateStore;
-import ai.agentican.framework.registry.PlanRegistryMemory;
-import ai.agentican.framework.registry.PlanRegistry;
+import ai.agentican.framework.orchestration.model.WorkflowStepCode;
+import ai.agentican.framework.store.WorkflowRunStoreMemory;
+import ai.agentican.framework.store.WorkflowRunStoreNotifying;
+import ai.agentican.framework.store.WorkflowRunStore;
+import ai.agentican.framework.registry.WorkflowRegistryMemory;
+import ai.agentican.framework.registry.WorkflowRegistry;
 import ai.agentican.framework.registry.SkillRegistryMemory;
 import ai.agentican.framework.registry.SkillRegistry;
-import ai.agentican.framework.orchestration.execution.TaskHandle;
-import ai.agentican.framework.orchestration.execution.TaskRunner;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.util.Ids;
-import ai.agentican.framework.util.Mdc;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.planning.PlannerAgent;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.planning.WorkflowPlannerAgent;
+import ai.agentican.framework.orchestration.planning.WorkflowPlan;
 import ai.agentican.framework.tools.Toolkit;
 import ai.agentican.framework.registry.ToolkitRegistry;
 import ai.agentican.framework.tools.composio.ComposioClient;
 import ai.agentican.framework.tools.mcp.McpToolkit;
 import ai.agentican.framework.util.Logs;
-import ai.agentican.framework.orchestration.execution.TaskDecorator;
-import ai.agentican.framework.orchestration.execution.TaskListener;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiFunction;
-import java.util.function.Supplier;
 
 public class Agentican implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Agentican.class);
 
-    private final AgenticanRegistry registry;
+    private final WorkflowPlannerAgent workflowPlanner;
+    private final WorkflowEngine workflowEngine;
 
-    private final PlannerAgent taskPlanner;
-    private final TaskRunner taskRunner;
-    private final TaskDecorator taskDecorator;
-    private final TaskListener taskListener;
-    private final TaskStateStore taskStateStore;
+    private Agentican(WorkflowPlannerAgent workflowPlanner, WorkflowEngine workflowEngine) {
 
-    private final HitlManager hitlManager;
-
-    private final KnowledgeIngestor knowledgeIngestor;
-
-    private final ExecutorService taskExecutor;
-    private final boolean ownsExecutor;
-
-    private final AgentFactory agentFactory;
-
-    private Agentican(AgenticanRegistry registry, PlannerAgent taskPlanner, TaskRunner taskRunner,
-                      TaskStateStore taskStateStore, HitlManager hitlManager, KnowledgeIngestor knowledgeIngestor,
-                      TaskDecorator taskDecorator, TaskListener taskListener, ExecutorService taskExecutor,
-                      boolean ownsExecutor, AgentFactory agentFactory) {
-
-        this.registry = registry;
-        this.taskPlanner = taskPlanner;
-        this.taskRunner = taskRunner;
-        this.taskStateStore = taskStateStore;
-        this.hitlManager = hitlManager;
-        this.knowledgeIngestor = knowledgeIngestor;
-        this.taskDecorator = taskDecorator;
-        this.taskListener = taskListener;
-        this.taskExecutor = taskExecutor;
-        this.ownsExecutor = ownsExecutor;
-        this.agentFactory = agentFactory;
+        this.workflowPlanner = workflowPlanner;
+        this.workflowEngine = workflowEngine;
     }
 
-    public Agent buildAgent(AgentConfig config) {
+    public WorkflowPlan plan(String description) {
 
-        return agentFactory.build(config);
+        return workflowPlanner.plan(description);
     }
 
-    public TaskHandle run(String taskDescription) {
+    public WorkflowRun<String> run(String description) {
 
-        return submit((taskId, cancelled) -> {
+        var plan = plan(description);
 
-            MDC.put("taskId", "[" + taskId + "] ");
+        var definition = plan.definition();
+        var inputs = plan.inputs();
 
-            LOG.info(Logs.AGENTICAN_DEL_TASK);
-            LOG.debug(Logs.AGENTICAN_DEL_TASK_FULL, taskDescription);
-
-            taskListener.onPlanStarted(taskId);
-
-            var planningResult = taskPlanner.plan(taskDescription);
-            var plan = planningResult.plan();
-
-            registry.plans().registerIfAbsent(plan);
-            taskListener.onPlanCompleted(taskId, plan.id());
-
-            return taskRunner.run(plan, taskId, planningResult.inputs(), cancelled);
-        });
+        return workflowEngine.dispatch(definition, inputs, null, WorkflowRunResult::output);
     }
 
-    public TaskHandle run(Plan plan) {
+    public WorkflowBuilder workflow(String workflowName) {
 
-        return run(plan, Map.of());
+        return new WorkflowBuilder(workflowEngine, workflowName);
     }
 
-    public TaskHandle run(Plan plan, Map<String, String> taskInputs) {
+    public WorkflowBuilder workflow(WorkflowDefinition plan) {
 
-        return run(plan, taskInputs, null);
+        return new WorkflowBuilder(workflowEngine, plan);
     }
 
-    public TaskHandle run(Plan plan, Map<String, String> taskInputs,
-                          ai.agentican.framework.orchestration.execution.OutputBinding outputBinding) {
+    public TaskBuilder task(String taskName) {
 
-        return submit((taskId, cancelled) -> {
-
-            registry.plans().registerIfAbsent(plan);
-            taskListener.onPlanCompleted(taskId, plan.id());
-
-            return taskRunner.run(plan, taskId, taskInputs, cancelled, outputBinding);
-        });
+        return new TaskBuilder(workflowEngine, taskName);
     }
 
     public AgenticanRegistry registry() {
 
-        return registry;
+        return workflowEngine.registry();
     }
 
-    public AgenticanBuilder workflowTask(String taskName) {
+    public AgenticanRecovery recovery() {
 
-        return new AgenticanBuilder(this, taskName);
-    }
-
-    public AgentInvokerBuilder agentTask(String taskName) {
-
-        return new AgentInvokerBuilder(this, taskName);
+        return new AgenticanRecovery(workflowEngine);
     }
 
     @Override
     public void close() {
 
-        if (ownsExecutor)
-            taskExecutor.shutdownNow();
-
-        registry.toolkits().close();
-    }
-
-    AgenticanInternals internals() {
-
-        return new AgenticanInternals(taskStateStore, taskListener, taskRunner, taskExecutor, taskDecorator,
-                hitlManager, knowledgeIngestor);
-    }
-
-    private TaskHandle submit(BiFunction<String, AtomicBoolean, TaskResult> taskFunnerFn) {
-
-        var taskId = Ids.generate();
-        var cancelled = new AtomicBoolean(false);
-
-        var supplier = wrapTaskRunner(Mdc.propagate(() -> {
-
-            try {
-
-                return taskFunnerFn.apply(taskId, cancelled);
-            }
-            catch (Exception e) {
-
-                LOG.error("Task {} failed: {}", taskId, e.getMessage(), e);
-                taskListener.onTaskCompleted(taskId, TaskStatus.FAILED);
-                throw e;
-            }
-        }));
-
-        return new TaskHandle(taskId, CompletableFuture.supplyAsync(supplier, taskExecutor), cancelled);
-    }
-
-    private <T> Supplier<T> wrapTaskRunner(Supplier<T> supplier) {
-
-        return taskDecorator != null ? taskDecorator.decorate(supplier) : supplier;
-    }
-
-    private static void requireExternalId(String kind, String name, String externalId) {
-
-        if (externalId == null || externalId.isBlank())
-            throw new IllegalStateException(kind + " '" + name + "' is missing an externalId. "
-                    + "Config-file and fluent-builder " + kind + "s must declare a stable externalId "
-                    + "so the catalog can upsert consistently across deploys.");
-    }
-
-    private static void validateCodeStepSlugs(Plan plan, CodeStepRegistry registry) {
-
-        for (var step : plan.steps()) {
-
-            if (step instanceof PlanStepCode<?> code && !registry.contains(code.codeSlug())) {
-
-                throw new IllegalStateException("Plan '" + plan.name() + "' step '" + code.name()
-                        + "' references unknown code step slug '" + code.codeSlug() + "'");
-            }
-        }
+        workflowEngine.close();
+        workflowEngine.registry().toolkits().close();
     }
 
     public static Builder builder() {
@@ -241,25 +124,7 @@ public class Agentican implements AutoCloseable {
         return new Builder();
     }
 
-    public static Builder builder(RuntimeConfig config) {
-
-        return new Builder(config);
-    }
-
-    public static Builder builder(Path yamlConfigFile) throws java.io.IOException {
-
-        return new Builder(RuntimeConfig.load(yamlConfigFile));
-    }
-
-    public static class Builder {
-
-        private final List<LlmConfig> llmConfigs = new ArrayList<>();
-        private final List<McpConfig> mcpConfigs = new ArrayList<>();
-        private final List<AgentConfig> agentConfigs = new ArrayList<>();
-        private final List<SkillConfig> skillConfigs = new ArrayList<>();
-        private final List<PlanConfig> planConfigs = new ArrayList<>();
-        private ComposioConfig composioConfig;
-        private WorkerConfig workerConfig;
+    public static final class Builder {
 
         private final Map<String, LlmClient> llms = new LinkedHashMap<>();
         private final Map<String, Toolkit> toolkits = new LinkedHashMap<>();
@@ -270,99 +135,110 @@ public class Agentican implements AutoCloseable {
         private KnowledgeStore knowledgeStore;
         private AgentRegistry agentRegistry;
         private SkillRegistry skillRegistry;
-        private PlanRegistry planRegistry;
+        private WorkflowRegistry workflowRegistry;
         private LlmClientDecorator llmDecorator;
-        private TaskDecorator taskDecorator;
-        private TaskListener stepListener;
-        private TaskStateStore taskStateStore;
+        private WorkflowRunDecorator workflowRunDecorator;
+        private WorkflowRunListener workflowRunListener;
+        private WorkflowRunStore workflowRunStore;
         private ExecutorService taskExecutor;
+
+        private final Configuration configuration = new Configuration();
+        private final Registry registry = new Registry();
 
         Builder() {}
 
-        Builder(RuntimeConfig seed) {
-
-            if (seed != null) {
-                llmConfigs.addAll(seed.llm());
-                mcpConfigs.addAll(seed.mcp());
-                agentConfigs.addAll(seed.agents());
-                skillConfigs.addAll(seed.skills());
-                planConfigs.addAll(seed.plans());
-                composioConfig = seed.composio();
-                workerConfig = seed.agentRunner();
-            }
-        }
-
-        public Builder llm(LlmConfig llm) { llmConfigs.add(llm); return this; }
-        public Builder mcp(McpConfig mcp) { mcpConfigs.add(mcp); return this; }
-        public Builder agent(AgentConfig agent) { agentConfigs.add(agent); return this; }
-        public Builder skill(SkillConfig skill) { skillConfigs.add(skill); return this; }
-        public Builder plan(PlanConfig plan) { planConfigs.add(plan); return this; }
-        public Builder composio(ComposioConfig composio) { composioConfig = composio; return this; }
-        public Builder worker(WorkerConfig worker) { workerConfig = worker; return this; }
-
-        public Builder llm(String name, LlmClient llm) { llms.put(name, llm); return this; }
-        public Builder toolkit(String slug, Toolkit toolkit) { toolkits.put(slug, toolkit); return this; }
-
-        public <I, O> Builder codeStep(String slug, Class<I> inputType, Class<O> outputType,
-                                                CodeStep<I, O> executor) {
-            codeStepRegistry.register(new CodeStepSpec<>(slug, null, inputType, outputType), executor);
-            return this;
-        }
-
-        public Builder vectorIndex(VectorIndex kb) {
-            vectorIndexRegistry.register(kb);
-            return this;
-        }
-
-        public Builder hitlManager(HitlManager hitlManager) { this.hitlManager = hitlManager; return this; }
-        public Builder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
-        public Builder agentRegistry(AgentRegistry agentRegistry) { this.agentRegistry = agentRegistry; return this; }
-        public Builder skillRegistry(SkillRegistry skillRegistry) { this.skillRegistry = skillRegistry; return this; }
-        public Builder planRegistry(PlanRegistry planRegistry) { this.planRegistry = planRegistry; return this; }
-        public Builder llmDecorator(LlmClientDecorator llmDecorator) { this.llmDecorator = llmDecorator; return this; }
-        public Builder taskDecorator(TaskDecorator taskDecorator) { this.taskDecorator = taskDecorator; return this; }
-        public Builder stepListener(TaskListener taskListener) { this.stepListener = taskListener; return this; }
-        public Builder taskStateStore(TaskStateStore taskStateStore) { this.taskStateStore = taskStateStore; return this; }
-        public Builder taskExecutor(ExecutorService taskExecutor) { this.taskExecutor = taskExecutor; return this; }
-
         public Agentican build() {
+
+            List<LlmConfig> llmConfigs;
+            List<McpConfig> mcpConfigs;
+
+            ComposioConfig composioConfig;
+            WorkerConfig workerConfig;
+
+            boolean strict;
+
+            if (configuration.mode == ConfigurationMode.YAML) {
+
+                var loaded = configuration.yaml.load();
+
+                llmConfigs = new ArrayList<>(loaded.llm());
+                mcpConfigs = new ArrayList<>(loaded.mcp());
+                composioConfig = loaded.composio();
+                workerConfig = loaded.agentRunner();
+                strict = loaded.strict();
+            }
+            else {
+
+                llmConfigs = configuration.api.llmConfigs;
+                mcpConfigs = configuration.api.mcpConfigs;
+                composioConfig = configuration.api.composioConfig;
+                workerConfig = configuration.api.workerConfig;
+                strict = configuration.api.strict;
+            }
+
+            List<AgentConfig> agentCfgs;
+            List<SkillConfig> skillCfgs;
+            List<WorkflowConfig> workflowCfgs;
+
+            if (registry.mode == RegistryMode.YAML) {
+
+                var loaded = registry.yaml.load();
+
+                agentCfgs = loaded.agents();
+                skillCfgs = loaded.skills();
+                workflowCfgs = loaded.workflows();
+            }
+            else if (registry.mode == RegistryMode.API) {
+
+                agentCfgs = registry.api.agents;
+                skillCfgs = registry.api.skills;
+                workflowCfgs = registry.api.workflows;
+            }
+            else {
+
+                agentCfgs = List.of();
+                skillCfgs = List.of();
+                workflowCfgs = List.of();
+            }
 
             if (llmConfigs.isEmpty() && llms.isEmpty())
                 throw new IllegalStateException("At least one LLM is required (declare an LlmConfig or inject an LlmClient)");
 
-            var config = new RuntimeConfig(llmConfigs, mcpConfigs, composioConfig, workerConfig,
-                    agentConfigs, skillConfigs, planConfigs);
+            var config = new RuntimeConfig(llmConfigs, mcpConfigs, composioConfig, workerConfig, agentCfgs, skillCfgs,
+                    workflowCfgs, strict);
 
             var hm = hitlManager != null ? hitlManager : new HitlManager(HitlNotifier.logging());
             var ks = knowledgeStore != null ? knowledgeStore : new KnowledgeStoreMemory();
-            var tss = taskStateStore != null ? taskStateStore : new TaskStateStoreMemory();
-            TaskListener tl = stepListener != null ? stepListener : new TaskListener() {};
+            var tss = workflowRunStore != null ? workflowRunStore : new WorkflowRunStoreMemory();
+            var tl = workflowRunListener != null ? workflowRunListener : new WorkflowRunListener() {};
             var ownsExecutor = (taskExecutor == null);
             var executor = taskExecutor != null ? taskExecutor : Executors.newVirtualThreadPerTaskExecutor();
 
-            var agentRunnerConfig = config.agentRunner();
+            var agentRunnerConfig = config.agentRunner() != null
+                    ? config.agentRunner()
+                    : new WorkerConfig(0, null);
 
             var mutableLlms = new LinkedHashMap<String, LlmClient>();
 
             config.llm().forEach(llmConfig -> {
 
                 LlmClient client = switch (llmConfig.provider()) {
-                    case "anthropic"          -> AnthropicLlmClient.create(llmConfig);
-                    case "openai", "groq"     -> OpenAiLlmClient.create(llmConfig);
-                    case "gemini"             -> GeminiLlmClient.create(llmConfig);
-                    case "bedrock"            -> BedrockLlmClient.create(llmConfig);
+
+                    case "anthropic" -> AnthropicLlmClient.create(llmConfig);
+                    case "openai", "groq" -> OpenAiLlmClient.create(llmConfig);
+                    case "gemini" -> GeminiLlmClient.create(llmConfig);
+                    case "bedrock" -> BedrockLlmClient.create(llmConfig);
                     case "sambanova",
                          "together",
                          "fireworks",
-                         "openai-compatible"  -> OpenAiCompatibleLlmClient.create(llmConfig);
-                    default -> throw new IllegalStateException(
-                            "Unsupported LLM provider: " + llmConfig.provider());
+                         "openai-compatible" -> OpenAiCompatibleLlmClient.create(llmConfig);
+                    default -> throw new IllegalStateException("Unsupported LLM provider: " + llmConfig.provider());
                 };
 
                 if (llmDecorator != null) client = llmDecorator.decorate(llmConfig, client);
 
-                client = new RetryingLlmClient(client,
-                        agentRunnerConfig.llmMaxRetries(), agentRunnerConfig.llmRetryBaseDelay());
+                client = new RetryingLlmClient(client, agentRunnerConfig.llmMaxRetries(),
+                        agentRunnerConfig.llmRetryBaseDelay());
 
                 mutableLlms.put(llmConfig.name(), client);
             });
@@ -371,7 +247,8 @@ public class Agentican implements AutoCloseable {
 
             var llmClients = Collections.unmodifiableMap(mutableLlms);
 
-            TaskStateStore notifyingStore = new TaskStateStoreNotifying(tss, tl);
+            var notifyingStore = new WorkflowRunStoreNotifying(tss, tl);
+
             KnowledgeIngestor knowledgeIngestor = null;
 
             var defaultLlm = llmClients.get(LlmConfig.DEFAULT);
@@ -379,8 +256,9 @@ public class Agentican implements AutoCloseable {
             if (defaultLlm != null) {
 
                 var extractor = new LlmKnowledgeExtractor(defaultLlm);
+
                 knowledgeIngestor = new KnowledgeIngestor(tss, ks, extractor, executor);
-                notifyingStore = new TaskStateStoreNotifying(notifyingStore, knowledgeIngestor);
+                notifyingStore = new WorkflowRunStoreNotifying(notifyingStore, knowledgeIngestor);
             }
 
             var finalTss = notifyingStore;
@@ -396,8 +274,7 @@ public class Agentican implements AutoCloseable {
 
                 var composioClient = ComposioClient.of(composioCfg.apiKey(), composioCfg.userId());
 
-                composioClient.availableToolkits().forEach(tk ->
-                        toolkitRegistry.register(tk.slug(), tk));
+                composioClient.availableToolkits().forEach(tk -> toolkitRegistry.register(tk.slug(), tk));
             }
 
             toolkits.forEach(toolkitRegistry::register);
@@ -407,73 +284,300 @@ public class Agentican implements AutoCloseable {
                 if (toolkits.containsKey(RetrievalToolkit.SLUG))
                     throw new IllegalStateException(
                             "Toolkit slug '" + RetrievalToolkit.SLUG
-                          + "' is reserved when vector indexs are configured. "
-                          + "Don't register a custom toolkit under that slug.");
+                                    + "' is reserved when vector indexs are configured. "
+                                    + "Don't register a custom toolkit under that slug.");
 
-                toolkitRegistry.register(RetrievalToolkit.SLUG,
-                        new RetrievalToolkit(vectorIndexRegistry));
+                toolkitRegistry.register(RetrievalToolkit.SLUG, new RetrievalToolkit(vectorIndexRegistry));
 
                 if (codeStepRegistry.contains(RetrieveCodeStep.SLUG))
                     throw new IllegalStateException(
                             "Code-step slug '" + RetrieveCodeStep.SLUG
-                          + "' is reserved when vector indexs are configured. "
-                          + "Don't register a custom code step under that slug.");
+                                    + "' is reserved when vector indexs are configured. "
+                                    + "Don't register a custom code step under that slug.");
 
                 codeStepRegistry.register(
-                        new CodeStepSpec<>(RetrieveCodeStep.SLUG, RetrieveCodeStep.DESCRIPTION,
-                                           RetrieveQuery.class, RetrieveOutput.class),
+                        new CodeStepSpec<>(RetrieveCodeStep.SLUG, RetrieveCodeStep.DESCRIPTION, RetrieveQuery.class,
+                                RetrieveOutput.class),
                         new RetrieveCodeStep(vectorIndexRegistry));
             }
 
-            SkillRegistry sr = skillRegistry != null ? skillRegistry : new SkillRegistryMemory();
+            var sr = skillRegistry != null ? skillRegistry : new SkillRegistryMemory();
+
             sr.seed();
 
-            config.skills().forEach(skill -> {
-                requireExternalId("skill", skill.name(), skill.externalId());
-                sr.register(skill);
-            });
+            config.skills().forEach(sr::register);
 
             var agentFactory = AgentFactory.builder()
                     .config(config)
                     .llms(llmClients)
                     .hitlManager(hm)
                     .knowledgeStore(ks)
-                    .taskStateStore(finalTss)
+                    .workflowRunStore(finalTss)
                     .skillRegistry(sr)
-                    .taskListener(tl)
+                    .workflowRunListener(tl)
                     .build();
 
-            AgentRegistry ar = agentRegistry != null ? agentRegistry : new AgentRegistryMemory();
-            ar.seed(agentFactory::build);
+            var ar = agentRegistry != null ? agentRegistry : new AgentRegistryMemory();
 
-            config.agents().forEach(agentConfig -> {
-                requireExternalId("agent", agentConfig.name(), agentConfig.externalId());
-                ar.register(agentFactory.build(agentConfig));
-            });
+            ar.agentFactory(agentFactory::build);
+            ar.seed();
 
-            PlanRegistry pr = planRegistry != null ? planRegistry : new PlanRegistryMemory();
+            config.agents().forEach(ar::register);
+
+            var pr = workflowRegistry != null ? workflowRegistry : new WorkflowRegistryMemory();
+
             pr.seed();
 
-            config.plans().forEach(planConfig -> {
-                requireExternalId("plan", planConfig.name(), planConfig.externalId());
-                var plan = planConfig.toPlan(codeStepRegistry);
-                validateCodeStepSlugs(plan, codeStepRegistry);
+            config.workflows().forEach(workflowConfig -> {
+
+                var plan = workflowConfig.toDefinition(codeStepRegistry);
+
+                for (var step : plan.steps()) {
+
+                    if (step instanceof WorkflowStepCode<?> code && !codeStepRegistry.contains(code.codeSlug())) {
+
+                        throw new IllegalStateException("WorkflowDefinition '" + plan.name() + "' step '" + code.name()
+                                + "' references unknown code step slug '" + code.codeSlug() + "'");
+                    }
+                }
+
                 pr.register(plan);
             });
 
-            var taskPlanner = new PlannerAgent(defaultLlm, ar, toolkitRegistry, sr, pr, agentFactory::build);
+            var taskPlanner = new WorkflowPlannerAgent(defaultLlm, ar, toolkitRegistry, sr, pr, agentFactory::build, strict);
 
-            var taskRunner = new TaskRunner(ar, hm, toolkitRegistry, finalTss,
-                    agentRunnerConfig.taskTimeout(), agentRunnerConfig.maxStepRetries(),
-                    taskDecorator, codeStepRegistry);
+            var taskRunner = new WorkflowRunner(ar, hm, toolkitRegistry, finalTss, agentRunnerConfig.taskTimeout(),
+                    agentRunnerConfig.maxStepRetries(), workflowRunDecorator, codeStepRegistry);
 
             LOG.info(Logs.AGENTICAN_INIT,
                     llmClients.size(), toolkitRegistry.slugs().size(), ar.asMap().size(), pr.asMap().size());
 
-            var registry = new AgenticanRegistry(pr, ar, toolkitRegistry, sr, vectorIndexRegistry);
+            var agenticanRegistry = new AgenticanRegistry(pr, ar, toolkitRegistry, sr, vectorIndexRegistry);
 
-            return new Agentican(registry, taskPlanner, taskRunner, finalTss, hm,
-                    knowledgeIngestor, taskDecorator, tl, executor, ownsExecutor, agentFactory);
+            var engine = new WorkflowEngine(agenticanRegistry, finalTss, tl, taskRunner, executor,
+                    workflowRunDecorator, hm, knowledgeIngestor, ownsExecutor);
+
+            return new Agentican(taskPlanner, engine);
+        }
+
+        public Configuration configuration() { return configuration; }
+        public Registry registry() { return registry; }
+
+        public Builder llm(String name, LlmClient llm) { llms.put(name, llm); return this; }
+        public Builder toolkit(String slug, Toolkit toolkit) { toolkits.put(slug, toolkit); return this; }
+        public Builder hitlManager(HitlManager hitlManager) { this.hitlManager = hitlManager; return this; }
+        public Builder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
+        public Builder agentRegistry(AgentRegistry agentRegistry) { this.agentRegistry = agentRegistry; return this; }
+        public Builder skillRegistry(SkillRegistry skillRegistry) { this.skillRegistry = skillRegistry; return this; }
+        public Builder workflowRegistry(WorkflowRegistry workflowRegistry) { this.workflowRegistry = workflowRegistry; return this; }
+        public Builder llmDecorator(LlmClientDecorator llmDecorator) { this.llmDecorator = llmDecorator; return this; }
+        public Builder workflowRunDecorator(WorkflowRunDecorator workflowRunDecorator) { this.workflowRunDecorator = workflowRunDecorator; return this; }
+        public Builder workflowRunListener(WorkflowRunListener workflowRunListener) { this.workflowRunListener = workflowRunListener; return this; }
+        public Builder workflowRunStore(WorkflowRunStore workflowRunStore) { this.workflowRunStore = workflowRunStore; return this; }
+        public Builder taskExecutor(ExecutorService taskExecutor) { this.taskExecutor = taskExecutor; return this; }
+
+        public Builder vectorIndex(VectorIndex kb) {
+
+            vectorIndexRegistry.register(kb);
+
+            return this;
+        }
+
+        public <I, O> Builder codeStep(String slug, Class<I> inputType, Class<O> outputType, CodeStep<I, O> executor) {
+
+            codeStepRegistry.register(new CodeStepSpec<>(slug, null, inputType, outputType), executor);
+
+            return this;
+        }
+
+        private static RuntimeConfig loadYaml(RuntimeConfig preloaded, Path path, String classpathResource,
+                                              String missingMessage) {
+
+            if (preloaded != null) return preloaded;
+
+            if (path != null) {
+
+                try {
+
+                    return RuntimeConfig.load(path);
+                }
+                catch (java.io.IOException e) {
+
+                    throw new java.io.UncheckedIOException(e);
+                }
+            }
+
+            if (classpathResource != null) {
+
+                var cl = Thread.currentThread().getContextClassLoader();
+
+                if (cl == null) cl = Builder.class.getClassLoader();
+
+                try (var in = cl.getResourceAsStream(classpathResource)) {
+
+                    if (in == null)
+                        throw new IllegalStateException("YAML classpath resource not found: " + classpathResource);
+
+                    return RuntimeConfig.load(in);
+                }
+                catch (java.io.IOException e) {
+
+                    throw new java.io.UncheckedIOException(e);
+                }
+            }
+
+            throw new IllegalStateException(missingMessage);
+        }
+
+        private enum ConfigurationMode { API, YAML }
+        private enum RegistryMode { API, YAML }
+
+        public final class Configuration {
+
+            private ConfigurationMode mode;
+
+            private final Api api = new Api();
+            private final Yaml yaml = new Yaml();
+
+            Configuration() {}
+
+            public Api api() {
+
+                requireMode(ConfigurationMode.API);
+
+                return api;
+            }
+
+            public Yaml yaml() {
+
+                requireMode(ConfigurationMode.YAML);
+
+                return yaml;
+            }
+
+            public Builder end() { return Builder.this; }
+
+            private void requireMode(ConfigurationMode m) {
+
+                if (mode != null && mode != m)
+                    throw new IllegalStateException(
+                            "Configuration source already set to " + mode + "; cannot also use " + m);
+
+                mode = m;
+            }
+
+            public final class Api {
+
+                private final List<LlmConfig> llmConfigs = new ArrayList<>();
+                private final List<McpConfig> mcpConfigs = new ArrayList<>();
+
+                private ComposioConfig composioConfig;
+                private WorkerConfig workerConfig;
+
+                private boolean strict;
+
+                Api() {}
+
+                public Api llm(LlmConfig llm) { llmConfigs.add(llm); return this; }
+                public Api mcp(McpConfig mcp) { mcpConfigs.add(mcp); return this; }
+                public Api composio(ComposioConfig composio) { composioConfig = composio; return this; }
+                public Api worker(WorkerConfig worker) { workerConfig = worker; return this; }
+                public Api strict() { strict = true; return this; }
+
+                public Builder end() { return Builder.this; }
+            }
+
+            public final class Yaml {
+
+                private Path path;
+                private String classpathResource;
+                private RuntimeConfig preloaded;
+
+                Yaml() {}
+
+                public Yaml path(Path path) { this.path = path; return this; }
+                public Yaml classpath(String resource) { this.classpathResource = resource; return this; }
+                public Yaml config(RuntimeConfig config) { this.preloaded = config; return this; }
+
+                public Builder end() { return Builder.this; }
+
+                RuntimeConfig load() {
+                    return loadYaml(preloaded, path, classpathResource,
+                            "Configuration source set to YAML but no source provided — call .path(Path), "
+                                    + ".classpath(String), or .config(RuntimeConfig).");
+                }
+            }
+        }
+
+        public final class Registry {
+
+            private RegistryMode mode;
+
+            private final Api api = new Api();
+            private final Yaml yaml = new Yaml();
+
+            Registry() {}
+
+            public Api api() {
+
+                requireMode(RegistryMode.API);
+
+                return api;
+            }
+
+            public Yaml yaml() {
+
+                requireMode(RegistryMode.YAML);
+
+                return yaml;
+            }
+
+            public Builder end() { return Builder.this; }
+
+            private void requireMode(RegistryMode m) {
+
+                if (mode != null && mode != m)
+                    throw new IllegalStateException(
+                            "Registry source already set to " + mode + "; cannot also use " + m);
+
+                mode = m;
+            }
+
+            public final class Api {
+
+                private final List<AgentConfig> agents = new ArrayList<>();
+                private final List<SkillConfig> skills = new ArrayList<>();
+                private final List<WorkflowConfig> workflows = new ArrayList<>();
+
+                Api() {}
+
+                public Api agent(AgentConfig agent)             { agents.add(agent);       return this; }
+                public Api skill(SkillConfig skill)             { skills.add(skill);       return this; }
+                public Api workflow(WorkflowConfig workflow)    { workflows.add(workflow); return this; }
+
+                public Builder end() { return Builder.this; }
+            }
+
+            public final class Yaml {
+
+                private Path path;
+                private String classpathResource;
+                private RuntimeConfig preloaded;
+
+                Yaml() {}
+
+                public Yaml path(Path path) { this.path = path; return this; }
+                public Yaml classpath(String resource) { this.classpathResource = resource; return this; }
+                public Yaml config(RuntimeConfig config) { this.preloaded = config; return this; }
+
+                public Builder end() { return Builder.this; }
+
+                RuntimeConfig load() {
+                    return loadYaml(preloaded, path, classpathResource,
+                            "Registry source set to YAML but no source provided — call .path(Path), "
+                                    + ".classpath(String), or .config(RuntimeConfig).");
+                }
+            }
         }
     }
 }

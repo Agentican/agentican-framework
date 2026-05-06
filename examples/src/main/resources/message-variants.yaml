@@ -9,7 +9,6 @@ agents:
       subject lines scannable (under 60 chars) and body copy tight. When asked for variants,
       the tonal range is genuine: each variant reads like a different person wrote it, not
       the same message with synonyms swapped in.
-    externalId: copywriter
 
 skills:
   - name: Tone spectrum
@@ -19,11 +18,9 @@ skills:
       the reader directly. Direct: short sentences, no hedging, leads with the ask. Technical:
       uses precise terminology, quantifies claims, assumes domain fluency. Each variant must
       stay true to its register — don't mix professional phrasing with direct punch.
-    externalId: tone-spectrum
 
-plans:
+workflows:
   - name: Message Variants
-    externalId: message-variants
     params:
       - name: core_message
         description: Core message to rewrite

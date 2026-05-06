@@ -1,4 +1,4 @@
-package ai.agentican.framework.invoker;
+package ai.agentican.framework;
 
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 
@@ -15,7 +15,7 @@ class SchemaGeneratorTest {
     @Test
     void jsonPropertyDescriptionPropagatesToSchema() {
 
-        var schema = SchemaGenerator.schemaFor(Annotated.class);
+        var schema = WorkflowSchemaGenerator.schemaFor(Annotated.class);
 
         assertNotNull(schema);
 
@@ -30,7 +30,7 @@ class SchemaGeneratorTest {
     @Test
     void objectSchemaHasAdditionalPropertiesFalse() {
 
-        var schema = SchemaGenerator.schemaFor(Annotated.class);
+        var schema = WorkflowSchemaGenerator.schemaFor(Annotated.class);
 
         assertEquals(Boolean.FALSE, schema.path("additionalProperties").asBoolean(true),
                 "Anthropic rejects schemas where 'object' types don't explicitly set additionalProperties=false");
@@ -39,7 +39,7 @@ class SchemaGeneratorTest {
     @Test
     void allRecordComponentsMarkedRequired() {
 
-        var schema = SchemaGenerator.schemaFor(Annotated.class);
+        var schema = WorkflowSchemaGenerator.schemaFor(Annotated.class);
         var required = schema.path("required");
 
         assertTrue(required.isArray() && required.size() == 2,

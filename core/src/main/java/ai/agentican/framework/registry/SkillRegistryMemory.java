@@ -18,6 +18,7 @@ public class SkillRegistryMemory implements SkillRegistry {
 
         byId.put(skill.id(), skill);
         byName.put(skill.name(), skill);
+
         return skill;
     }
 
@@ -27,7 +28,9 @@ public class SkillRegistryMemory implements SkillRegistry {
         var existing = byId.putIfAbsent(skill.id(), skill);
 
         if (existing == null) {
+
             byName.putIfAbsent(skill.name(), skill);
+
             return skill;
         }
 
@@ -35,31 +38,31 @@ public class SkillRegistryMemory implements SkillRegistry {
     }
 
     @Override
-    public boolean isRegistered(String id) {
+    public boolean hasById(String id) {
 
         return byId.containsKey(id);
     }
 
     @Override
-    public boolean isRegisteredByName(String name) {
+    public boolean hasByName(String name) {
 
         return byName.containsKey(name);
     }
 
     @Override
-    public SkillConfig get(String id) {
+    public SkillConfig byId(String id) {
 
         return byId.get(id);
     }
 
     @Override
-    public SkillConfig getByName(String name) {
+    public SkillConfig byName(String name) {
 
         return byName.get(name);
     }
 
     @Override
-    public Collection<SkillConfig> getAll() {
+    public Collection<SkillConfig> list() {
 
         return Collections.unmodifiableCollection(byId.values());
     }
@@ -73,8 +76,8 @@ public class SkillRegistryMemory implements SkillRegistry {
     @Override
     public void delete(String ref) {
 
-        var skill = getByExternalId(ref);
-        if (skill == null) skill = byId.get(ref);
+        var skill = byId.get(ref);
+
         if (skill == null) skill = byName.get(ref);
 
         if (skill == null) return;

@@ -24,7 +24,7 @@ class TemplatesTest {
     @Test
     void renderSystemPromptWithSkills() {
 
-        var skills = List.of(new SkillConfig(null, "summarize", "Summarize long text", null));
+        var skills = List.of(new SkillConfig(null, "summarize", "Summarize long text"));
 
         var result = templates.renderSystemPrompt("TestBot", "A helper", skills);
 
@@ -64,7 +64,7 @@ class TemplatesTest {
     @Test
     void renderPlannerPromptWithNoAgentsOrTools() {
 
-        var result = templates.renderPlannerPrompt(List.of(), List.of(), List.of(), List.of());
+        var result = templates.renderPlannerPrompt(List.of(), List.of(), List.of(), List.of(), false);
 
         assertTrue(result.contains("No agents configured"), "Expected no-agents indicator in: " + result);
         assertTrue(result.contains("No tools connected"), "Expected no-tools indicator in: " + result);
@@ -73,7 +73,7 @@ class TemplatesTest {
     @Test
     void renderPlannerPromptContainsPlanningProcess() {
 
-        var result = templates.renderPlannerPrompt(List.of(), List.of(), List.of(), List.of());
+        var result = templates.renderPlannerPrompt(List.of(), List.of(), List.of(), List.of(), false);
 
         assertTrue(result.contains("planning-process"), "Expected planning-process section in: " + result);
     }
@@ -85,7 +85,7 @@ class TemplatesTest {
 
         var result = templates.renderRefinePlanMessage(planJson, List.of(), List.of(), List.of());
 
-        assertTrue(result.contains("my-step"), "Expected plan JSON to be rendered in: " + result);
-        assertTrue(result.contains("initial-plan"), "Expected <initial-plan> tag in: " + result);
+        assertTrue(result.contains("my-step"), "Expected definition JSON to be rendered in: " + result);
+        assertTrue(result.contains("initial-definition"), "Expected <initial-definition> tag in: " + result);
     }
 }

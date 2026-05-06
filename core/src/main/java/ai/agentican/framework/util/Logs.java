@@ -7,10 +7,10 @@ public class Logs {
     public static final String AGENTICAN_DEL_TASK_FULL = "Task: {}";
     public static final String AGENTICAN_BUILT_AGENT = "Built agent: {}";
 
-    public static final String PLANNER_CREATING = "Creating task plan";
+    public static final String PLANNER_CREATING = "Creating task definition";
     public static final String PLANNER_SEND_LLM = "Sending LLM request";
     public static final String PLANNER_RECD_LLM = "Received LLM response";
-    public static final String PLANNER_PLAN_CREATED = "Created task plan: {} stepConfigs, {} new agent(s), {} new skill(s)";
+    public static final String PLANNER_PLAN_CREATED = "Created task definition: {} stepConfigs, {} new agent(s), {} new skill(s)";
     public static final String PLANNER_REFINE_STEP = "Refining task step: type={}, name={}, toolkits={}, tools={}";
     public static final String PLANNER_PLAN = "Task task: {}";
 

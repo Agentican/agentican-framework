@@ -15,15 +15,16 @@ public class ChurnRisk {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var assessment = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var assessment = agentican.workflow(PLAN_NAME)
                     .input(Account.class)
                     .output(ChurnAssessment.class)
                     .build();
 
-            var result = assessment.runAsync(account()).join();
+            var result = assessment.start(account()).future().join();
 
             print(result);
         }

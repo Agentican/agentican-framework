@@ -1,7 +1,6 @@
 package ai.agentican.framework.examples.notools.workflows;
 
 import ai.agentican.framework.Agentican;
-import ai.agentican.framework.orchestration.execution.TaskResult;
 
 import java.nio.file.Path;
 import java.util.Objects;
@@ -10,9 +9,11 @@ public class QuickTask {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var result = agentican.run(task()).resultAsync().join();
+            var result = agentican.run(task()).await();
 
             print(result);
         }
@@ -30,8 +31,8 @@ public class QuickTask {
                 + "Consider developer experience, auditability, and operational cost.";
     }
 
-    static void print(TaskResult result) {
+    static void print(String result) {
 
-        System.out.println(result.output());
+        System.out.println(result);
     }
 }

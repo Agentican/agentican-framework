@@ -8,7 +8,9 @@ import com.google.genai.Client;
 import com.google.genai.types.Candidate;
 import com.google.genai.types.Content;
 import com.google.genai.types.FinishReason;
+import com.google.genai.types.FunctionCall;
 import com.google.genai.types.FunctionDeclaration;
+import com.google.genai.types.FunctionResponse;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.GoogleSearch;
@@ -67,7 +69,6 @@ public class GeminiLlmClient {
 
         var systemContent = Content.fromParts(Part.fromText(
                 request.systemPrompt()));
-        var userText = buildUserText(request);
 
         var tools = new ArrayList<Tool>();
 
@@ -110,9 +111,53 @@ public class GeminiLlmClient {
                     .responseJsonSchema(schemaMap);
         }
 
-        var response = client.models.generateContent(model, userText, configBuilder.build());
+        var contents = request.messages().isEmpty()
+                ? List.of(Content.fromParts(Part.fromText(buildUserText(request))))
+                : translateMessages(request.messages());
+
+        var response = client.models.generateContent(model, contents, configBuilder.build());
 
         return translate(response);
+    }
+
+    private static List<Content> translateMessages(List<Message> messages) {
+
+        var out = new ArrayList<Content>(messages.size());
+
+        for (var msg : messages) {
+
+            var parts = new ArrayList<Part>();
+
+            for (var block : msg.blocks()) {
+
+                switch (block) {
+
+                    case Message.TextBlock t -> parts.add(Part.fromText(t.text()));
+
+                    case Message.ToolUseBlock tu -> parts.add(Part.builder()
+                            .functionCall(FunctionCall.builder()
+                                    .id(tu.id())
+                                    .name(tu.toolName())
+                                    .args(tu.args())
+                                    .build())
+                            .build());
+
+                    case Message.ToolResultBlock tr -> parts.add(Part.builder()
+                            .functionResponse(FunctionResponse.builder()
+                                    .id(tr.toolUseId())
+                                    .response(Map.of("content", tr.content()))
+                                    .build())
+                            .build());
+                }
+            }
+
+            out.add(Content.builder()
+                    .role(msg.role() == Message.Role.USER ? "user" : "model")
+                    .parts(parts)
+                    .build());
+        }
+
+        return out;
     }
 
     private static String buildUserText(LlmRequest request) {

@@ -24,17 +24,19 @@ public class MeetingMinutes {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var cleaner = agentican.agentTask(TASK_NAME)
+            var cleaner = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(RawNotes.class)
-                    .output(CleanedNotes.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(RawNotes.class)
+                    .output(CleanedNotes.class)
                     .build();
 
-            var cleaned = cleaner.runAsync(notes()).join();
+            var cleaned = cleaner.start(notes()).future().join();
 
             print(cleaned);
         }

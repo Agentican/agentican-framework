@@ -24,7 +24,7 @@ final class TaskTypeArgs {
 
         throw new IllegalStateException(
                 "Task injection point must declare two type parameters, e.g. "
-                        + "AgenticanTask<MyInput, MyOutput>. Use Void for either if not needed. Got: " + type);
+                        + "Workflow<MyInput, MyOutput>. Use Void for either if not needed. Got: " + type);
     }
 
     static <A extends Annotation> A qualifier(InjectionPoint ip, Class<A> annotationType) {

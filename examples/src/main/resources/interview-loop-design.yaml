@@ -10,7 +10,6 @@ agents:
       describe it — concrete scenarios, not hypotheticals. Produces tiered question
       sets (foundational / core / stretch) with scoring rubrics so interviewers grade
       consistently. Avoids brain-teasers and trivia.
-    externalId: engineering-manager
 
   - name: Recruiter
     role: |
@@ -19,7 +18,6 @@ agents:
       specific background (same school, same stack, same company culture) and checks
       that difficulty scales with seniority. Suggests specific replacement questions,
       not vague critiques.
-    externalId: recruiter
 
 skills:
   - name: Leveling rubric
@@ -30,11 +28,9 @@ skills:
       services, mentors others. L6 (staff): spans multiple teams, shapes architecture, owns
       ambiguity. Questions should stretch candidates to the next level — an L5 kit tests L5
       execution AND light L6 judgment, not just L4 fundamentals.
-    externalId: leveling-rubric
 
-plans:
+workflows:
   - name: Interview Loop Design
-    externalId: interview-loop-design
     outputStep: refine
     params:
       - name: role

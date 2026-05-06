@@ -1,8 +1,8 @@
 package ai.agentican.quarkus.rest.resource;
 
-import ai.agentican.framework.store.TaskStateStore;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.store.WorkflowRunStore;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.util.Ids;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -20,12 +20,12 @@ import static org.hamcrest.Matchers.hasSize;
 class TasksResourceTest {
 
     @Inject
-    TaskStateStore taskStateStore;
+    WorkflowRunStore workflowRunStore;
 
     @Test
     void listReturnsTasksFromLogStore() {
 
-        seedTask("rest-list-1", TaskStatus.COMPLETED);
+        seedTask("rest-list-1", WorkflowRunStatus.COMPLETED);
 
         given()
                 .when().get("/agentican/tasks")
@@ -37,7 +37,7 @@ class TasksResourceTest {
     @Test
     void getReturnsTaskSummary() {
 
-        seedTask("rest-get-1", TaskStatus.COMPLETED);
+        seedTask("rest-get-1", WorkflowRunStatus.COMPLETED);
 
         given()
                 .when().get("/agentican/tasks/rest-get-1")
@@ -59,7 +59,7 @@ class TasksResourceTest {
     @Test
     void getLogReturnsFullTaskLog() {
 
-        seedTask("rest-log-1", TaskStatus.COMPLETED);
+        seedTask("rest-log-1", WorkflowRunStatus.COMPLETED);
 
         given()
                 .when().get("/agentican/tasks/rest-log-1/log")
@@ -95,7 +95,7 @@ class TasksResourceTest {
         given()
                 .contentType("application/json")
                 .body("{\"description\": \"hi\", \"task\": {\"name\": \"x\", \"steps\": [" +
-                      "{\"type\": \"agent\", \"name\": \"s\", \"agentId\": \"researcher\", \"instructions\": \"i\"}]}}")
+                      "{\"type\": \"agent\", \"name\": \"s\", \"agentName\": \"researcher\", \"instructions\": \"i\"}]}}")
                 .when().post("/agentican/tasks")
                 .then()
                 .statusCode(400)
@@ -117,7 +117,7 @@ class TasksResourceTest {
     void listLimitClampsToMax() {
 
         for (var i = 0; i < 5; i++) {
-            seedTask("rest-paginate-" + i, TaskStatus.COMPLETED);
+            seedTask("rest-paginate-" + i, WorkflowRunStatus.COMPLETED);
         }
 
         given()
@@ -130,12 +130,12 @@ class TasksResourceTest {
     @Test
     void getLogReturnsStepRunsList() {
 
-        var task = Plan.builder("demo").description("d").step("s", "a", "i").build();
-        taskStateStore.taskStarted("rest-runs-1", "demo", task, Map.of());
+        var task = WorkflowDefinition.builder("demo").description("d").step("s", "a", "i").build();
+        workflowRunStore.taskStarted("rest-runs-1", "demo", task, Map.of());
         var stepId = Ids.generate();
-        taskStateStore.stepStarted("rest-runs-1", stepId, "s");
-        taskStateStore.stepCompleted("rest-runs-1", stepId, TaskStatus.COMPLETED, "done");
-        taskStateStore.taskCompleted("rest-runs-1", TaskStatus.COMPLETED);
+        workflowRunStore.stepStarted("rest-runs-1", stepId, "s");
+        workflowRunStore.stepCompleted("rest-runs-1", stepId, WorkflowRunStatus.COMPLETED, "done");
+        workflowRunStore.taskCompleted("rest-runs-1", WorkflowRunStatus.COMPLETED);
 
         given()
                 .when().get("/agentican/tasks/rest-runs-1/log")
@@ -144,10 +144,10 @@ class TasksResourceTest {
                 .body("steps[0].runs", org.hamcrest.Matchers.notNullValue());
     }
 
-    private void seedTask(String taskId, TaskStatus status) {
+    private void seedTask(String taskId, WorkflowRunStatus status) {
 
-        var task = Plan.builder("demo").description("d").step("s", "a", "i").build();
-        taskStateStore.taskStarted(taskId, "demo", task, Map.of());
-        taskStateStore.taskCompleted(taskId, status);
+        var task = WorkflowDefinition.builder("demo").description("d").step("s", "a", "i").build();
+        workflowRunStore.taskStarted(taskId, "demo", task, Map.of());
+        workflowRunStore.taskCompleted(taskId, status);
     }
 }

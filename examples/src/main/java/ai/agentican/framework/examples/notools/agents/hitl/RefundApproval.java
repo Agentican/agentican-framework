@@ -23,20 +23,22 @@ public class RefundApproval {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var decide = agentican.agentTask(TASK_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var decide = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(RefundRequest.class)
-                    .output(RefundDecision.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
                     .hitl(true)
+                    .input(RefundRequest.class)
+                    .output(RefundDecision.class)
                     .build();
 
-            var decision = decide.runAsync(request()).join();
+            var decision = decide.start(request()).future().join();
 
             print(decision);
         }

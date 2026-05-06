@@ -13,6 +13,24 @@ import java.util.Optional;
 @ConfigMapping(prefix = "agentican")
 public interface AgenticanConfig {
 
+    /**
+     * Catalog (agents/skills/plans) load source. Engine config (LLM, MCP, composio,
+     * strict, agentRunner) is independent of this and always read from these properties,
+     * with YAML as a fallback when present.
+     *
+     * <ul>
+     *   <li>{@code yaml} — load agents/skills/plans from {@link #config()} (default {@code agentican.yaml})</li>
+     *   <li>{@code database} — load from the JPA-backed registries; useful with {@code quarkus-store-jpa}</li>
+     * </ul>
+     */
+    enum Catalog { yaml, database }
+
+    @WithDefault("yaml")
+    Catalog catalog();
+
+    @WithDefault("agentican.yaml")
+    String config();
+
     List<LlmConfig> llm();
 
     Optional<AgentRunnerConfig> agentRunner();
@@ -21,15 +39,14 @@ public interface AgenticanConfig {
 
     List<McpConfig> mcp();
 
-    List<AgentConfig> agents();
-
-    List<SkillConfig> skills();
-
     @WithDefault("true")
     boolean resumeOnStart();
 
     @WithDefault("10")
     int resumeMaxConcurrent();
+
+    @WithDefault("false")
+    boolean strict();
 
     interface LlmConfig {
 
@@ -86,33 +103,5 @@ public interface AgenticanConfig {
         Map<String, String> queryParams();
 
         Map<String, String> headers();
-    }
-
-    interface AgentConfig {
-
-        Optional<String> id();
-
-        Optional<String> externalId();
-
-        @NotBlank
-        String name();
-
-        @NotBlank
-        String role();
-
-        Optional<String> llm();
-    }
-
-    interface SkillConfig {
-
-        Optional<String> id();
-
-        Optional<String> externalId();
-
-        @NotBlank
-        String name();
-
-        @NotBlank
-        String instructions();
     }
 }

@@ -9,7 +9,6 @@ agents:
       is a maintenance liability and gets ignored within two weeks. Asks the
       requester what they'll actually do with each metric before designing the
       layout.
-    externalId: analytics-engineer
 
 skills:
   - name: Dashboard scoping
@@ -22,4 +21,3 @@ skills:
       the middle row; detail tables below. Cadence: state how often each metric is
       expected to be checked (real-time, hourly, daily, weekly) — the cadence
       determines the caching strategy.
-    externalId: dashboard-scoping

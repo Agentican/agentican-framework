@@ -26,19 +26,21 @@ public class OkrDraft {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var draft = agentican.agentTask(TASK_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var draft = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(TeamContext.class)
-                    .output(QuarterlyOKRs.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(TeamContext.class)
+                    .output(QuarterlyOKRs.class)
                     .build();
 
-            var okrs = draft.runAsync(team()).join();
+            var okrs = draft.start(team()).future().join();
 
             print(okrs);
         }

@@ -1,9 +1,9 @@
 package ai.agentican.quarkus.otel;
 
-import ai.agentican.framework.orchestration.execution.TaskListener;
-import ai.agentican.framework.orchestration.execution.TaskDecorator;
+import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
+import ai.agentican.framework.orchestration.execution.WorkflowRunDecorator;
 import ai.agentican.framework.llm.LlmClientDecorator;
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.store.WorkflowRunStore;
 import io.opentelemetry.api.trace.Tracer;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -18,18 +18,18 @@ public class TracingAutoConfiguration {
     Tracer tracer;
 
     @Inject
-    TaskStateStore taskStateStore;
+    WorkflowRunStore workflowRunStore;
 
     @Produces
     @ApplicationScoped
-    public TaskListener tracedLifecycleListener() {
+    public WorkflowRunListener tracedLifecycleListener() {
 
-        return new TracedLifecycleListener(tracer, taskStateStore);
+        return new TracedLifecycleListener(tracer, workflowRunStore);
     }
 
     @Produces
     @ApplicationScoped
-    public TaskDecorator tracedTaskDecorator() {
+    public WorkflowRunDecorator tracedTaskDecorator() {
 
         return new TracedTaskDecorator();
     }

@@ -25,17 +25,19 @@ public class AlertReview {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var reviewer = agentican.agentTask(TASK_NAME)
+            var reviewer = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(AlertDefinition.class)
-                    .output(AlertCritique.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(AlertDefinition.class)
+                    .output(AlertCritique.class)
                     .build();
 
-            var critique = reviewer.runAsync(alert()).join();
+            var critique = reviewer.start(alert()).future().join();
 
             print(critique);
         }

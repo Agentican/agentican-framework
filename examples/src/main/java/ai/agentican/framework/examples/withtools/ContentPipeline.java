@@ -14,15 +14,16 @@ public class ContentPipeline {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var pipeline = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var pipeline = agentican.workflow(PLAN_NAME)
                     .input(ArticleBrief.class)
                     .output(PublishedArticle.class)
                     .build();
 
-            var article = pipeline.runAsync(brief()).join();
+            var article = pipeline.start(brief()).future().join();
 
             print(article);
         }

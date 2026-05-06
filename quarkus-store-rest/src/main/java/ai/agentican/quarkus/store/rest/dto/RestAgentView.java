@@ -7,5 +7,4 @@ public record RestAgentView(
         String id,
         String name,
         String role,
-        String llm,
-        String externalId) {}
+        String llm) {}

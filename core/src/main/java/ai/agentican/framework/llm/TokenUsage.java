@@ -8,12 +8,8 @@ public record TokenUsage(long input, long output, long cacheRead, long cacheWrit
 
     public TokenUsage plus(TokenUsage other) {
 
-        return new TokenUsage(
-                input + other.input,
-                output + other.output,
-                cacheRead + other.cacheRead,
-                cacheWrite + other.cacheWrite,
-                webSearches + other.webSearches);
+        return new TokenUsage(input + other.input, output + other.output, cacheRead + other.cacheRead,
+                cacheWrite + other.cacheWrite, webSearches + other.webSearches);
     }
 
     public static TokenUsage sum(Stream<TokenUsage> usages) {

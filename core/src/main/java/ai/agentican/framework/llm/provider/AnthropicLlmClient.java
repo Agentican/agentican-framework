@@ -65,37 +65,15 @@ public class AnthropicLlmClient {
                 .cacheControl(CACHE_CONTROL)
                 .build();
 
-        var userBlocks = new ArrayList<ContentBlockParam>();
-
-        if (request.userTask() != null && !request.userTask().isBlank()) {
-
-            var userTaskBlock = TextBlockParam.builder()
-                    .text(request.userTask())
-                    .cacheControl(CACHE_CONTROL)
-                    .build();
-
-            userBlocks.add(ContentBlockParam.ofText(userTaskBlock));
-        }
-
-        if (request.userMessage() != null && !request.userMessage().isBlank()) {
-
-            var userMessageBlock = TextBlockParam.builder()
-                    .text(request.userMessage())
-                    .build();
-
-            userBlocks.add(ContentBlockParam.ofText(userMessageBlock));
-        }
-
-        var userMessageParam = MessageParam.builder()
-                .role(MessageParam.Role.USER)
-                .contentOfBlockParams(userBlocks)
-                .build();
+        var messages = request.messages().isEmpty()
+                ? legacySingleUserMessage(request)
+                : translateMessages(request.messages());
 
         var messageBuilder = MessageCreateParams.builder()
                 .model(Model.of(model))
                 .maxTokens(maxTokens)
                 .systemOfTextBlockParams(List.of(systemPromptBlock))
-                .messages(List.of(userMessageParam));
+                .messages(messages);
 
         if (temperature != null) messageBuilder.temperature(temperature);
 
@@ -165,6 +143,101 @@ public class AnthropicLlmClient {
 
         return new LlmResponse(responseText, toolCalls, stopReason, inputTokens, outputTokens,
                 cacheReadTokens, cacheWriteTokens, webSearchRequests);
+    }
+
+    private static List<MessageParam> legacySingleUserMessage(LlmRequest request) {
+
+        var userBlocks = new ArrayList<ContentBlockParam>();
+
+        if (request.userTask() != null && !request.userTask().isBlank()) {
+
+            var userTaskBlock = TextBlockParam.builder()
+                    .text(request.userTask())
+                    .cacheControl(CACHE_CONTROL)
+                    .build();
+
+            userBlocks.add(ContentBlockParam.ofText(userTaskBlock));
+        }
+
+        if (request.userMessage() != null && !request.userMessage().isBlank()) {
+
+            var userMessageBlock = TextBlockParam.builder()
+                    .text(request.userMessage())
+                    .build();
+
+            userBlocks.add(ContentBlockParam.ofText(userMessageBlock));
+        }
+
+        return List.of(MessageParam.builder()
+                .role(MessageParam.Role.USER)
+                .contentOfBlockParams(userBlocks)
+                .build());
+    }
+
+    private static List<MessageParam> translateMessages(List<ai.agentican.framework.llm.Message> messages) {
+
+        var out = new ArrayList<MessageParam>(messages.size());
+
+        var firstUserSeen = false;
+
+        for (var msg : messages) {
+
+            var blocks = new ArrayList<ContentBlockParam>(msg.blocks().size());
+
+            var isFirstUser = !firstUserSeen && msg.role() == ai.agentican.framework.llm.Message.Role.USER;
+
+            var lastIdx = msg.blocks().size() - 1;
+
+            for (int i = 0; i < msg.blocks().size(); i++) {
+
+                var block = msg.blocks().get(i);
+                var applyCache = isFirstUser && i == lastIdx;
+
+                blocks.add(translateBlock(block, applyCache));
+            }
+
+            out.add(MessageParam.builder()
+                    .role(msg.role() == ai.agentican.framework.llm.Message.Role.USER
+                            ? MessageParam.Role.USER : MessageParam.Role.ASSISTANT)
+                    .contentOfBlockParams(blocks)
+                    .build());
+
+            if (isFirstUser) firstUserSeen = true;
+        }
+
+        return out;
+    }
+
+    private static ContentBlockParam translateBlock(ai.agentican.framework.llm.Message.Block block, boolean applyCache) {
+
+        return switch (block) {
+
+            case ai.agentican.framework.llm.Message.TextBlock t -> {
+
+                var b = TextBlockParam.builder().text(t.text());
+                if (applyCache) b.cacheControl(CACHE_CONTROL);
+                yield ContentBlockParam.ofText(b.build());
+            }
+
+            case ai.agentican.framework.llm.Message.ToolUseBlock tu -> {
+
+                var inputJson = JSON.<JsonValue>convertValue(tu.args(), new TypeReference<JsonValue>() {});
+                yield ContentBlockParam.ofToolUse(ToolUseBlockParam.builder()
+                        .id(tu.id())
+                        .name(tu.toolName())
+                        .input(inputJson != null ? inputJson : JsonValue.from(Map.of()))
+                        .build());
+            }
+
+            case ai.agentican.framework.llm.Message.ToolResultBlock tr -> {
+
+                var b = ToolResultBlockParam.builder()
+                        .toolUseId(tr.toolUseId())
+                        .content(tr.content());
+                if (tr.isError()) b.isError(true);
+                yield ContentBlockParam.ofToolResult(b.build());
+            }
+        };
     }
 
     private static OutputConfig buildOutputConfig(StructuredOutput so) {

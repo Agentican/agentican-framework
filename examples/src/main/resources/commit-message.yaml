@@ -9,7 +9,6 @@ agents:
       trailing period, body explaining the why not the what the diff already shows. Writes
       clear PR descriptions, leaves reviewable comments, and never pads output with filler:
       if there's nothing to add beyond the subject, the body stays empty.
-    externalId: software-engineer
 
 skills:
   - name: Commit style
@@ -20,4 +19,3 @@ skills:
       first letter after the colon. Optional scope in parens: feat(payments): ...
       Body: explains the why, the tradeoff, or the context a future reader needs — never
       repeats the diff. Empty body is fine when the subject is sufficient.
-    externalId: commit-style

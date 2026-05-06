@@ -22,17 +22,17 @@ class RestSkillRegistryTest {
     void seedPopulatesCacheFromCatalog() {
 
         var rows = List.of(
-                new RestSkillView("s-1", "tone", "Use friendly tone", "ext.tone"),
-                new RestSkillView("s-2", "brevity", "Be brief", null));
+                new RestSkillView("s-1", "tone", "Use friendly tone"),
+                new RestSkillView("s-2", "brevity", "Be brief"));
 
         var client = new FakeRestCatalogClient("[]", List.of(), rows);
         var registry = registryWith(client);
 
         registry.seed();
 
-        assertEquals(2, registry.getAll().size());
-        assertEquals("Use friendly tone", registry.getByName("tone").instructions());
-        assertEquals("s-2", registry.getByName("brevity").id());
+        assertEquals(2, registry.list().size());
+        assertEquals("Use friendly tone", registry.byName("tone").instructions());
+        assertEquals("s-2", registry.byName("brevity").id());
     }
 
     @Test
@@ -58,26 +58,26 @@ class RestSkillRegistryTest {
         var registry = registryWith(client);
         registry.seed();
 
-        var skill = new SkillConfig("s-local", "local", "local instructions", "ext.local");
+        var skill = new SkillConfig("s-local", "local", "local instructions");
 
         assertSame(skill, registry.register(skill));
-        assertEquals(skill, registry.get("s-local"));
-        assertEquals(skill, registry.getByName("local"));
+        assertEquals(skill, registry.byId("s-local"));
+        assertEquals(skill, registry.byName("local"));
     }
 
     @Test
-    void registerIfAbsentDedupesByExternalId() {
+    void registerIfAbsentReturnsExistingEntryById() {
 
-        var seeded = List.of(new RestSkillView("s-1", "shared", "v1", "ext.shared"));
+        var seeded = List.of(new RestSkillView("s-1", "shared", "v1"));
         var client = new FakeRestCatalogClient("[]", List.of(), seeded);
         var registry = registryWith(client);
         registry.seed();
 
-        var duplicate = new SkillConfig("s-2", "shared-variant", "v2", "ext.shared");
+        var same = new SkillConfig("s-1", "shared", "v2");
 
-        var returned = registry.registerIfAbsent(duplicate);
+        var returned = registry.registerIfAbsent(same);
 
-        assertEquals("s-1", returned.id(), "Existing entry returned when externalId matches");
-        assertEquals(1, registry.getAll().size());
+        assertEquals("s-1", returned.id(), "Existing entry returned when id matches");
+        assertEquals(1, registry.list().size());
     }
 }

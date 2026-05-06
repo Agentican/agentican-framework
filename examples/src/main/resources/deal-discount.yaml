@@ -10,7 +10,6 @@ agents:
       to a specific concession from the customer (term length, payment terms, logo
       rights) and drafts the talk track the rep should use verbatim. Refuses to
       rubber-stamp percentage asks without a stated customer concession.
-    externalId: sales-director
 
 skills:
   - name: Discount approval matrix
@@ -23,4 +22,3 @@ skills:
       paired with a specific customer concession — if the rep doesn't bring one, the
       decision is "no, counter with X." (5) Talk track must be verbatim ready-to-send,
       not bullet points for the rep to improvise around.
-    externalId: discount-approval-matrix

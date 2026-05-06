@@ -23,17 +23,19 @@ public class CommitMessage {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var scribe = agentican.agentTask(TASK_NAME)
+            var scribe = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(ChangeDescription.class)
-                    .output(ConventionalCommit.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(ChangeDescription.class)
+                    .output(ConventionalCommit.class)
                     .build();
 
-            var msg = scribe.runAsync(diff()).join();
+            var msg = scribe.start(diff()).future().join();
 
             print(msg);
         }

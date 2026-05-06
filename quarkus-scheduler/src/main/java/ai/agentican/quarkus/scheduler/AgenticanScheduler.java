@@ -49,7 +49,7 @@ public class AgenticanScheduler {
 
                         var handle = agentican.run(task.description());
 
-                        handle.resultAsync().whenComplete((result, error) -> {
+                        handle.untypedFuture().whenComplete((result, error) -> {
 
                             if (error != null)
                                 LOG.error("Scheduled task '{}' failed: {}", task.name(), error.getMessage());

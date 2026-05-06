@@ -1,6 +1,6 @@
 package ai.agentican.quarkus.rest.dto;
 
-import ai.agentican.framework.state.TaskLog;
+import ai.agentican.framework.state.WorkflowRunLog;
 
 import java.time.Instant;
 
@@ -14,7 +14,7 @@ public record TaskSummary(
         long cacheReadTokens,
         long cacheWriteTokens) {
 
-    public static TaskSummary of(TaskLog log) {
+    public static TaskSummary of(WorkflowRunLog log) {
 
         return new TaskSummary(
                 log.taskId(),

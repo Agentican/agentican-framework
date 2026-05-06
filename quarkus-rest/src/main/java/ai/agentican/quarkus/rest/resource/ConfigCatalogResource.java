@@ -3,10 +3,9 @@ package ai.agentican.quarkus.rest.resource;
 import ai.agentican.framework.Agentican;
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.SkillConfig;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanValidator;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowDefinitionValidator;
 import ai.agentican.framework.util.Ids;
-import ai.agentican.quarkus.AgenticanConfig;
 import ai.agentican.quarkus.audit.CatalogAuditLog;
 import ai.agentican.quarkus.rest.dto.CatalogImportSummary;
 import ai.agentican.quarkus.rest.dto.CatalogSnapshot;
@@ -27,9 +26,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Path("/agentican/config")
 public class ConfigCatalogResource {
@@ -40,9 +37,6 @@ public class ConfigCatalogResource {
 
     @Inject
     Agentican agentican;
-
-    @Inject
-    AgenticanConfig config;
 
     @Inject
     ObjectMapper jsonMapper;
@@ -96,20 +90,16 @@ public class ConfigCatalogResource {
 
     private CatalogSnapshot buildSnapshot() {
 
-        var agents = agentican.registry().agents().getAll().stream()
-                .filter(a -> a.config().externalId() != null)
+        var agents = agentican.registry().agents().list().stream()
                 .map(a -> new CatalogSnapshot.AgentExport(
-                        a.config().externalId(), a.name(), a.role(), a.config().llm()))
+                        a.id(), a.name(), a.role(), a.config().llm()))
                 .toList();
 
-        var skills = agentican.registry().skills().getAll().stream()
-                .filter(s -> s.externalId() != null)
-                .map(s -> new CatalogSnapshot.SkillExport(s.externalId(), s.name(), s.instructions()))
+        var skills = agentican.registry().skills().list().stream()
+                .map(s -> new CatalogSnapshot.SkillExport(s.id(), s.name(), s.instructions()))
                 .toList();
 
-        var plans = agentican.registry().plans().getAll().stream()
-                .filter(p -> p.externalId() != null)
-                .toList();
+        var plans = agentican.registry().workflows().list().stream().toList();
 
         return new CatalogSnapshot(agents, skills, plans);
     }
@@ -118,17 +108,14 @@ public class ConfigCatalogResource {
 
         var errors = new ArrayList<String>();
 
-        var propertyAgentIds = propertyExternalIds(config.agents().stream().map(a -> a.externalId()).toList());
-        var propertySkillIds = propertyExternalIds(config.skills().stream().map(s -> s.externalId()).toList());
-
-        var agentCounts = importAgents(snapshot, propertyAgentIds, errors, dryRun);
-        var skillCounts = importSkills(snapshot, propertySkillIds, errors, dryRun);
+        var agentCounts = importAgents(snapshot, errors, dryRun);
+        var skillCounts = importSkills(snapshot, errors, dryRun);
         var planCounts  = importPlans(snapshot, errors, dryRun);
 
         return new CatalogImportSummary(dryRun, agentCounts, skillCounts, planCounts, errors);
     }
 
-    private CatalogImportSummary.Counts importAgents(CatalogSnapshot snapshot, Set<String> propertyIds,
+    private CatalogImportSummary.Counts importAgents(CatalogSnapshot snapshot,
                                                       List<String> errors, boolean dryRun) {
 
         var created = 0;
@@ -139,31 +126,26 @@ public class ConfigCatalogResource {
 
         for (var a : snapshot.agents()) {
 
-            if (a.externalId() == null || a.externalId().isBlank()) {
-                errors.add("Agent '" + a.name() + "' has no externalId; skipping");
+            if (a.name() == null || a.name().isBlank()) {
+                errors.add("Agent has no name; skipping");
                 skipped++;
                 continue;
             }
 
-            if (propertyIds.contains(a.externalId())) {
-                skipped++;
-                continue;
-            }
-
-            var existing = agentican.registry().agents().getByExternalId(a.externalId());
+            var existing = agentican.registry().agents().byName(a.name());
             var willCreate = (existing == null);
 
             if (!dryRun) {
                 try {
                     var beforeJson = existing != null ? toJson(existing.config()) : null;
                     var id = existing != null ? existing.id() : Ids.generate();
-                    var cfg = new AgentConfig(id, a.name(), a.role(), a.llm(), a.externalId());
-                    agentican.registry().agents().register(agentican.buildAgent(cfg));
-                    audit.record(CatalogAuditLog.AGENT, a.externalId(), CatalogAuditLog.IMPORTED,
+                    var cfg = new AgentConfig(id, a.name(), a.role(), a.llm(), null, null, null);
+                    agentican.registry().agents().register(cfg);
+                    audit.record(CatalogAuditLog.AGENT, id, CatalogAuditLog.IMPORTED,
                             null, beforeJson, toJson(cfg));
                 }
                 catch (Exception e) {
-                    errors.add("Agent '" + a.externalId() + "': " + e.getMessage());
+                    errors.add("Agent '" + a.name() + "': " + e.getMessage());
                     continue;
                 }
             }
@@ -174,7 +156,7 @@ public class ConfigCatalogResource {
         return new CatalogImportSummary.Counts(created, updated, skipped);
     }
 
-    private CatalogImportSummary.Counts importSkills(CatalogSnapshot snapshot, Set<String> propertyIds,
+    private CatalogImportSummary.Counts importSkills(CatalogSnapshot snapshot,
                                                       List<String> errors, boolean dryRun) {
 
         var created = 0;
@@ -185,31 +167,26 @@ public class ConfigCatalogResource {
 
         for (var s : snapshot.skills()) {
 
-            if (s.externalId() == null || s.externalId().isBlank()) {
-                errors.add("Skill '" + s.name() + "' has no externalId; skipping");
+            if (s.name() == null || s.name().isBlank()) {
+                errors.add("Skill has no name; skipping");
                 skipped++;
                 continue;
             }
 
-            if (propertyIds.contains(s.externalId())) {
-                skipped++;
-                continue;
-            }
-
-            var existing = agentican.registry().skills().getByExternalId(s.externalId());
+            var existing = agentican.registry().skills().byName(s.name());
             var willCreate = (existing == null);
 
             if (!dryRun) {
                 try {
                     var beforeJson = existing != null ? toJson(existing) : null;
                     var id = existing != null ? existing.id() : Ids.generate();
-                    var cfg = new SkillConfig(id, s.name(), s.instructions(), s.externalId());
+                    var cfg = new SkillConfig(id, s.name(), s.instructions());
                     agentican.registry().skills().register(cfg);
-                    audit.record(CatalogAuditLog.SKILL, s.externalId(), CatalogAuditLog.IMPORTED,
+                    audit.record(CatalogAuditLog.SKILL, id, CatalogAuditLog.IMPORTED,
                             null, beforeJson, toJson(cfg));
                 }
                 catch (Exception e) {
-                    errors.add("Skill '" + s.externalId() + "': " + e.getMessage());
+                    errors.add("Skill '" + s.name() + "': " + e.getMessage());
                     continue;
                 }
             }
@@ -226,24 +203,24 @@ public class ConfigCatalogResource {
         var updated = 0;
         var skipped = 0;
 
-        if (snapshot.plans() == null) return new CatalogImportSummary.Counts(0, 0, 0);
+        if (snapshot.workflows() == null) return new CatalogImportSummary.Counts(0, 0, 0);
 
-        for (var p : snapshot.plans()) {
+        for (var p : snapshot.workflows()) {
 
-            if (p.externalId() == null || p.externalId().isBlank()) {
-                errors.add("Plan '" + p.name() + "' has no externalId; skipping");
+            if (p.name() == null || p.name().isBlank()) {
+                errors.add("WorkflowDefinition has no name; skipping");
                 skipped++;
                 continue;
             }
 
-            var issues = PlanValidator.validate(p, agentican.registry().agents(), agentican.registry().skills());
+            var issues = WorkflowDefinitionValidator.validate(p, agentican.registry().agents(), agentican.registry().skills());
             if (!issues.isEmpty()) {
-                errors.add("Plan '" + p.externalId() + "' failed validation: " + String.join("; ", issues));
+                errors.add("WorkflowDefinition '" + p.name() + "' failed validation: " + String.join("; ", issues));
                 skipped++;
                 continue;
             }
 
-            var existing = agentican.registry().plans().getByExternalId(p.externalId());
+            var existing = agentican.registry().workflows().byName(p.name());
             var willCreate = (existing == null);
 
             if (!dryRun) {
@@ -252,14 +229,13 @@ public class ConfigCatalogResource {
                     var id = (p.id() == null || p.id().isBlank())
                             ? (existing != null ? existing.id() : Ids.generate())
                             : p.id();
-                    var aligned = new Plan(id, p.name(), p.description(), p.params(), p.steps(),
-                            p.externalId(), p.outputStep());
-                    agentican.registry().plans().register(aligned);
-                    audit.record(CatalogAuditLog.PLAN, p.externalId(), CatalogAuditLog.IMPORTED,
+                    var aligned = new WorkflowDefinition(id, p.name(), p.description(), p.params(), p.steps(), p.outputStep());
+                    agentican.registry().workflows().register(aligned);
+                    audit.record(CatalogAuditLog.PLAN, id, CatalogAuditLog.IMPORTED,
                             null, beforeJson, toJson(aligned));
                 }
                 catch (Exception e) {
-                    errors.add("Plan '" + p.externalId() + "': " + e.getMessage());
+                    errors.add("WorkflowDefinition '" + p.name() + "': " + e.getMessage());
                     continue;
                 }
             }
@@ -268,13 +244,6 @@ public class ConfigCatalogResource {
         }
 
         return new CatalogImportSummary.Counts(created, updated, skipped);
-    }
-
-    private static Set<String> propertyExternalIds(List<java.util.Optional<String>> optionals) {
-
-        var out = new HashSet<String>();
-        optionals.forEach(o -> o.ifPresent(out::add));
-        return out;
     }
 
     private String toJson(Object value) {

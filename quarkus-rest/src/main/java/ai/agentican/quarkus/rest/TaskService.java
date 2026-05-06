@@ -1,8 +1,9 @@
 package ai.agentican.quarkus.rest;
 
 import ai.agentican.framework.Agentican;
-import ai.agentican.framework.orchestration.execution.TaskHandle;
-import ai.agentican.framework.orchestration.model.Plan;
+import ai.agentican.framework.orchestration.execution.WorkflowRunResult;
+import ai.agentican.framework.orchestration.execution.WorkflowRun;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -18,62 +19,51 @@ public class TaskService {
     @Inject
     Agentican agentican;
 
-    private final ConcurrentMap<String, TaskHandle> handles = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, WorkflowRun<WorkflowRunResult>> handles = new ConcurrentHashMap<>();
 
-    public TaskHandle submit(String description) {
+    public WorkflowRun<WorkflowRunResult> submit(String description) {
 
-        var handle = agentican.run(description);
+        var planning = agentican.plan(description);
+        return submit(planning.definition(), planning.inputs());
+    }
+
+    public WorkflowRun<WorkflowRunResult> submit(WorkflowDefinition plan) {
+
+        return submit(plan, Map.of());
+    }
+
+    public WorkflowRun<WorkflowRunResult> submit(WorkflowDefinition plan, Map<String, String> inputs) {
+
+        var handle = agentican.workflow(plan).raw().start(inputs);
 
         track(handle);
 
         return handle;
     }
 
-    public TaskHandle submit(Plan plan) {
+    public WorkflowRun<WorkflowRunResult> submitByPlan(String planId, Map<String, String> inputs) {
 
-        var handle = agentican.run(plan);
-
-        track(handle);
-
-        return handle;
-    }
-
-    public TaskHandle submit(Plan plan, Map<String, String> inputs) {
-
-        var handle = agentican.run(plan, inputs);
-
-        track(handle);
-
-        return handle;
-    }
-
-    public TaskHandle submitByPlan(String planId, Map<String, String> inputs) {
-
-        var plan = agentican.registry().plans().getById(planId);
+        var plan = agentican.registry().workflows().byId(planId);
 
         if (plan == null)
-            throw new jakarta.ws.rs.NotFoundException("No plan definition with id: " + planId);
+            throw new jakarta.ws.rs.NotFoundException("No definition definition with id: " + planId);
 
-        var handle = agentican.run(plan, inputs);
-
-        track(handle);
-
-        return handle;
+        return submit(plan, inputs);
     }
 
-    public TaskHandle handleFor(String taskId) {
+    public WorkflowRun<WorkflowRunResult> handleFor(String taskId) {
 
         return handles.get(taskId);
     }
 
-    public Collection<TaskHandle> activeHandles() {
+    public Collection<WorkflowRun<WorkflowRunResult>> activeHandles() {
 
         return Collections.unmodifiableCollection(handles.values());
     }
 
-    private void track(TaskHandle handle) {
+    private void track(WorkflowRun<WorkflowRunResult> handle) {
 
-        handles.put(handle.taskId(), handle);
-        handle.resultAsync().whenComplete((result, error) -> handles.remove(handle.taskId()));
+        handles.put(handle.id(), handle);
+        handle.future().whenComplete((result, error) -> handles.remove(handle.id()));
     }
 }

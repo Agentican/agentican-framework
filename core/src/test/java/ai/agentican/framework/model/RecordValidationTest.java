@@ -2,9 +2,9 @@ package ai.agentican.framework.model;
 
 import ai.agentican.framework.agent.Agent;
 import ai.agentican.framework.agent.AgentRunner;
-import ai.agentican.framework.orchestration.execution.TaskStepResult;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.orchestration.execution.WorkflowStepResult;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -32,13 +32,13 @@ class RecordValidationTest {
     void taskRequiresSteps() {
 
         assertThrows(IllegalArgumentException.class, () ->
-                Plan.builder("name").description("desc").build());
+                WorkflowDefinition.builder("name").description("desc").build());
     }
 
     @Test
     void taskStepResultRequiresName() {
 
         assertThrows(IllegalArgumentException.class, () ->
-                new TaskStepResult(null, TaskStatus.COMPLETED, "output", List.of()));
+                new WorkflowStepResult(null, WorkflowRunStatus.COMPLETED, "output", List.of()));
     }
 }

@@ -7,7 +7,7 @@ public interface CatalogAuditLog {
 
     String AGENT = "agent";
     String SKILL = "skill";
-    String PLAN  = "plan";
+    String PLAN  = "definition";
 
     String CREATED  = "created";
     String UPDATED  = "updated";

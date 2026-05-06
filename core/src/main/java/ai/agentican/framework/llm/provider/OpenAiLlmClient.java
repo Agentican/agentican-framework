@@ -7,11 +7,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.core.JsonValue;
+import com.openai.models.responses.EasyInputMessage;
 import com.openai.models.responses.FunctionTool;
 import com.openai.models.responses.Response;
 import com.openai.models.responses.ResponseCreateParams;
 import com.openai.models.responses.ResponseFormatTextConfig;
 import com.openai.models.responses.ResponseFormatTextJsonSchemaConfig;
+import com.openai.models.responses.ResponseFunctionToolCall;
+import com.openai.models.responses.ResponseInputItem;
 import com.openai.models.responses.ResponseStatus;
 import com.openai.models.responses.ResponseTextConfig;
 import com.openai.models.responses.Tool;
@@ -79,13 +82,15 @@ public class OpenAiLlmClient {
 
     private LlmResponse send(LlmRequest request) {
 
-        var userText = buildUserText(request);
-
         var paramsBuilder = ResponseCreateParams.builder()
                 .model(model)
                 .instructions(request.systemPrompt())
-                .input(userText)
                 .maxOutputTokens(maxTokens);
+
+        if (request.messages().isEmpty())
+            paramsBuilder.input(buildUserText(request));
+        else
+            paramsBuilder.inputOfResponse(translateMessages(request.messages()));
 
         if (temperature != null) paramsBuilder.temperature(temperature);
 
@@ -154,6 +159,73 @@ public class OpenAiLlmClient {
                 }
             }
         }
+    }
+
+    private static java.util.List<ResponseInputItem> translateMessages(java.util.List<Message> messages) {
+
+        var out = new ArrayList<ResponseInputItem>();
+
+        for (var msg : messages) {
+
+            if (msg.role() == Message.Role.USER) {
+
+                msg.blocks().stream()
+                        .filter(b -> b instanceof Message.ToolResultBlock)
+                        .map(b -> (Message.ToolResultBlock) b)
+                        .forEach(tr -> out.add(ResponseInputItem.ofFunctionCallOutput(
+                                ResponseInputItem.FunctionCallOutput.builder()
+                                        .callId(tr.toolUseId())
+                                        .output(tr.content())
+                                        .build())));
+
+                var text = msg.blocks().stream()
+                        .filter(b -> b instanceof Message.TextBlock)
+                        .map(b -> ((Message.TextBlock) b).text())
+                        .filter(t -> !t.isBlank())
+                        .reduce((a, b) -> a + "\n\n" + b)
+                        .orElse(null);
+
+                if (text != null)
+                    out.add(ResponseInputItem.ofEasyInputMessage(EasyInputMessage.builder()
+                            .role(EasyInputMessage.Role.USER)
+                            .content(text)
+                            .build()));
+            }
+            else {
+
+                var text = msg.blocks().stream()
+                        .filter(b -> b instanceof Message.TextBlock)
+                        .map(b -> ((Message.TextBlock) b).text())
+                        .filter(t -> !t.isBlank())
+                        .reduce((a, b) -> a + "\n\n" + b)
+                        .orElse(null);
+
+                if (text != null)
+                    out.add(ResponseInputItem.ofEasyInputMessage(EasyInputMessage.builder()
+                            .role(EasyInputMessage.Role.ASSISTANT)
+                            .content(text)
+                            .build()));
+
+                msg.blocks().stream()
+                        .filter(b -> b instanceof Message.ToolUseBlock)
+                        .map(b -> (Message.ToolUseBlock) b)
+                        .forEach(tu -> {
+                            String argsJson;
+                            try {
+                                argsJson = MAPPER.writeValueAsString(tu.args());
+                            } catch (Exception e) {
+                                argsJson = "{}";
+                            }
+                            out.add(ResponseInputItem.ofFunctionCall(ResponseFunctionToolCall.builder()
+                                    .callId(tu.id())
+                                    .name(tu.toolName())
+                                    .arguments(argsJson)
+                                    .build()));
+                        });
+            }
+        }
+
+        return out;
     }
 
     private static String buildUserText(LlmRequest request) {

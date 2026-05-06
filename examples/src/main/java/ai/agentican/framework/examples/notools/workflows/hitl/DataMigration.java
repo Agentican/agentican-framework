@@ -12,22 +12,23 @@ import java.util.Objects;
 
 public class DataMigration {
 
-    static String TASK_NAME = "Plan Postgres-To-Aurora Cutover";
-    static String PLAN_NAME = "Data Migration Plan";
+    static String TASK_NAME = "WorkflowDefinition Postgres-To-Aurora Cutover";
+    static String PLAN_NAME = "Data Migration WorkflowDefinition";
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var migration = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var migration = agentican.workflow(PLAN_NAME)
                     .input(MigrationScenario.class)
                     .output(Runbook.class)
                     .build();
 
-            var runbook = migration.runAsync(scenario()).join();
+            var runbook = migration.start(scenario()).future().join();
 
             print(runbook);
         }

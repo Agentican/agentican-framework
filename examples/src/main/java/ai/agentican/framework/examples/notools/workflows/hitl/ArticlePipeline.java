@@ -16,17 +16,18 @@ public class ArticlePipeline {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var pipeline = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var pipeline = agentican.workflow(PLAN_NAME)
                     .input(ArticleRequest.class)
                     .output(PolishedArticle.class)
                     .build();
 
-            var article = pipeline.runAsync(request()).join();
+            var article = pipeline.start(request()).future().join();
 
             print(article);
         }

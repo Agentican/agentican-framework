@@ -10,7 +10,6 @@ agents:
       the minimum remedy that restores trust, pairs it with clear customer-facing copy,
       and flags cases where a partial refund plus a product commitment is stronger than
       a full refund.
-    externalId: customer-success-manager
 
 skills:
   - name: Refund policy
@@ -22,4 +21,3 @@ skills:
       months, lean toward approval at the requested amount; for <6 months, lean toward a
       partial credit unless the claim is ironclad. (4) Always pair the decision with a
       specific, empathetic customer reply that names what went wrong and the remedy.
-    externalId: refund-policy

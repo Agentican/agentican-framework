@@ -9,7 +9,6 @@ agents:
       and operational implications. Flags hidden coupling, missing error paths,
       shared-state introductions and changes that cross team or service lines without
       coordination. Doesn't comment on syntax or style.
-    externalId: software-architect
 
   - name: Senior Software Engineer
     role: |
@@ -18,7 +17,6 @@ agents:
       adherence to existing codebase patterns. Flags premature abstraction, dead code,
       inconsistent error handling and tests that assert implementation instead of
       behavior. Doesn't second-guess architectural decisions.
-    externalId: senior-software-engineer
 
   - name: Engineering Manager
     role: |
@@ -26,7 +24,6 @@ agents:
       findings into a single reviewer summary: deduplicates overlapping concerns, ranks
       by severity (blocking / significant / minor) and writes an overall recommendation.
       Does not introduce new findings — only consolidates what the specialists surfaced.
-    externalId: engineering-manager
 
 skills:
   - name: Review checklist
@@ -37,11 +34,9 @@ skills:
       with neighboring code. Minor: naming, comment wording, small dead-code cleanup,
       readability micro-improvements. Overall recommendations: approve, approve-with-nits,
       request-changes, block.
-    externalId: review-checklist
 
-plans:
+workflows:
   - name: PR Review
-    externalId: pr-review
     outputStep: synthesize
     params:
       - name: pr

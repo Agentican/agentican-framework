@@ -25,20 +25,22 @@ public class IncidentPostmortem {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var draft = agentican.agentTask(TASK_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var draft = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(IncidentBrief.class)
-                    .output(PostmortemEmail.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
                     .hitl(true)
+                    .input(IncidentBrief.class)
+                    .output(PostmortemEmail.class)
                     .build();
 
-            var email = draft.runAsync(incident()).join();
+            var email = draft.start(incident()).future().join();
 
             print(email);
         }

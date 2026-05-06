@@ -4,7 +4,7 @@ import java.util.Map;
 
 public record ToolCall(
         String id,
-        String toolName,
+        String name,
         Map<String, Object> args) {
 
     public ToolCall {
@@ -12,7 +12,7 @@ public record ToolCall(
         if (id == null || id.isBlank())
             throw new IllegalArgumentException("Tool call ID is required");
 
-        if (toolName == null || toolName.isBlank())
+        if (name == null || name.isBlank())
             throw new IllegalArgumentException("Tool name is required");
 
         if (args == null)

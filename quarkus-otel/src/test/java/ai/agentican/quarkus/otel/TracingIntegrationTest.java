@@ -1,10 +1,10 @@
 package ai.agentican.quarkus.otel;
 
 import ai.agentican.framework.Agentican;
-import ai.agentican.framework.orchestration.execution.TaskListener;
-import ai.agentican.framework.orchestration.execution.TaskDecorator;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
+import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
+import ai.agentican.framework.orchestration.execution.WorkflowRunDecorator;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 import ai.agentican.quarkus.test.MockLlmClient;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
@@ -27,10 +27,10 @@ class TracingIntegrationTest {
     MockLlmClient mockLlm;
 
     @Inject
-    TaskDecorator taskDecorator;
+    WorkflowRunDecorator workflowRunDecorator;
 
     @Inject
-    Instance<TaskListener> stepListeners;
+    Instance<WorkflowRunListener> stepListeners;
 
     @Inject
     InMemorySpanExporter spanExporter;
@@ -45,9 +45,9 @@ class TracingIntegrationTest {
     @Test
     void tracingBeansAreAutoConfigured() {
 
-        assertNotNull(taskDecorator, "TaskDecorator should be produced");
+        assertNotNull(workflowRunDecorator, "WorkflowRunDecorator should be produced");
         assertTrue(stepListeners.stream().count() >= 1,
-                "Should have at least 1 TaskListener (lifecycle). Got: " + stepListeners.stream().count());
+                "Should have at least 1 WorkflowRunListener (lifecycle). Got: " + stepListeners.stream().count());
     }
 
     @Test
@@ -55,13 +55,13 @@ class TracingIntegrationTest {
 
         mockLlm.queueEndTurn("Traced result");
 
-        var task = Plan.builder("otel-test").description("test")
-                .step(new PlanStepAgent("research", "researcher", "do something",
+        var task = WorkflowDefinition.builder("otel-test").description("test")
+                .step(new WorkflowStepAgent("research", "researcher", "do something",
                         List.of(), false, List.of(), List.of()))
                 .build();
 
-        var handle = agentican.run(task);
-        var result = handle.result();
+        var handle = agentican.workflow(task).raw().start(java.util.Map.of());
+        var result = handle.await();
 
         assertEquals("COMPLETED", result.status().name());
     }
@@ -72,14 +72,14 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("Step 1 result");
         mockLlm.queueEndTurn("Step 2 result");
 
-        var task = Plan.builder("multi-step-trace").description("test").steps(List.of(
-                new PlanStepAgent("step1", "researcher", "do step 1", List.of(), false, List.of(), List.of()),
-                new PlanStepAgent("step2", "researcher", "do step 2", List.of("step1"), false, List.of(), List.of())))
+        var task = WorkflowDefinition.builder("multi-step-trace").description("test").steps(List.of(
+                new WorkflowStepAgent("step1", "researcher", "do step 1", List.of(), false, List.of(), List.of()),
+                new WorkflowStepAgent("step2", "researcher", "do step 2", List.of("step1"), false, List.of(), List.of())))
                 .build();
 
-        var handle = agentican.run(task);
+        var handle = agentican.workflow(task).raw().start(java.util.Map.of());
 
-        assertEquals("COMPLETED", handle.result().status().name());
+        assertEquals("COMPLETED", handle.await().status().name());
     }
 
     @Test
@@ -88,17 +88,17 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("Step 1 done");
         mockLlm.queueEndTurn("Step 2 done");
 
-        var task = Plan.builder("trace-id-test").description("test").steps(List.of(
-                new PlanStepAgent("alpha", "researcher", "do alpha", List.of(), false, List.of(), List.of()),
-                new PlanStepAgent("beta", "researcher", "do beta", List.of("alpha"), false, List.of(), List.of())))
+        var task = WorkflowDefinition.builder("trace-id-test").description("test").steps(List.of(
+                new WorkflowStepAgent("alpha", "researcher", "do alpha", List.of(), false, List.of(), List.of()),
+                new WorkflowStepAgent("beta", "researcher", "do beta", List.of("alpha"), false, List.of(), List.of())))
                 .build();
 
-        var handle = agentican.run(task);
-        assertEquals("COMPLETED", handle.result().status().name());
+        var handle = agentican.workflow(task).raw().start(java.util.Map.of());
+        assertEquals("COMPLETED", handle.await().status().name());
 
         Thread.sleep(500);
 
-        var spans = spanExporter.getByTaskId(handle.taskId());
+        var spans = spanExporter.getByTaskId(handle.id());
 
         assertFalse(spans.isEmpty(), "Should have exported spans");
 
@@ -120,17 +120,17 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("Step A result");
         mockLlm.queueEndTurn("Step B result");
 
-        var task = Plan.builder("full-tree-test").description("test").steps(List.of(
-                new PlanStepAgent("step-a", "researcher", "do A", List.of(), false, List.of(), List.of()),
-                new PlanStepAgent("step-b", "researcher", "do B", List.of("step-a"), false, List.of(), List.of())))
+        var task = WorkflowDefinition.builder("full-tree-test").description("test").steps(List.of(
+                new WorkflowStepAgent("step-a", "researcher", "do A", List.of(), false, List.of(), List.of()),
+                new WorkflowStepAgent("step-b", "researcher", "do B", List.of("step-a"), false, List.of(), List.of())))
                 .build();
 
-        var handle = agentican.run(task);
-        assertEquals("COMPLETED", handle.result().status().name());
+        var handle = agentican.workflow(task).raw().start(java.util.Map.of());
+        assertEquals("COMPLETED", handle.await().status().name());
 
         Thread.sleep(500);
 
-        var spans = spanExporter.getByTaskId(handle.taskId());
+        var spans = spanExporter.getByTaskId(handle.id());
         var names = spans.stream().map(s -> s.name()).toList();
 
         var taskSpans = spans.stream().filter(s -> s.name().equals("agentican.task")).toList();
@@ -167,17 +167,17 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("First done");
         mockLlm.queueEndTurn("Second done");
 
-        var task = Plan.builder("nesting-test").description("test").steps(List.of(
-                new PlanStepAgent("first", "researcher", "do first", List.of(), false, List.of(), List.of()),
-                new PlanStepAgent("second", "researcher", "do second", List.of("first"), false, List.of(), List.of())))
+        var task = WorkflowDefinition.builder("nesting-test").description("test").steps(List.of(
+                new WorkflowStepAgent("first", "researcher", "do first", List.of(), false, List.of(), List.of()),
+                new WorkflowStepAgent("second", "researcher", "do second", List.of("first"), false, List.of(), List.of())))
                 .build();
 
-        var handle = agentican.run(task);
-        handle.result();
+        var handle = agentican.workflow(task).raw().start(java.util.Map.of());
+        handle.await();
 
         Thread.sleep(500);
 
-        var spans = spanExporter.getByTaskId(handle.taskId());
+        var spans = spanExporter.getByTaskId(handle.id());
 
         var taskSpans = spans.stream().filter(s -> s.name().equals("agentican.task")).toList();
         var stepSpans = spans.stream().filter(s -> s.name().startsWith("agentican.step")).toList();

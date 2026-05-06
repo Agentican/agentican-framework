@@ -15,15 +15,16 @@ public class ExpenseAudit {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var audit = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var audit = agentican.workflow(PLAN_NAME)
                     .input(ExpenseReport.class)
                     .output(AuditSummary.class)
                     .build();
 
-            var summary = audit.runAsync(report()).join();
+            var summary = audit.start(report()).future().join();
 
             print(summary);
         }

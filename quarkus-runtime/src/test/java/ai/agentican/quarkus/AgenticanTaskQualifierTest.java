@@ -1,6 +1,6 @@
 package ai.agentican.quarkus;
 
-import ai.agentican.framework.invoker.AgenticanTask;
+import ai.agentican.framework.Workflow;
 
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -17,21 +17,17 @@ class AgenticanTaskQualifierTest {
     static final String INSTRUCTIONS = "Research {{input}} and summarize the findings.";
 
     @Inject
-    @AgentTask(name = TASK_NAME, agent = AGENT_NAME, instructions = INSTRUCTIONS)
-    AgenticanTask<String, String> researcher;
+    @Task(name = TASK_NAME, agent = AGENT_NAME, instructions = INSTRUCTIONS)
+    Workflow<String, String> researcher;
 
     @Inject
-    @AgentTask(
+    @Task(
             name = "Research With Skill",
             agent = AGENT_NAME,
             instructions = INSTRUCTIONS,
             skills = {"literature-search"},
             hitl = true)
-    AgenticanTask<String, String> researcherWithOpts;
-
-    @Inject
-    @WorkflowTask(name = "Unresolved Plan", plan = "not-yet-registered")
-    AgenticanTask<String, String> unresolved;
+    Workflow<String, String> researcherWithOpts;
 
     @Test
     void agentTaskQualifierResolves() {
@@ -43,11 +39,5 @@ class AgenticanTaskQualifierTest {
     void agentTaskQualifierAcceptsSkillsAndHitl() {
 
         assertNotNull(researcherWithOpts);
-    }
-
-    @Test
-    void workflowTaskQualifierResolvesEvenWithoutRegisteredPlan() {
-
-        assertNotNull(unresolved);
     }
 }

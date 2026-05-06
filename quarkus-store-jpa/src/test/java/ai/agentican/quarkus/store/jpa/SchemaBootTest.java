@@ -3,7 +3,7 @@ package ai.agentican.quarkus.store.jpa;
 import ai.agentican.quarkus.store.jpa.entity.AgentEntity;
 import ai.agentican.quarkus.store.jpa.entity.KnowledgeEntryEntity;
 import ai.agentican.quarkus.store.jpa.entity.KnowledgeFactEntity;
-import ai.agentican.quarkus.store.jpa.entity.PlanEntity;
+import ai.agentican.quarkus.store.jpa.entity.WorkflowEntity;
 import ai.agentican.quarkus.store.jpa.entity.SkillEntity;
 import ai.agentican.quarkus.store.jpa.entity.TaskEntity;
 import ai.agentican.quarkus.store.jpa.entity.TaskStepEntity;
@@ -58,17 +58,17 @@ class SchemaBootTest {
     @Transactional
     void canPersistPlanWithDefinitionJson() {
 
-        var plan = new PlanEntity();
-        plan.id = "plan-" + UUID.randomUUID();
-        plan.name = "Research Plan";
-        plan.description = "A plan";
-        plan.definitionJson = "{\"id\":\"plan-x\",\"name\":\"Research Plan\",\"steps\":[]}";
+        var plan = new WorkflowEntity();
+        plan.id = "definition-" + UUID.randomUUID();
+        plan.name = "Research WorkflowDefinition";
+        plan.description = "A definition";
+        plan.definitionJson = "{\"id\":\"definition-x\",\"name\":\"Research WorkflowDefinition\",\"steps\":[]}";
         plan.createdAt = Instant.now();
         plan.persist();
 
-        var fetched = (PlanEntity) PlanEntity.findById(plan.id);
+        var fetched = (WorkflowEntity) WorkflowEntity.findById(plan.id);
         assertNotNull(fetched);
-        assertEquals("Research Plan", fetched.name);
+        assertEquals("Research WorkflowDefinition", fetched.name);
         assertNotNull(fetched.definitionJson);
     }
 
@@ -76,9 +76,9 @@ class SchemaBootTest {
     @Transactional
     void canPersistTaskExecutionGraphWithFkToPlan() {
 
-        var plan = new PlanEntity();
-        plan.id = "plan-ex-" + UUID.randomUUID();
-        plan.name = "Execution Plan";
+        var plan = new WorkflowEntity();
+        plan.id = "definition-ex-" + UUID.randomUUID();
+        plan.name = "Execution WorkflowDefinition";
         plan.definitionJson = "{}";
         plan.createdAt = Instant.now();
         plan.persist();

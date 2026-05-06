@@ -5,8 +5,11 @@ import ai.agentican.framework.util.DotEnv;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -21,24 +24,33 @@ public record RuntimeConfig(
         WorkerConfig agentRunner,
         List<AgentConfig> agents,
         List<SkillConfig> skills,
-        List<PlanConfig> plans) {
+        List<WorkflowConfig> workflows,
+        boolean strict) {
 
     private static final Pattern ENV_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
-    private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
+    private static final ObjectMapper YAML_MAPPER =
+            new ObjectMapper(new YAMLFactory()).registerModule(new JavaTimeModule());
 
     public RuntimeConfig {
 
         if (llm == null) llm = List.of();
         if (mcp == null) mcp = List.of();
-        if (agentRunner == null) agentRunner = new WorkerConfig(0, null);
         if (agents == null) agents = List.of();
         if (skills == null) skills = List.of();
-        if (plans == null) plans = List.of();
+        if (workflows == null) workflows = List.of();
     }
 
     public static RuntimeConfig load(Path path) throws IOException {
 
-        var raw = Files.readString(path);
+        return load(Files.readString(path));
+    }
+
+    public static RuntimeConfig load(InputStream input) throws IOException {
+
+        return load(new String(input.readAllBytes(), StandardCharsets.UTF_8));
+    }
+
+    private static RuntimeConfig load(String raw) throws IOException {
 
         var resolved = resolveEnvVars(raw);
 

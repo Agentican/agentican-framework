@@ -1,9 +1,9 @@
 package ai.agentican.quarkus;
 
 import ai.agentican.framework.Agentican;
-import ai.agentican.framework.orchestration.execution.TaskHandle;
-import ai.agentican.framework.orchestration.execution.TaskResult;
-import ai.agentican.framework.orchestration.model.Plan;
+import ai.agentican.framework.orchestration.execution.WorkflowRunResult;
+import ai.agentican.framework.orchestration.execution.WorkflowRun;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -16,33 +16,34 @@ public class ReactiveAgentican {
     @Inject
     Agentican agentican;
 
-    public Uni<TaskHandle> run(String description) {
+    public Uni<WorkflowRun<String>> run(String description) {
 
         return Uni.createFrom().item(() -> agentican.run(description));
     }
 
-    public Uni<TaskHandle> run(Plan plan) {
+    public Uni<WorkflowRun<WorkflowRunResult>> run(WorkflowDefinition plan) {
 
-        return Uni.createFrom().item(() -> agentican.run(plan));
+        return run(plan, Map.of());
     }
 
-    public Uni<TaskHandle> run(Plan plan, Map<String, String> inputs) {
+    public Uni<WorkflowRun<WorkflowRunResult>> run(WorkflowDefinition plan, Map<String, String> inputs) {
 
-        return Uni.createFrom().item(() -> agentican.run(plan, inputs));
+        return Uni.createFrom().item(() -> agentican.workflow(plan).raw().start(inputs));
     }
 
-    public Uni<TaskResult> runAndAwait(String description) {
+    public Uni<WorkflowRunResult> runAndAwait(String description) {
 
-        return Uni.createFrom().completionStage(() -> agentican.run(description).resultAsync());
+        return Uni.createFrom().completionStage(() -> agentican.run(description).untypedFuture());
     }
 
-    public Uni<TaskResult> runAndAwait(Plan plan) {
+    public Uni<WorkflowRunResult> runAndAwait(WorkflowDefinition plan) {
 
-        return Uni.createFrom().completionStage(() -> agentican.run(plan).resultAsync());
+        return runAndAwait(plan, Map.of());
     }
 
-    public Uni<TaskResult> runAndAwait(Plan plan, Map<String, String> inputs) {
+    public Uni<WorkflowRunResult> runAndAwait(WorkflowDefinition plan, Map<String, String> inputs) {
 
-        return Uni.createFrom().completionStage(() -> agentican.run(plan, inputs).resultAsync());
+        return Uni.createFrom().completionStage(
+                () -> agentican.workflow(plan).raw().start(inputs).future());
     }
 }

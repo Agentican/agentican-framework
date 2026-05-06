@@ -1,17 +1,11 @@
 package ai.agentican.framework;
 
-import ai.agentican.framework.hitl.HitlManager;
-import ai.agentican.framework.knowledge.KnowledgeIngestor;
-import ai.agentican.framework.orchestration.execution.TaskRunner;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.orchestration.execution.resume.ReapReason;
 import ai.agentican.framework.orchestration.execution.resume.ResumeClassifier;
 import ai.agentican.framework.state.StepLog;
-import ai.agentican.framework.state.TaskLog;
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.state.WorkflowRunLog;
 import ai.agentican.framework.util.Mdc;
-import ai.agentican.framework.orchestration.execution.TaskDecorator;
-import ai.agentican.framework.orchestration.execution.TaskListener;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +14,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -31,27 +24,13 @@ public class AgenticanRecovery implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(AgenticanRecovery.class);
 
-    private final TaskStateStore taskStateStore;
-    private final TaskListener taskListener;
-    private final TaskRunner taskRunner;
-    private final ExecutorService taskExecutor;
-    private final TaskDecorator taskDecorator;
-    private final HitlManager hitlManager;
-    private final KnowledgeIngestor knowledgeIngestor;
+    private final WorkflowEngine engine;
 
     private final CopyOnWriteArrayList<CompletableFuture<?>> reingestFutures = new CopyOnWriteArrayList<>();
 
-    public AgenticanRecovery(Agentican agentican) {
+    public AgenticanRecovery(WorkflowEngine engine) {
 
-        var internals = agentican.internals();
-
-        this.taskStateStore = internals.taskStateStore();
-        this.taskListener = internals.taskListener();
-        this.taskRunner = internals.taskRunner();
-        this.taskExecutor = internals.taskExecutor();
-        this.taskDecorator = internals.taskDecorator();
-        this.hitlManager = internals.hitlManager();
-        this.knowledgeIngestor = internals.knowledgeIngestor();
+        this.engine = engine;
     }
 
     public int reapOrphans() {
@@ -61,7 +40,10 @@ public class AgenticanRecovery implements AutoCloseable {
 
     public int reapOrphans(ReapReason reason) {
 
-        var tasks = taskStateStore.listInProgress();
+        var workflowRunStore = engine.workflowRunStore;
+
+        var tasks = workflowRunStore.listInProgress();
+
         int reaped = 0;
 
         for (var task : tasks) {
@@ -89,9 +71,16 @@ public class AgenticanRecovery implements AutoCloseable {
 
     public int resumeInterrupted(int maxConcurrent) {
 
-        var tasks = taskStateStore.listInProgress();
+        var workflowRunStore = engine.workflowRunStore;
+        var workflowRunListener = engine.workflowRunListener;
+        var taskRunner = engine.taskRunner;
+        var taskExecutor = engine.taskExecutor;
+
+        var tasks = workflowRunStore.listInProgress();
+
         int resumed = 0;
         int reaped = 0;
+
         var semaphore = new Semaphore(maxConcurrent > 0 ? maxConcurrent : 1, true);
 
         for (var task : tasks) {
@@ -133,20 +122,21 @@ public class AgenticanRecovery implements AutoCloseable {
             var cancelled = new AtomicBoolean(false);
 
             var submitted = wrapTaskRunner(Mdc.propagate(() -> {
+
                 try {
                     semaphore.acquire();
-                    taskListener.onTaskResumed(taskId);
+                    workflowRunListener.onTaskResumed(taskId);
                     return taskRunner.resume(plan, taskId, params, cancelled);
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     LOG.warn("Resume of task {} interrupted while waiting for concurrency slot", taskId);
-                    taskListener.onTaskCompleted(taskId, TaskStatus.CANCELLED);
+                    workflowRunListener.onTaskCompleted(taskId, WorkflowRunStatus.CANCELLED);
                     throw new CompletionException(e);
                 }
                 catch (Exception e) {
                     LOG.error("Resume of task {} failed: {}", taskId, e.getMessage(), e);
-                    taskListener.onTaskCompleted(taskId, TaskStatus.FAILED);
+                    workflowRunListener.onTaskCompleted(taskId, WorkflowRunStatus.FAILED);
                     throw e;
                 }
                 finally {
@@ -189,16 +179,20 @@ public class AgenticanRecovery implements AutoCloseable {
 
     private <T> Supplier<T> wrapTaskRunner(Supplier<T> supplier) {
 
-        return taskDecorator != null ? taskDecorator.decorate(supplier) : supplier;
+        var workflowRunDecorator = engine.workflowRunDecorator;
+
+        return workflowRunDecorator != null ? workflowRunDecorator.decorate(supplier) : supplier;
     }
 
-    private int reapDanglingSubTasks(List<TaskLog> inProgress) {
+    private int reapDanglingSubTasks(List<WorkflowRunLog> inProgress) {
+
+        var workflowRunStore = engine.workflowRunStore;
 
         int reaped = 0;
         for (var t : inProgress) {
             if (t.parentTaskId() == null) continue;
 
-            var parent = taskStateStore.load(t.parentTaskId());
+            var parent = workflowRunStore.load(t.parentTaskId());
             if (parent == null || parent.status() == null) continue;
 
             LOG.warn("Reaping dangling sub-task {} (parent {} already terminal: {})",
@@ -210,13 +204,16 @@ public class AgenticanRecovery implements AutoCloseable {
         return reaped;
     }
 
-    private void reingestCompletedSteps(TaskLog task) {
+    private void reingestCompletedSteps(WorkflowRunLog task) {
+
+        var knowledgeIngestor = engine.knowledgeIngestor;
+        var taskExecutor = engine.taskExecutor;
 
         if (knowledgeIngestor == null) return;
 
         var taskId = task.taskId();
         var stepIds = task.steps().values().stream()
-                .filter(s -> s.status() == TaskStatus.COMPLETED)
+                .filter(s -> s.status() == WorkflowRunStatus.COMPLETED)
                 .filter(s -> s.output() != null && !s.output().isBlank())
                 .map(StepLog::id)
                 .toList();
@@ -239,7 +236,9 @@ public class AgenticanRecovery implements AutoCloseable {
         future.whenComplete((v, ex) -> reingestFutures.remove(future));
     }
 
-    private void rehydratePendingCheckpoints(TaskLog task) {
+    private void rehydratePendingCheckpoints(WorkflowRunLog task) {
+
+        var hitlManager = engine.hitlManager;
 
         if (hitlManager == null) return;
 
@@ -263,22 +262,28 @@ public class AgenticanRecovery implements AutoCloseable {
         }
     }
 
-    private void reapSingleTask(TaskLog task, ReapReason reason) {
+    private void reapSingleTask(WorkflowRunLog task, ReapReason reason) {
+
+        var workflowRunStore = engine.workflowRunStore;
+        var workflowRunListener = engine.workflowRunListener;
 
         reapOrphanedSubTasks(task.taskId(), reason);
 
         for (var step : task.steps().values()) {
             if (step.status() == null)
-                taskStateStore.stepCompleted(task.taskId(), step.id(), TaskStatus.FAILED,
+                workflowRunStore.stepCompleted(task.taskId(), step.id(), WorkflowRunStatus.FAILED,
                         "Step abandoned: " + reason.name());
         }
-        taskStateStore.taskCompleted(task.taskId(), TaskStatus.FAILED);
-        taskListener.onTaskReaped(task.taskId(), reason);
+        workflowRunStore.taskCompleted(task.taskId(), WorkflowRunStatus.FAILED);
+        workflowRunListener.onTaskReaped(task.taskId(), reason);
     }
 
     private void reapOrphanedSubTasks(String parentTaskId, ReapReason reason) {
 
-        var all = taskStateStore.list();
+        var workflowRunStore = engine.workflowRunStore;
+        var workflowRunListener = engine.workflowRunListener;
+
+        var all = workflowRunStore.list();
         for (var candidate : all) {
             if (!parentTaskId.equals(candidate.parentTaskId())) continue;
             if (candidate.status() != null) continue;
@@ -287,11 +292,11 @@ public class AgenticanRecovery implements AutoCloseable {
 
             for (var step : candidate.steps().values()) {
                 if (step.status() == null)
-                    taskStateStore.stepCompleted(candidate.taskId(), step.id(), TaskStatus.FAILED,
+                    workflowRunStore.stepCompleted(candidate.taskId(), step.id(), WorkflowRunStatus.FAILED,
                             "Step abandoned: " + reason.name());
             }
-            taskStateStore.taskCompleted(candidate.taskId(), TaskStatus.FAILED);
-            taskListener.onTaskReaped(candidate.taskId(), ReapReason.PARENT_REAPED);
+            workflowRunStore.taskCompleted(candidate.taskId(), WorkflowRunStatus.FAILED);
+            workflowRunListener.onTaskReaped(candidate.taskId(), ReapReason.PARENT_REAPED);
         }
     }
 }

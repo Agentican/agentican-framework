@@ -10,7 +10,6 @@ agents:
       magnitude relative to plan, and names concrete drivers (vendor price change,
       headcount ramp, FX movement) with confidence levels rather than "spending was
       higher than expected" tautologies. Flags when context is insufficient to explain.
-    externalId: budget-analyst
 
 skills:
   - name: Variance analysis framework
@@ -23,4 +22,3 @@ skills:
       levels: high (directly supported by the context), medium (plausible given context),
       low (speculative), insufficient-context (cannot attribute). One concrete next
       action for the finance team.
-    externalId: variance-analysis-framework

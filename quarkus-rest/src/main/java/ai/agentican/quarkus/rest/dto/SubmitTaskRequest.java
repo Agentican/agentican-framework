@@ -1,12 +1,12 @@
 package ai.agentican.quarkus.rest.dto;
 
-import ai.agentican.framework.orchestration.model.Plan;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 
 import java.util.Map;
 
 public record SubmitTaskRequest(
         String description,
-        Plan task,
+        WorkflowDefinition task,
         String planId,
         Map<String, String> inputs) {
 

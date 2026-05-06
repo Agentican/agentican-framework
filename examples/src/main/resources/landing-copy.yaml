@@ -8,7 +8,6 @@ agents:
       and calls-to-action for different readers. When the brief doesn't make the
       target reader clear, asks who the page is for instead of writing generic copy —
       generic copy is the most common reason a hero section fails.
-    externalId: brand-writer
 
 skills:
   - name: Hero copy rules
@@ -20,4 +19,3 @@ skills:
       (B2C): everyday language, one direct benefit, CTA reads "Sign up" or "Get
       started free". The registers do not mix. If the audience isn't stated in the
       brief, do not guess — ask.
-    externalId: hero-copy-rules

@@ -23,8 +23,8 @@ class StepLoopRunner {
     @FunctionalInterface
     interface SubPlanRunner {
 
-        TaskResult run(Plan plan, Map<String, String> params, AtomicBoolean cancelled, Map<String, String> outputs,
-                       String parentTaskId, String parentStepId, int iterationIndex);
+        WorkflowRunResult run(WorkflowDefinition plan, Map<String, String> params, AtomicBoolean cancelled,
+                              Map<String, String> outputs, String parentTaskId, String parentStepId, int iterationIndex);
     }
 
     private final SubPlanRunner subPlanRunner;
@@ -34,7 +34,7 @@ class StepLoopRunner {
         this.subPlanRunner = subPlanRunner;
     }
 
-    TaskStepResult run(PlanStepLoop step, Map<String, String> outputs, Map<String, String> params,
+    WorkflowStepResult run(WorkflowStepLoop step, Map<String, String> outputs, Map<String, String> params,
                        AtomicBoolean cancelled, String parentTaskId, String parentStepId) {
 
         var upstreamOutput = outputs.get(step.over());
@@ -43,7 +43,7 @@ class StepLoopRunner {
 
         if (upstreamOutput == null) {
 
-            return new TaskStepResult(step.name(), TaskStatus.FAILED,
+            return new WorkflowStepResult(step.name(), WorkflowRunStatus.FAILED,
                     "No output or param found for '" + step.over() + "' (loop step '" + step.name() + "')",
                     List.of());
         }
@@ -53,7 +53,8 @@ class StepLoopRunner {
         if (items.isEmpty()) {
 
             LOG.warn("Loop step '{}': no items found in upstream output", step.name());
-            return new TaskStepResult(step.name(), TaskStatus.COMPLETED, "", List.of());
+
+            return new WorkflowStepResult(step.name(), WorkflowRunStatus.COMPLETED, "", List.of());
         }
 
         LOG.info(Logs.RUNNER_RUN_LOOP_STEP, step.name(), items.size());
@@ -71,18 +72,17 @@ class StepLoopRunner {
 
             var resolvedBody = resolveLoopBody(step.body(), indexed.item(), params);
 
-            var subPlan = Plan.builder(step.name() + "-iter-" + (indexed.index() + 1))
+            var subPlan = WorkflowDefinition.builder(step.name() + "-iter-" + (indexed.index() + 1))
                     .description("")
                     .steps(resolvedBody)
                     .build();
 
             LOG.info(Logs.RUNNER_RUN_LOOP_STEP_ITEM, step.name(), indexed.index() + 1);
 
-            return subPlanRunner.run(subPlan, params, cancelled, outputs,
-                    parentTaskId, parentStepId, indexed.index());
+            return subPlanRunner.run(subPlan, params, cancelled, outputs, parentTaskId, parentStepId, indexed.index());
         });
 
-        var iterationResults = new LinkedHashMap<Integer, TaskResult>();
+        var iterationResults = new LinkedHashMap<Integer, WorkflowRunResult>();
 
         for (int i = 0; i < results.size(); i++)
             iterationResults.put(i, results.get(i));
@@ -90,8 +90,8 @@ class StepLoopRunner {
         return aggregateResults(step.name(), items.size(), iterationResults);
     }
 
-    private TaskStepResult aggregateResults(String stepName, int itemCount,
-                                             Map<Integer, TaskResult> iterationResults) {
+    private WorkflowStepResult aggregateResults(String stepName, int itemCount,
+                                             Map<Integer, WorkflowRunResult> iterationResults) {
 
         var aggregated = new StringBuilder();
         var allAgentResults = new ArrayList<AgentResult>();
@@ -107,6 +107,7 @@ class StepLoopRunner {
             if (subResult != null && !subResult.stepResults().isEmpty()) {
 
                 var lastStep = subResult.stepResults().getLast();
+
                 aggregated.append(lastStep.output() != null ? lastStep.output() : "");
 
                 subResult.stepResults().stream()
@@ -116,35 +117,36 @@ class StepLoopRunner {
         }
 
         var allCompleted = iterationResults.values().stream()
-                .allMatch(r -> r != null && r.status() == TaskStatus.COMPLETED);
-        var status = allCompleted ? TaskStatus.COMPLETED : TaskStatus.FAILED;
+                .allMatch(r -> r != null && r.status() == WorkflowRunStatus.COMPLETED);
 
-        return new TaskStepResult(stepName, status, aggregated.toString(), allAgentResults);
+        var status = allCompleted ? WorkflowRunStatus.COMPLETED : WorkflowRunStatus.FAILED;
+
+        return new WorkflowStepResult(stepName, status, aggregated.toString(), allAgentResults);
     }
 
-    List<PlanStep> resolveLoopBody(List<PlanStep> body, String item, Map<String, String> params) {
+    List<WorkflowStep> resolveLoopBody(List<WorkflowStep> body, String item, Map<String, String> params) {
 
-        return body.stream().map(step -> (PlanStep) switch (step) {
+        return body.stream().map(step -> (WorkflowStep) switch (step) {
 
-            case PlanStepAgent s -> new PlanStepAgent(
-                    s.name(), s.agentId(),
+            case WorkflowStepAgent s -> new WorkflowStepAgent(
+                    s.name(), s.agentName(),
                     Placeholders.resolveParams(Placeholders.resolveItem(s.instructions(), item), params),
                     s.dependencies(), s.hitl(), s.skills(), s.tools());
 
-            case PlanStepLoop s -> new PlanStepLoop(
+            case WorkflowStepLoop s -> new WorkflowStepLoop(
                     s.name(), s.over(),
                     resolveLoopBody(s.body(), item, params),
                     s.dependencies(), s.hitl());
 
-            case PlanStepBranch s -> new PlanStepBranch(
+            case WorkflowStepBranch s -> new WorkflowStepBranch(
                     s.name(), s.from(),
-                    s.paths().stream().map(p -> new PlanStepBranch.Path(
+                    s.paths().stream().map(p -> new WorkflowStepBranch.Path(
                             p.pathName(),
                             resolveLoopBody(p.body(), item, params))).toList(),
                     s.defaultPath(), s.dependencies(), s.hitl());
 
-            case PlanStepCode<?> s -> s;
+            case WorkflowStepCode<?> s -> s;
+
         }).toList();
     }
-
 }

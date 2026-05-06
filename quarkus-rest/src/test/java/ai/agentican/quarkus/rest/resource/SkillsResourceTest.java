@@ -28,62 +28,61 @@ class SkillsResourceTest {
     @Test
     void createUpdateDeleteRoundTrip() {
 
-        var externalId = "test-skill-" + System.nanoTime();
+        var name = "test-skill-" + System.nanoTime();
 
         try {
 
             given().contentType("application/json")
                     .body("""
-                            {"externalId":"%s","name":"Deep Diligence","instructions":"Cross-check every claim."}
-                            """.formatted(externalId))
+                            {"name":"%s","instructions":"Cross-check every claim."}
+                            """.formatted(name))
                     .when().post("/agentican/skills")
                     .then()
                     .statusCode(201)
-                    .body("externalId", equalTo(externalId))
-                    .body("name", equalTo("Deep Diligence"))
+                    .body("name", equalTo(name))
                     .body("instructions", equalTo("Cross-check every claim."))
                     .body("declaredInConfig", is(false));
 
-            given().when().get("/agentican/skills/" + externalId)
+            given().when().get("/agentican/skills/" + name)
                     .then()
                     .statusCode(200)
-                    .body("name", equalTo("Deep Diligence"));
+                    .body("name", equalTo(name));
 
             given().contentType("application/json")
                     .body("""
-                            {"name":"Deep Diligence","instructions":"Verify against three primary sources."}
-                            """)
-                    .when().put("/agentican/skills/" + externalId)
+                            {"name":"%s","instructions":"Verify against three primary sources."}
+                            """.formatted(name))
+                    .when().put("/agentican/skills/" + name)
                     .then()
                     .statusCode(200)
                     .body("instructions", equalTo("Verify against three primary sources."));
         }
         finally {
 
-            given().when().delete("/agentican/skills/" + externalId).then().statusCode(204);
+            given().when().delete("/agentican/skills/" + name).then().statusCode(204);
         }
 
-        given().when().get("/agentican/skills/" + externalId).then().statusCode(404);
+        given().when().get("/agentican/skills/" + name).then().statusCode(404);
     }
 
     @Test
-    void createDuplicateExternalIdReturns409() {
+    void createDuplicateNameReturns409() {
 
-        var externalId = "dup-skill-" + System.nanoTime();
+        var name = "dup-skill-" + System.nanoTime();
 
         try {
 
             given().contentType("application/json")
                     .body("""
-                            {"externalId":"%s","name":"One","instructions":"first"}
-                            """.formatted(externalId))
+                            {"name":"%s","instructions":"first"}
+                            """.formatted(name))
                     .when().post("/agentican/skills")
                     .then().statusCode(201);
 
             given().contentType("application/json")
                     .body("""
-                            {"externalId":"%s","name":"Two","instructions":"second"}
-                            """.formatted(externalId))
+                            {"name":"%s","instructions":"second"}
+                            """.formatted(name))
                     .when().post("/agentican/skills")
                     .then()
                     .statusCode(409)
@@ -91,7 +90,7 @@ class SkillsResourceTest {
         }
         finally {
 
-            given().when().delete("/agentican/skills/" + externalId).then().statusCode(204);
+            given().when().delete("/agentican/skills/" + name).then().statusCode(204);
         }
     }
 
@@ -100,7 +99,7 @@ class SkillsResourceTest {
 
         given().contentType("application/json")
                 .body("""
-                        {"externalId":"no-instr-%s","name":"Naming","instructions":""}
+                        {"name":"Naming-%s","instructions":""}
                         """.formatted(System.nanoTime()))
                 .when().post("/agentican/skills")
                 .then()

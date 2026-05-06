@@ -48,7 +48,6 @@ public class RetryingLlmClient implements LlmClient {
             try {
 
                 return sender.apply(request);
-
             }
             catch (Exception e) {
 
@@ -62,9 +61,13 @@ public class RetryingLlmClient implements LlmClient {
                         attempt + 1, maxRetries + 1, delay.toMillis(), e.getMessage());
 
                 try {
+
                     Thread.sleep(delay.toMillis());
-                } catch (InterruptedException ie) {
+                }
+                catch (InterruptedException ie) {
+
                     Thread.currentThread().interrupt();
+
                     throw wrapException(e);
                 }
             }
@@ -90,6 +93,7 @@ public class RetryingLlmClient implements LlmClient {
         if (e.getCause() instanceof TimeoutException) return true;
 
         var msg = e.getMessage();
+
         if (msg == null) return false;
 
         var lower = msg.toLowerCase();
@@ -103,6 +107,7 @@ public class RetryingLlmClient implements LlmClient {
     private static RuntimeException wrapException(Exception e) {
 
         if (e instanceof RuntimeException re) return re;
+
         return new RuntimeException(e);
     }
 }

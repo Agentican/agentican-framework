@@ -10,7 +10,6 @@ agents:
       Preserves the actual wording of decisions rather than smoothing them into
       corporate-speak: "we're going to pilot with two customers" stays that way, not
       "pilot program approved."
-    externalId: chief-of-staff
 
 skills:
   - name: Notes structure
@@ -22,4 +21,3 @@ skills:
       rather than silently assigning. Open questions: unresolved topics explicitly
       punted. Summary is one sentence that a reader who skipped the notes would find
       useful.
-    externalId: notes-structure

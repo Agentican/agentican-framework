@@ -15,15 +15,16 @@ public class CandidateScreening {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var screening = agentican.workflowTask(TASK_NAME)
-                    .plan(PLAN_NAME)
+            var screening = agentican.workflow(PLAN_NAME)
                     .input(CandidateRoster.class)
                     .output(OutreachDrafts.class)
                     .build();
 
-            var outreach = screening.runAsync(candidates()).join();
+            var outreach = screening.start(candidates()).future().join();
 
             print(outreach);
         }

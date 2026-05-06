@@ -1,6 +1,7 @@
 package ai.agentican.framework.agent;
 
-import ai.agentican.framework.orchestration.execution.TaskListener;
+import ai.agentican.framework.config.WorkerConfig;
+import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.config.RuntimeConfig;
@@ -8,7 +9,7 @@ import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.store.KnowledgeStore;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.registry.SkillRegistry;
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.framework.util.Logs;
 
 import org.slf4j.Logger;
@@ -22,63 +23,87 @@ public class AgentFactory {
 
     private final RuntimeConfig config;
     private final HitlManager hitlManager;
-    private final KnowledgeStore knowledgeStore;
     private final SkillRegistry skillRegistry;
-    private final TaskListener taskListener;
-    private final TaskStateStore taskStateStore;
+    private final KnowledgeStore knowledgeStore;
+    private final WorkflowRunStore workflowRunStore;
+    private final WorkflowRunListener workflowRunListener;
 
     private final Map<String, LlmClient> llms;
 
     private AgentFactory(RuntimeConfig config, Map<String, LlmClient> llms, HitlManager hitlManager,
-                         SkillRegistry skillRegistry, KnowledgeStore knowledgeStore,
-                         TaskStateStore taskStateStore, TaskListener taskListener) {
+                         SkillRegistry skillRegistry, KnowledgeStore knowledgeStore, WorkflowRunStore workflowRunStore,
+                         WorkflowRunListener workflowRunListener) {
 
         this.config = config;
-        this.hitlManager = hitlManager;
-        this.knowledgeStore = knowledgeStore;
-        this.skillRegistry = skillRegistry;
-        this.taskListener = taskListener;
-        this.taskStateStore = taskStateStore;
-
         this.llms = llms;
+        this.hitlManager = hitlManager;
+        this.skillRegistry = skillRegistry;
+        this.knowledgeStore = knowledgeStore;
+        this.workflowRunStore = workflowRunStore;
+        this.workflowRunListener = workflowRunListener;
     }
 
     public Agent build(AgentConfig agentConfig) {
 
-        var agentName = agentConfig.name();
-        var llmName = agentConfig.llm();
+        var configAgentName = agentConfig.name();
+        var configLlmName = agentConfig.llm();
 
         var defaultLlm = llms.get(LlmConfig.DEFAULT);
-        var agentLlm = llms.getOrDefault(llmName, defaultLlm);
+        var agentLlm = llms.getOrDefault(configLlmName, defaultLlm);
 
         if (agentLlm == null)
-            throw new IllegalStateException("No LLM client found for '" + agentConfig.llm() + "' (agent: " + agentName + ")");
+            throw new IllegalStateException("No LLM client found for '" + agentConfig.llm() + "' (agent: " + configAgentName + ")");
 
-        var agentRunnerConfig = config.agentRunner();
+        var runnerConfig = config.agentRunner() != null
+                ? config.agentRunner()
+                : new WorkerConfig(0, null);
 
-        var maxTurns = agentRunnerConfig.maxTurns();
-        var timeout = agentRunnerConfig.timeout();
+        var maxTurns = agentConfig.maxTurns() != null
+                ? agentConfig.maxTurns()
+                : runnerConfig.maxTurns();
+
+        var timeout = agentConfig.timeout() != null
+                ? agentConfig.timeout()
+                : runnerConfig.timeout();
 
         var llmConfig = config.llm().stream()
-                .filter(llm -> llm.name().equals(llmName))
+                .filter(llm -> llm.name().equals(configLlmName))
                 .findFirst()
                 .orElse(config.llm().isEmpty() ? null : config.llm().getFirst());
 
-        var agentRunner = SmacAgentRunner.builder()
-                .llmClient(agentLlm)
-                .llmName(llmName != null ? llmName : LlmConfig.DEFAULT)
-                .llmProvider(llmConfig != null ? llmConfig.provider() : null)
-                .llmModel(llmConfig != null ? llmConfig.model() : null)
-                .maxIterations(maxTurns)
-                .timeout(timeout)
-                .hitlManager(hitlManager)
-                .knowledgeStore(knowledgeStore)
-                .taskStateStore(taskStateStore)
-                .skillRegistry(skillRegistry)
-                .taskListener(taskListener)
-                .build();
+        var llm = configLlmName != null ? configLlmName : LlmConfig.DEFAULT;
+        var provider = llmConfig != null ? llmConfig.provider() : null;
+        var model = llmConfig != null ? llmConfig.model() : null;
 
-        LOG.info(Logs.AGENTICAN_BUILT_AGENT, agentName);
+        var agentRunner = switch (agentConfig.runner()) {
+
+            case AgentConfig.RUNNER_REACT -> ReActAgentRunner.builder()
+                    .llmClient(agentLlm)
+                    .llmName(llm)
+                    .llmProvider(provider)
+                    .llmModel(model)
+                    .maxIterations(maxTurns)
+                    .timeout(timeout)
+                    .workflowRunStore(workflowRunStore)
+                    .workflowRunListener(workflowRunListener)
+                    .build();
+
+            default -> SmacAgentRunner.builder()
+                    .llmClient(agentLlm)
+                    .llmName(llm)
+                    .llmProvider(provider)
+                    .llmModel(model)
+                    .maxIterations(maxTurns)
+                    .timeout(timeout)
+                    .hitlManager(hitlManager)
+                    .knowledgeStore(knowledgeStore)
+                    .workflowRunStore(workflowRunStore)
+                    .skillRegistry(skillRegistry)
+                    .workflowRunListener(workflowRunListener)
+                    .build();
+        };
+
+        LOG.info(Logs.AGENTICAN_BUILT_AGENT, configAgentName);
 
         return Agent.builder().config(agentConfig).runner(agentRunner).build();
     }
@@ -94,8 +119,8 @@ public class AgentFactory {
         private HitlManager hitlManager;
         private SkillRegistry skillRegistry;
         private KnowledgeStore knowledgeStore;
-        private TaskStateStore taskStateStore;
-        private TaskListener taskListener;
+        private WorkflowRunStore workflowRunStore;
+        private WorkflowRunListener workflowRunListener;
 
         private Map<String, LlmClient> llms;
 
@@ -103,17 +128,17 @@ public class AgentFactory {
 
         public Builder config(RuntimeConfig config) { this.config = config; return this; }
         public Builder hitlManager(HitlManager hitlManager) { this.hitlManager = hitlManager; return this; }
-        public Builder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
         public Builder skillRegistry(SkillRegistry skillRegistry) { this.skillRegistry = skillRegistry; return this; }
-        public Builder taskListener(TaskListener taskListener) { this.taskListener = taskListener; return this; }
-        public Builder taskStateStore(TaskStateStore taskStateStore) { this.taskStateStore = taskStateStore; return this; }
+        public Builder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
+        public Builder workflowRunStore(WorkflowRunStore workflowRunStore) { this.workflowRunStore = workflowRunStore; return this; }
+        public Builder workflowRunListener(WorkflowRunListener workflowRunListener) { this.workflowRunListener = workflowRunListener; return this; }
 
         public Builder llms(Map<String, LlmClient> llms) { this.llms = llms; return this; }
 
         public AgentFactory build() {
 
-            return new AgentFactory(config, llms, hitlManager, skillRegistry, knowledgeStore,
-                    taskStateStore, taskListener);
+            return new AgentFactory(config, llms, hitlManager, skillRegistry, knowledgeStore, workflowRunStore,
+                    workflowRunListener);
         }
     }
 }

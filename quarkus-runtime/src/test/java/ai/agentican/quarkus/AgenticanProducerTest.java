@@ -15,7 +15,7 @@ class AgenticanProducerTest {
     Agentican agentican;
 
     @Inject
-    AgenticanConfig config;
+    ai.agentican.framework.config.RuntimeConfig runtimeConfig;
 
     @Test
     void agenticanIsProducedAsApplicationScopedBean() {
@@ -25,40 +25,33 @@ class AgenticanProducerTest {
     }
 
     @Test
-    void configMappingBindsLlm() {
+    void runtimeConfigBindsLlmFromYaml() {
 
-        assertEquals(1, config.llm().size());
+        assertEquals(1, runtimeConfig.llm().size());
 
-        var llm = config.llm().getFirst();
+        var llm = runtimeConfig.llm().getFirst();
 
         assertEquals("default", llm.name());
         assertEquals("anthropic", llm.provider());
         assertEquals("test-key", llm.apiKey());
-        assertEquals("claude-sonnet-4-5", llm.model().orElseThrow());
+        assertEquals("claude-sonnet-4-5", llm.model());
     }
 
     @Test
-    void configMappingBindsAgentRunnerDefaults() {
+    void runtimeConfigBindsAgentRunnerFromYaml() {
 
-        var runner = config.agentRunner().orElseThrow();
+        var runner = runtimeConfig.agentRunner();
 
+        assertNotNull(runner);
         assertEquals(15, runner.maxTurns());
     }
 
     @Test
-    void configMappingBindsPreRegisteredAgents() {
+    void preRegisteredAgentsAreLoadedFromYamlIntoRegistry() {
 
-        assertEquals(1, config.agents().size());
+        var registered = agentican.registry().agents().byName("researcher");
 
-        var researcher = config.agents().getFirst();
-
-        assertEquals("researcher", researcher.name());
-        assertEquals("Expert at finding information", researcher.role());
-    }
-
-    @Test
-    void preRegisteredAgentsAreAvailableInRegistry() {
-
-        assertNotNull(agentican.registry().agents().getByName("researcher"));
+        assertNotNull(registered, "Agent loaded from agentican.yaml should be registered");
+        assertEquals("Expert at finding information", registered.role());
     }
 }

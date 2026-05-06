@@ -4,7 +4,7 @@ import ai.agentican.framework.agent.Agent;
 import ai.agentican.framework.agent.AgentToolUse;
 import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
-import ai.agentican.framework.orchestration.model.Plan;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import ai.agentican.framework.orchestration.planning.ToolView;
 import ai.agentican.framework.tools.scratchpad.ScratchpadEntry;
 
@@ -14,8 +14,6 @@ import io.quarkus.qute.Template;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 
@@ -60,13 +58,14 @@ public class Templates {
     }
 
     public String renderPlannerPrompt(Collection<Agent> agents, Collection<SkillConfig> skills,
-                                      List<String> tools, Collection<Plan> existingPlans) {
+                                      List<String> tools, Collection<WorkflowDefinition> existingPlans, boolean strict) {
 
         return plannerPromptTemplate
                 .data("agents", agents != null ? agents : List.of())
                 .data("skills", skills != null ? skills : List.of())
                 .data("tools", tools != null ? tools : List.of())
                 .data("existingPlans", existingPlans != null ? existingPlans : List.of())
+                .data("strict", strict)
                 .render();
     }
 
@@ -149,17 +148,4 @@ public class Templates {
         }
     }
 
-    private static Template loadFileTemplate(Path path) {
-
-        try {
-
-            var content = Files.readString(path);
-
-            return Engine.builder().addDefaults().addValueResolver(new ReflectionValueResolver()).build().parse(content);
-        }
-        catch (IOException e) {
-
-            throw new IllegalStateException("Failed to load template from " + path, e);
-        }
-    }
 }

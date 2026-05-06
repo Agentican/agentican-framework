@@ -1,9 +1,9 @@
 package ai.agentican.quarkus.metrics;
 
-import ai.agentican.framework.orchestration.execution.TaskListener;
+import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
 import ai.agentican.framework.llm.LlmClientDecorator;
 
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.store.WorkflowRunStore;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
@@ -16,7 +16,7 @@ public class MetricsAutoConfiguration {
     MeterRegistry registry;
 
     @Inject
-    TaskStateStore taskStateStore;
+    WorkflowRunStore workflowRunStore;
 
     @Produces
     @ApplicationScoped
@@ -28,8 +28,8 @@ public class MetricsAutoConfiguration {
 
     @Produces
     @ApplicationScoped
-    public TaskListener meteredTurnListener() {
+    public WorkflowRunListener meteredTurnListener() {
 
-        return new MeteredTurnListener(registry, taskStateStore);
+        return new MeteredTurnListener(registry, workflowRunStore);
     }
 }

@@ -2,16 +2,15 @@ package ai.agentican.framework;
 
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.LlmConfig;
-import ai.agentican.framework.config.PlanConfig;
+import ai.agentican.framework.config.WorkflowConfig;
 import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.store.TaskStateStoreMemory;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
+import ai.agentican.framework.store.WorkflowRunStoreMemory;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 import ai.agentican.framework.tools.ToolDefinition;
-import ai.agentican.framework.hitl.HitlCheckpoint;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -34,7 +33,10 @@ class AgenticanTest {
     void builderDefaultsHitlManager() {
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
                 .build()) {
 
@@ -46,7 +48,10 @@ class AgenticanTest {
     void builderDefaultsTaskStateStore() {
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
                 .build()) {
 
@@ -61,21 +66,24 @@ class AgenticanTest {
                 .onSend("Do the thing", "Done it.");
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
                 .build()) {
 
-            var task = Plan.builder("test-task").description("")
-                    .step(new PlanStepAgent("step-a", "test-agent", "Do the thing", List.of(), false, List.of(), List.of()))
+            var task = WorkflowDefinition.builder("test-task").description("")
+                    .step(new WorkflowStepAgent("step-a", "test-agent", "Do the thing", List.of(), false, List.of(), List.of()))
                     .build();
 
-            var handle = agentican.run(task);
+            var handle = agentican.workflow(task).input(Void.class).build().start();
 
             assertNotNull(handle);
             assertFalse(handle.isCancelled());
 
-            var result = handle.result();
-            assertEquals(TaskStatus.FAILED, result.status());
+            var result = handle.untypedFuture().join();
+            assertEquals(WorkflowRunStatus.FAILED, result.status());
         }
     }
 
@@ -97,14 +105,17 @@ class AgenticanTest {
                 .onSend("Do the work", "Work completed successfully.");
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
                 .build()) {
 
             var handle = agentican.run("Do some work");
-            var result = handle.result();
+            var result = handle.untypedFuture().join();
 
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
             assertEquals("Work completed successfully.", result.output());
         }
     }
@@ -126,14 +137,17 @@ class AgenticanTest {
                 .onSend("Process widgets", "Processed widgets successfully.");
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
                 .build()) {
 
             var handle = agentican.run("Process something");
-            var result = handle.result();
+            var result = handle.untypedFuture().join();
 
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
             assertTrue(result.output().contains("widgets"));
         }
     }
@@ -158,7 +172,10 @@ class AgenticanTest {
                 .onSend("Step A", "Step A done.");
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
                 .build()) {
 
@@ -167,8 +184,8 @@ class AgenticanTest {
             handle.cancel();
             assertTrue(handle.isCancelled());
 
-            var result = handle.result();
-            assertNotEquals(TaskStatus.COMPLETED, result.status());
+            var result = handle.untypedFuture().join();
+            assertNotEquals(WorkflowRunStatus.COMPLETED, result.status());
         }
     }
 
@@ -186,7 +203,7 @@ class AgenticanTest {
                         "steps": [{"name": "use-tool", "type": "agent", "agent": "tool-user", "instructions": "Use MY_TOOL", "tools": ["MY_TOOL"]}]
                     }
                     """)
-                .onSend("plan refiner", """
+                .onSend("definition refiner", """
                     {
                       "params": [],
                       "steps": [
@@ -202,15 +219,18 @@ class AgenticanTest {
                 .onExecute("MY_TOOL", "{\"result\": \"custom data\"}");
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
                 .toolkit("my-toolkit", myToolkit)
                 .build()) {
 
             var handle = agentican.run("Use the custom tool");
-            var result = handle.result();
+            var result = handle.untypedFuture().join();
 
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         }
     }
 
@@ -234,15 +254,18 @@ class AgenticanTest {
                 mgr.respond(checkpoint.id(), HitlResponse.approve()));
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
                 .hitlManager(hitlManager)
                 .build()) {
 
             var handle = agentican.run("Write something that needs approval");
-            var result = handle.result();
+            var result = handle.untypedFuture().join();
 
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         }
     }
 
@@ -274,15 +297,18 @@ class AgenticanTest {
         });
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
                 .hitlManager(hitlManager)
                 .build()) {
 
             var handle = agentican.run("Write something that needs approval");
-            var result = handle.result();
+            var result = handle.untypedFuture().join();
 
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
             assertEquals(2, checkpointCount.get(),
                     "Every attempt (initial + each retry) should fire its own checkpoint");
         }
@@ -315,15 +341,18 @@ class AgenticanTest {
         });
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
                 .hitlManager(hitlManager)
                 .build()) {
 
             var handle = agentican.run("Write something that needs approval");
-            var result = handle.result();
+            var result = handle.untypedFuture().join();
 
-            assertEquals(TaskStatus.FAILED, result.status());
+            assertEquals(WorkflowRunStatus.FAILED, result.status());
             assertEquals(3, checkpointCount.get(),
                     "Default maxRetries=3, so we expect 3 attempts before giving up");
         }
@@ -343,7 +372,7 @@ class AgenticanTest {
                         "steps": [{"name": "build", "type": "agent", "agent": "builder", "instructions": "Build with SAFE_TOOL", "tools": ["SAFE_TOOL"]}]
                     }
                     """)
-                .onSend("plan refiner", """
+                .onSend("definition refiner", """
                     {
                       "params": [],
                       "steps": [
@@ -363,16 +392,19 @@ class AgenticanTest {
                 mgr.respond(checkpoint.id(), HitlResponse.approve()));
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
                 .toolkit("tools", toolkit)
                 .hitlManager(hitlManager)
                 .build()) {
 
             var handle = agentican.run("Build something safely");
-            var result = handle.result();
+            var result = handle.untypedFuture().join();
 
-            assertEquals(TaskStatus.COMPLETED, result.status());
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         }
     }
 
@@ -380,7 +412,10 @@ class AgenticanTest {
     void closeIsIdempotent() {
 
         var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
                 .build();
 
@@ -445,16 +480,20 @@ class AgenticanTest {
                 mgr.respond(checkpoint.id(), HitlResponse.approve()));
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
                 .toolkit("notion", notionToolkit)
                 .hitlManager(hitlManager)
                 .build()) {
 
-            var result = agentican.run("Find the top 3 LLMs based on reasoning and tool use. For each one, find its pricing and create a separate page in Notion with its details.");
+            var run = agentican.run("Find the top 3 LLMs based on reasoning and tool use. For each one, find its pricing and create a separate page in Notion with its details.");
+            var result = run.untypedFuture().join();
 
-            assertEquals(TaskStatus.COMPLETED, result.result().status());
-            assertTrue(result.result().stepResults().size() >= 3);
+            assertEquals(WorkflowRunStatus.COMPLETED, result.status());
+            assertTrue(result.stepResults().size() >= 3);
         }
     }
 
@@ -462,13 +501,18 @@ class AgenticanTest {
     void fluentAgentIsRegistered() {
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
-                .agent(new AgentConfig(null, "FluentAgent", "a fluent test role", null, "fluent-agent-id"))
+                .registry().api()
+                    .agent(new AgentConfig(null, "FluentAgent", "a fluent test role", null, null, null, null))
+                    .end()
                 .build()) {
 
-            assertTrue(agentican.registry().agents().isRegisteredByName("FluentAgent"));
-            assertEquals("FluentAgent", agentican.registry().agents().getByName("FluentAgent").name());
+            assertTrue(agentican.registry().agents().hasByName("FluentAgent"));
+            assertEquals("FluentAgent", agentican.registry().agents().byName("FluentAgent").name());
         }
     }
 
@@ -476,30 +520,40 @@ class AgenticanTest {
     void fluentSkillIsRegistered() {
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
-                .skill(new SkillConfig(null, "FluentSkill", "do the thing", "fluent-skill-id"))
+                .registry().api()
+                    .skill(new SkillConfig(null, "FluentSkill", "do the thing"))
+                    .end()
                 .build()) {
 
-            assertTrue(agentican.registry().skills().isRegisteredByName("FluentSkill"));
+            assertTrue(agentican.registry().skills().hasByName("FluentSkill"));
         }
     }
 
     @Test
     void fluentPlanIsRegistered() {
 
-        var step = new PlanConfig.PlanStepConfig("s1", "agent", "noop", "do nothing",
+        var step = new WorkflowConfig.PlanStepConfig("s1", "agent", "noop", "do nothing",
                 List.of(), false, List.of(), List.of(), null, null, List.of(), null, List.of(), null, null);
 
-        var planConfig = new PlanConfig("fluent-plan", "desc", List.of(), List.of(step), "fluent-plan-ext", null);
+        var planConfig = new WorkflowConfig("fluent-plan", "desc", List.of(), List.of(step), null);
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
-                .plan(planConfig)
+                .registry().api()
+                    .workflow(planConfig)
+                    .end()
                 .build()) {
 
-            assertNotNull(agentican.registry().plans().get("fluent-plan"));
+            assertNotNull(agentican.registry().workflows().byName("fluent-plan"));
         }
     }
 
@@ -507,28 +561,36 @@ class AgenticanTest {
     void multipleAgentsFromBuilderRegister() {
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
-                .agent(new AgentConfig(null, "FromConfig", "config role", null, "config-agent-id"))
-                .agent(new AgentConfig(null, "FromFluent", "fluent role", null, "fluent-agent-id"))
+                .registry().api()
+                    .agent(new AgentConfig(null, "FromConfig", "config role", null, null, null, null))
+                    .agent(new AgentConfig(null, "FromFluent", "fluent role", null, null, null, null))
+                    .end()
                 .build()) {
 
-            assertTrue(agentican.registry().agents().isRegisteredByName("FromConfig"));
-            assertTrue(agentican.registry().agents().isRegisteredByName("FromFluent"));
+            assertTrue(agentican.registry().agents().hasByName("FromConfig"));
+            assertTrue(agentican.registry().agents().hasByName("FromFluent"));
         }
     }
 
     @Test
     void reapOrphansMarksInProgressTasksFailed() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .build();
-                 var service = new AgenticanRecovery(agentican)) {
+                 var service = agentican.recovery()) {
 
             var taskId = "orphan-" + ai.agentican.framework.util.Ids.generate();
             store.taskStarted(taskId, "left running", null, Map.of());
@@ -540,31 +602,34 @@ class AgenticanTest {
             assertEquals(1, reaped);
 
             var reloaded = store.load(taskId);
-            assertEquals(TaskStatus.FAILED, reloaded.status());
-            assertEquals(TaskStatus.FAILED, reloaded.step("running-step").status());
+            assertEquals(WorkflowRunStatus.FAILED, reloaded.status());
+            assertEquals(WorkflowRunStatus.FAILED, reloaded.step("running-step").status());
         }
     }
 
     @Test
     void reapOrphansLeavesTerminalTasksAlone() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .build();
-                 var service = new AgenticanRecovery(agentican)) {
+                 var service = agentican.recovery()) {
 
             var taskId = "done-" + ai.agentican.framework.util.Ids.generate();
             store.taskStarted(taskId, "already done", null, Map.of());
-            store.taskCompleted(taskId, TaskStatus.COMPLETED);
+            store.taskCompleted(taskId, WorkflowRunStatus.COMPLETED);
 
             var reaped = service.reapOrphans();
 
             assertEquals(0, reaped);
-            assertEquals(TaskStatus.COMPLETED, store.load(taskId).status());
+            assertEquals(WorkflowRunStatus.COMPLETED, store.load(taskId).status());
         }
     }
 
@@ -584,28 +649,34 @@ class AgenticanTest {
                     """)
                 .onSend("after resume", "All done after resume");
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", mockLlm.toLlmClient())
-                .agent(new AgentConfig(null, "worker", "Worker role", null, "worker"))
-                .taskStateStore(store)
+                .registry().api()
+                    .agent(new AgentConfig(null, "worker", "Worker role", null, null, null, null))
+                    .end()
+
+                .workflowRunStore(store)
                 .build();
-                 var service = new AgenticanRecovery(agentican)) {
+                 var service = agentican.recovery()) {
 
             var taskId = "t-" + ai.agentican.framework.util.Ids.generate();
             var stepId = "s-" + ai.agentican.framework.util.Ids.generate();
             var runId = ai.agentican.framework.util.Ids.generate();
             var turnId = ai.agentican.framework.util.Ids.generate();
 
-            var step = new ai.agentican.framework.orchestration.model.PlanStepAgent(
+            var step = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "do-work", "worker", "Run to completion after resume",
                     List.of(), false, List.of(), List.of());
-            var plan = ai.agentican.framework.orchestration.model.Plan.builder("Resume Task")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Resume Task")
                     .description("test").step(step).build();
 
-            agentican.registry().plans().register(plan);
+            agentican.registry().workflows().register(plan);
 
             store.taskStarted(taskId, "Resume Task", plan, Map.of());
             store.stepStarted(taskId, stepId, "do-work");
@@ -618,16 +689,16 @@ class AgenticanTest {
             long deadline = System.currentTimeMillis() + 5000;
             while (System.currentTimeMillis() < deadline) {
                 var loaded = store.load(taskId);
-                if (loaded != null && loaded.status() == TaskStatus.COMPLETED) break;
+                if (loaded != null && loaded.status() == WorkflowRunStatus.COMPLETED) break;
                 Thread.sleep(50);
             }
 
             var final_ = store.load(taskId);
-            assertEquals(TaskStatus.COMPLETED, final_.status(),
+            assertEquals(WorkflowRunStatus.COMPLETED, final_.status(),
                     "Resume should drive the abandoned turn to completion via a fresh turn");
 
             var doWorkStep = final_.step("do-work");
-            assertEquals(TaskStatus.COMPLETED, doWorkStep.status());
+            assertEquals(WorkflowRunStatus.COMPLETED, doWorkStep.status());
             assertTrue(doWorkStep.output() != null && doWorkStep.output().contains("done"));
         }
     }
@@ -635,12 +706,15 @@ class AgenticanTest {
     @Test
     void resumeWithPlanCorruptReapsWithSpecificReason() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .build()) {
 
             var taskId = "t-corrupt-" + ai.agentican.framework.util.Ids.generate();
@@ -660,12 +734,15 @@ class AgenticanTest {
     @Test
     void listInProgressFiltersOutTerminalTasks() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .build()) {
 
             var runningId = "run-" + ai.agentican.framework.util.Ids.generate();
@@ -673,7 +750,7 @@ class AgenticanTest {
 
             store.taskStarted(runningId, "running", null, Map.of());
             store.taskStarted(doneId, "done", null, Map.of());
-            store.taskCompleted(doneId, TaskStatus.COMPLETED);
+            store.taskCompleted(doneId, WorkflowRunStatus.COMPLETED);
 
             var inProgressIds = store.listInProgress().stream()
                     .map(t -> t.taskId()).toList();
@@ -686,21 +763,27 @@ class AgenticanTest {
     @Test
     void resumeMaxConcurrentGatesResumesWithoutLosingAny() throws Exception {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
-                .llm("default", request -> endTurn("ok"))
-                .agent(new AgentConfig(null, "worker", "Worker", null, "worker"))
-                .taskStateStore(store)
-                .build();
-                 var service = new AgenticanRecovery(agentican)) {
 
-            var step = new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
+                .llm("default", request -> endTurn("ok"))
+                .registry().api()
+                    .agent(new AgentConfig(null, "worker", "Worker", null, null, null, null))
+                    .end()
+
+                .workflowRunStore(store)
+                .build();
+                 var service = agentican.recovery()) {
+
+            var step = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "do", "worker", "do it", List.of(), false, List.of(), List.of());
-            var plan = ai.agentican.framework.orchestration.model.Plan.builder("Bounded Resume")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Bounded Resume")
                     .description("test").step(step).build();
-            agentican.registry().plans().register(plan);
+            agentican.registry().workflows().register(plan);
 
             for (int i = 0; i < 3; i++) {
                 var taskId = "t-" + i + "-" + ai.agentican.framework.util.Ids.generate();
@@ -733,39 +816,45 @@ class AgenticanTest {
                 .onSend("sibling-c", "C done")
                 .onSend("synthesize", "all synthesized");
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
-                .llm("default", mockLlm.toLlmClient())
-                .agent(new AgentConfig(null, "worker", "Worker", null, "worker"))
-                .taskStateStore(store)
-                .build();
-                 var service = new AgenticanRecovery(agentican)) {
 
-            var siblingA = new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
+                .llm("default", mockLlm.toLlmClient())
+                .registry().api()
+                    .agent(new AgentConfig(null, "worker", "Worker", null, null, null, null))
+                    .end()
+
+                .workflowRunStore(store)
+                .build();
+                 var service = agentican.recovery()) {
+
+            var siblingA = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "sibling-a", "worker", "sibling-a", List.of(), false, List.of(), List.of());
-            var siblingB = new ai.agentican.framework.orchestration.model.PlanStepAgent(
+            var siblingB = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "sibling-b", "worker", "sibling-b", List.of(), false, List.of(), List.of());
-            var siblingC = new ai.agentican.framework.orchestration.model.PlanStepAgent(
+            var siblingC = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "sibling-c", "worker", "sibling-c", List.of(), false, List.of(), List.of());
-            var synth = new ai.agentican.framework.orchestration.model.PlanStepAgent(
+            var synth = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "synthesize", "worker", "synthesize",
                     List.of("sibling-a", "sibling-b", "sibling-c"), false, List.of(), List.of());
 
-            var plan = ai.agentican.framework.orchestration.model.Plan.builder("Parallel Resume")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Parallel Resume")
                     .description("test")
                     .steps(List.of(siblingA, siblingB, siblingC, synth))
                     .build();
 
-            agentican.registry().plans().register(plan);
+            agentican.registry().workflows().register(plan);
 
             var taskId = "t-" + ai.agentican.framework.util.Ids.generate();
             store.taskStarted(taskId, "Parallel Resume", plan, Map.of());
 
             var aStepId = ai.agentican.framework.util.Ids.generate();
             store.stepStarted(taskId, aStepId, "sibling-a");
-            store.stepCompleted(taskId, aStepId, TaskStatus.COMPLETED, "A done");
+            store.stepCompleted(taskId, aStepId, WorkflowRunStatus.COMPLETED, "A done");
 
             int handled = service.resumeInterrupted();
             assertEquals(1, handled);
@@ -773,18 +862,18 @@ class AgenticanTest {
             long deadline = System.currentTimeMillis() + 5000;
             while (System.currentTimeMillis() < deadline) {
                 var loaded = store.load(taskId);
-                if (loaded != null && loaded.status() == TaskStatus.COMPLETED) break;
+                if (loaded != null && loaded.status() == WorkflowRunStatus.COMPLETED) break;
                 Thread.sleep(50);
             }
 
             var finalLog = store.load(taskId);
-            assertEquals(TaskStatus.COMPLETED, finalLog.status(),
+            assertEquals(WorkflowRunStatus.COMPLETED, finalLog.status(),
                     "Parallel-resume should reach COMPLETED via the runSeeded dispatch loop");
 
-            assertEquals(TaskStatus.COMPLETED, finalLog.step("sibling-a").status());
-            assertEquals(TaskStatus.COMPLETED, finalLog.step("sibling-b").status());
-            assertEquals(TaskStatus.COMPLETED, finalLog.step("sibling-c").status());
-            assertEquals(TaskStatus.COMPLETED, finalLog.step("synthesize").status());
+            assertEquals(WorkflowRunStatus.COMPLETED, finalLog.step("sibling-a").status());
+            assertEquals(WorkflowRunStatus.COMPLETED, finalLog.step("sibling-b").status());
+            assertEquals(WorkflowRunStatus.COMPLETED, finalLog.step("sibling-c").status());
+            assertEquals(WorkflowRunStatus.COMPLETED, finalLog.step("synthesize").status());
 
             assertEquals(0, finalLog.step("sibling-a").runs().size(),
                     "Already-completed step must NOT be re-dispatched (zero new runs after resume)");
@@ -796,14 +885,17 @@ class AgenticanTest {
     @Test
     void resumeInterruptedClassifiesAndReaps() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .build();
-                 var service = new AgenticanRecovery(agentican)) {
+                 var service = agentican.recovery()) {
 
             var taskId = "interrupted-" + ai.agentican.framework.util.Ids.generate();
             store.taskStarted(taskId, "mid-step-crash", null, Map.of());
@@ -815,7 +907,7 @@ class AgenticanTest {
             assertEquals(1, handled);
 
             var reloaded = store.load(taskId);
-            assertEquals(TaskStatus.FAILED, reloaded.status(),
+            assertEquals(WorkflowRunStatus.FAILED, reloaded.status(),
                     "In v1, resumeInterrupted falls back to reap while drive-forward is implemented in PR 5");
         }
     }
@@ -823,14 +915,17 @@ class AgenticanTest {
     @Test
     void reapOrphansLeavesSubTasksToParent() {
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
-                .taskStateStore(store)
+                .workflowRunStore(store)
                 .build();
-                 var service = new AgenticanRecovery(agentican)) {
+                 var service = agentican.recovery()) {
 
             var parentId = "parent-" + ai.agentican.framework.util.Ids.generate();
             var childId = "child-" + ai.agentican.framework.util.Ids.generate();
@@ -843,8 +938,8 @@ class AgenticanTest {
             var reaped = service.reapOrphans();
 
             assertEquals(1, reaped, "Only the parent is counted in the reap total; sub-tasks cascade");
-            assertEquals(TaskStatus.FAILED, store.load(parentId).status());
-            assertEquals(TaskStatus.FAILED, store.load(childId).status(),
+            assertEquals(WorkflowRunStatus.FAILED, store.load(parentId).status());
+            assertEquals(WorkflowRunStatus.FAILED, store.load(childId).status(),
                     "Sub-task cascades to FAILED when its parent is reaped — prevents orphan RUNNING sub-task rows");
         }
     }
@@ -857,35 +952,41 @@ class AgenticanTest {
         var mockLlm = new MockLlmClient()
                 .onSendRepeated("should-never-call", endTurn("would be wrong"));
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> {
                     llmCallCount.incrementAndGet();
                     return mockLlm.toLlmClient().send(request);
                 })
-                .agent(new AgentConfig(null, "worker", "Worker", null, "worker"))
-                .taskStateStore(store)
-                .build();
-                 var service = new AgenticanRecovery(agentican)) {
+                .registry().api()
+                    .agent(new AgentConfig(null, "worker", "Worker", null, null, null, null))
+                    .end()
 
-            var pathBodyStep = new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                .workflowRunStore(store)
+                .build();
+                 var service = agentican.recovery()) {
+
+            var pathBodyStep = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "path-body", "worker", "do path", List.of(), false, List.of(), List.of());
-            var sourceForBranch = new ai.agentican.framework.orchestration.model.PlanStepAgent(
+            var sourceForBranch = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "source", "worker", "produce", List.of(), false, List.of(), List.of());
-            var branch = new ai.agentican.framework.orchestration.model.PlanStepBranch(
+            var branch = new ai.agentican.framework.orchestration.model.WorkflowStepBranch(
                     "choose", "source",
-                    List.of(new ai.agentican.framework.orchestration.model.PlanStepBranch.Path(
+                    List.of(new ai.agentican.framework.orchestration.model.WorkflowStepBranch.Path(
                             "A", List.of(pathBodyStep))),
                     "A", List.of(), false);
 
-            var plan = ai.agentican.framework.orchestration.model.Plan.builder("Branch Resume")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Branch Resume")
                     .description("test")
                     .steps(List.of(sourceForBranch, branch))
                     .build();
 
-            agentican.registry().plans().register(plan);
+            agentican.registry().workflows().register(plan);
 
             var taskId = "t-branch-" + ai.agentican.framework.util.Ids.generate();
             var stepId = "s-" + ai.agentican.framework.util.Ids.generate();
@@ -896,17 +997,17 @@ class AgenticanTest {
 
             var sourceStepId = "src-" + ai.agentican.framework.util.Ids.generate();
             store.stepStarted(taskId, sourceStepId, "source");
-            store.stepCompleted(taskId, sourceStepId, TaskStatus.COMPLETED, "source-output");
+            store.stepCompleted(taskId, sourceStepId, WorkflowRunStatus.COMPLETED, "source-output");
 
             store.stepStarted(taskId, stepId, "choose");
             store.branchPathChosen(taskId, stepId, "A");
 
-            var childPlan = ai.agentican.framework.orchestration.model.Plan.builder("choose-A")
+            var childPlan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("choose-A")
                     .description("").step(pathBodyStep).build();
             store.taskStarted(childId, "choose-A", childPlan, Map.of(), taskId, stepId, 0);
             store.stepStarted(childId, childStepId, "path-body");
-            store.stepCompleted(childId, childStepId, TaskStatus.COMPLETED, "prerecorded path output");
-            store.taskCompleted(childId, TaskStatus.COMPLETED);
+            store.stepCompleted(childId, childStepId, WorkflowRunStatus.COMPLETED, "prerecorded path output");
+            store.taskCompleted(childId, WorkflowRunStatus.COMPLETED);
 
             var before = llmCallCount.get();
 
@@ -916,12 +1017,12 @@ class AgenticanTest {
             long deadline = System.currentTimeMillis() + 5000;
             while (System.currentTimeMillis() < deadline) {
                 var loaded = store.load(taskId);
-                if (loaded != null && loaded.status() == TaskStatus.COMPLETED) break;
+                if (loaded != null && loaded.status() == WorkflowRunStatus.COMPLETED) break;
                 Thread.sleep(50);
             }
 
             var finalLog = store.load(taskId);
-            assertEquals(TaskStatus.COMPLETED, finalLog.status(),
+            assertEquals(WorkflowRunStatus.COMPLETED, finalLog.status(),
                     "Branch-resume should complete the parent task by reusing the existing child output");
             assertEquals(before, llmCallCount.get(),
                     "No LLM call should be made — the existing completed child output is reused verbatim");
@@ -936,34 +1037,40 @@ class AgenticanTest {
         var mockLlm = new MockLlmClient()
                 .onSendRepeated("iter-body", endTurn("iter-1 fresh output"));
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> {
                     llmCallCount.incrementAndGet();
                     return mockLlm.toLlmClient().send(request);
                 })
-                .agent(new AgentConfig(null, "worker", "Worker", null, "worker"))
-                .taskStateStore(store)
-                .build();
-                 var service = new AgenticanRecovery(agentican)) {
+                .registry().api()
+                    .agent(new AgentConfig(null, "worker", "Worker", null, null, null, null))
+                    .end()
 
-            var source = new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                .workflowRunStore(store)
+                .build();
+                 var service = agentican.recovery()) {
+
+            var source = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "source", "worker", "produce items", List.of(), false, List.of(), List.of());
 
-            var bodyStep = new ai.agentican.framework.orchestration.model.PlanStepAgent(
+            var bodyStep = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "iter-body", "worker", "iter-body", List.of(), false, List.of(), List.of());
 
-            var loop = new ai.agentican.framework.orchestration.model.PlanStepLoop(
+            var loop = new ai.agentican.framework.orchestration.model.WorkflowStepLoop(
                     "each", "source", List.of(bodyStep), List.of(), false);
 
-            var plan = ai.agentican.framework.orchestration.model.Plan.builder("Loop Resume")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Loop Resume")
                     .description("test")
                     .steps(List.of(source, loop))
                     .build();
 
-            agentican.registry().plans().register(plan);
+            agentican.registry().workflows().register(plan);
 
             var taskId = "t-loop-" + ai.agentican.framework.util.Ids.generate();
             var sourceStepId = "src-" + ai.agentican.framework.util.Ids.generate();
@@ -974,17 +1081,17 @@ class AgenticanTest {
             store.taskStarted(taskId, "Loop Resume", plan, Map.of());
 
             store.stepStarted(taskId, sourceStepId, "source");
-            store.stepCompleted(taskId, sourceStepId, TaskStatus.COMPLETED,
+            store.stepCompleted(taskId, sourceStepId, WorkflowRunStatus.COMPLETED,
                     "[\"a\",\"b\"]");
 
             store.stepStarted(taskId, loopStepId, "each");
 
-            var iterPlan = ai.agentican.framework.orchestration.model.Plan.builder("each-iter-1")
+            var iterPlan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("each-iter-1")
                     .description("").step(bodyStep).build();
             store.taskStarted(iter0Id, "each-iter-1", iterPlan, Map.of(), taskId, loopStepId, 0);
             store.stepStarted(iter0Id, iter0StepId, "iter-body");
-            store.stepCompleted(iter0Id, iter0StepId, TaskStatus.COMPLETED, "iter-0 prerecorded");
-            store.taskCompleted(iter0Id, TaskStatus.COMPLETED);
+            store.stepCompleted(iter0Id, iter0StepId, WorkflowRunStatus.COMPLETED, "iter-0 prerecorded");
+            store.taskCompleted(iter0Id, WorkflowRunStatus.COMPLETED);
 
             var before = llmCallCount.get();
 
@@ -994,16 +1101,16 @@ class AgenticanTest {
             long deadline = System.currentTimeMillis() + 5000;
             while (System.currentTimeMillis() < deadline) {
                 var loaded = store.load(taskId);
-                if (loaded != null && loaded.status() == TaskStatus.COMPLETED) break;
+                if (loaded != null && loaded.status() == WorkflowRunStatus.COMPLETED) break;
                 Thread.sleep(50);
             }
 
             var finalLog = store.load(taskId);
-            assertEquals(TaskStatus.COMPLETED, finalLog.status(),
+            assertEquals(WorkflowRunStatus.COMPLETED, finalLog.status(),
                     "Loop-resume should complete after dispatching only the missing iteration");
 
             var iter0Log = store.load(iter0Id);
-            assertEquals(TaskStatus.COMPLETED, iter0Log.status());
+            assertEquals(WorkflowRunStatus.COMPLETED, iter0Log.status());
             assertEquals("iter-0 prerecorded", iter0Log.step("iter-body").output(),
                     "Completed iteration output must be preserved verbatim — iter-0 was not re-run");
 
@@ -1017,22 +1124,28 @@ class AgenticanTest {
 
         var mockLlm = new MockLlmClient();
 
-        var store = new TaskStateStoreMemory();
+        var store = new WorkflowRunStoreMemory();
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
-                .llm("default", mockLlm.toLlmClient())
-                .agent(new AgentConfig(null, "worker", "Worker", null, "worker"))
-                .taskStateStore(store)
-                .build();
-                 var service = new AgenticanRecovery(agentican)) {
 
-            var step = new ai.agentican.framework.orchestration.model.PlanStepAgent(
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
+                .llm("default", mockLlm.toLlmClient())
+                .registry().api()
+                    .agent(new AgentConfig(null, "worker", "Worker", null, null, null, null))
+                    .end()
+
+                .workflowRunStore(store)
+                .build();
+                 var service = agentican.recovery()) {
+
+            var step = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
                     "review", "worker", "review draft", List.of(), true, List.of(), List.of());
-            var plan = ai.agentican.framework.orchestration.model.Plan.builder("Rejected-Output Resume")
+            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Rejected-Output Resume")
                     .description("test").step(step).build();
 
-            agentican.registry().plans().register(plan);
+            agentican.registry().workflows().register(plan);
 
             var taskId = "t-rej-" + ai.agentican.framework.util.Ids.generate();
             var stepId = "s-" + ai.agentican.framework.util.Ids.generate();
@@ -1044,7 +1157,7 @@ class AgenticanTest {
             store.runStarted(taskId, stepId, runId, "worker");
             store.turnStarted(taskId, runId, turnId);
             store.messageSent(taskId, turnId,
-                    new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c"));
+                    new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
             store.responseReceived(taskId, turnId,
                     new ai.agentican.framework.llm.LlmResponse("draft", List.of(),
                             ai.agentican.framework.llm.StopReason.END_TURN, 1, 1, 0, 0, 0));
@@ -1056,7 +1169,7 @@ class AgenticanTest {
                     "review", "Step output: review", "draft");
             store.hitlNotified(taskId, stepId, checkpoint);
             store.hitlResponded(taskId, stepId, HitlResponse.reject("needs more polish"));
-            store.stepCompleted(taskId, stepId, TaskStatus.SUSPENDED, "draft");
+            store.stepCompleted(taskId, stepId, WorkflowRunStatus.SUSPENDED, "draft");
 
             int handled = service.resumeInterrupted();
             assertEquals(1, handled);
@@ -1069,23 +1182,13 @@ class AgenticanTest {
             }
 
             var finalLog = store.load(taskId);
-            assertEquals(TaskStatus.FAILED, finalLog.status(),
+            assertEquals(WorkflowRunStatus.FAILED, finalLog.status(),
                     "Rejected STEP_OUTPUT on resume must drive the task to FAILED");
-            assertEquals(TaskStatus.FAILED, finalLog.step("review").status());
+            assertEquals(WorkflowRunStatus.FAILED, finalLog.step("review").status());
             assertNotNull(finalLog.step("review").output());
             assertTrue(finalLog.step("review").output().contains("needs more polish"),
                     "Rejection feedback must be surfaced in the step output");
         }
     }
 
-    @Test
-    void agentMissingExternalIdFailsAtBoot() {
-
-        var builder = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
-                .llm("default", request -> endTurn("ok"))
-                .agent(new AgentConfig(null, "Nameless", "role", null, null));
-
-        assertThrows(IllegalStateException.class, builder::build);
-    }
 }

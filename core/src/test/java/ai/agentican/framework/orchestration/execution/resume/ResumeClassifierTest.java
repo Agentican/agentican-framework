@@ -4,12 +4,12 @@ import ai.agentican.framework.llm.LlmRequest;
 import ai.agentican.framework.llm.LlmResponse;
 import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.llm.ToolCall;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 import ai.agentican.framework.state.RunLog;
 import ai.agentican.framework.state.StepLog;
-import ai.agentican.framework.state.TaskLog;
+import ai.agentican.framework.state.WorkflowRunLog;
 import ai.agentican.framework.state.TurnLog;
 import ai.agentican.framework.tools.ToolResult;
 import ai.agentican.framework.util.Ids;
@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ResumeClassifierTest {
 
     private static final LlmRequest REQUEST =
-            new LlmRequest("sys", null, "user", List.of(), 0, "default", "anthropic", "claude");
+            new LlmRequest("sys", null, "user", List.of(), 0, "default", "anthropic", "claude", null, java.util.List.of());
 
     @Test
     void nullTaskLogReaps() {
@@ -38,7 +38,7 @@ class ResumeClassifierTest {
     @Test
     void missingPlanReaps() {
 
-        var taskLog = new TaskLog("t-1", "t", null, Map.of());
+        var taskLog = new WorkflowRunLog("t-1", "t", null, Map.of());
         var result = ResumeClassifier.classify(taskLog, null);
         assertTrue(result.reapOnly());
         assertEquals(ai.agentican.framework.orchestration.execution.resume.ReapReason.PLAN_UNAVAILABLE, result.reapReason());
@@ -47,8 +47,8 @@ class ResumeClassifierTest {
     @Test
     void terminalTaskReaps() {
 
-        var taskLog = new TaskLog("t-1", "t", null, Map.of());
-        taskLog.setStatus(TaskStatus.COMPLETED);
+        var taskLog = new WorkflowRunLog("t-1", "t", null, Map.of());
+        taskLog.setStatus(WorkflowRunStatus.COMPLETED);
 
         var result = ResumeClassifier.classify(taskLog, fakePlan());
         assertTrue(result.reapOnly());
@@ -57,7 +57,7 @@ class ResumeClassifierTest {
     @Test
     void taskWithNoStepsClassifiesCleanly() {
 
-        var taskLog = new TaskLog("t-1", "t", null, Map.of());
+        var taskLog = new WorkflowRunLog("t-1", "t", null, Map.of());
         var result = ResumeClassifier.classify(taskLog, fakePlan());
 
         assertFalse(result.reapOnly());
@@ -70,7 +70,7 @@ class ResumeClassifierTest {
     void stepStartedNoRunsClassifiedAsInFlightWithNoTurn() {
 
         var plan = fakePlan();
-        var taskLog = new TaskLog("t-1", "t", null, Map.of());
+        var taskLog = new WorkflowRunLog("t-1", "t", null, Map.of());
         taskLog.addStep("research", new StepLog(Ids.generate(), "research"));
 
         var result = ResumeClassifier.classify(taskLog, plan);
@@ -162,7 +162,7 @@ class ResumeClassifierTest {
     @Test
     void turnClosedDetectedViaCompletedAtOnly() {
 
-        var taskLog = new TaskLog("t-1", "t", null, Map.of());
+        var taskLog = new WorkflowRunLog("t-1", "t", null, Map.of());
         var step = new StepLog(Ids.generate(), "research");
         taskLog.addStep("research", step);
         var run = new RunLog(Ids.generate(), 0, "Researcher");
@@ -179,16 +179,16 @@ class ResumeClassifierTest {
     @Test
     void completedStepsAreCollectedInOrder() {
 
-        var plan = Plan.builder("t").description("").steps(List.of(
-                new PlanStepAgent("a", "x", "do a", List.of(), false, List.of(), List.of()),
-                new PlanStepAgent("b", "x", "do b", List.of("a"), false, List.of(), List.of()),
-                new PlanStepAgent("c", "x", "do c", List.of("b"), false, List.of(), List.of())))
+        var plan = WorkflowDefinition.builder("t").description("").steps(List.of(
+                new WorkflowStepAgent("a", "x", "do a", List.of(), false, List.of(), List.of()),
+                new WorkflowStepAgent("b", "x", "do b", List.of("a"), false, List.of(), List.of()),
+                new WorkflowStepAgent("c", "x", "do c", List.of("b"), false, List.of(), List.of())))
                 .build();
 
-        var taskLog = new TaskLog("t-1", "t", null, Map.of());
+        var taskLog = new WorkflowRunLog("t-1", "t", null, Map.of());
 
-        var aStep = new StepLog(Ids.generate(), "a"); aStep.setStatus(TaskStatus.COMPLETED);
-        var bStep = new StepLog(Ids.generate(), "b"); bStep.setStatus(TaskStatus.COMPLETED);
+        var aStep = new StepLog(Ids.generate(), "a"); aStep.setStatus(WorkflowRunStatus.COMPLETED);
+        var bStep = new StepLog(Ids.generate(), "b"); bStep.setStatus(WorkflowRunStatus.COMPLETED);
         var cStep = new StepLog(Ids.generate(), "c");
 
         taskLog.addStep("a", aStep);
@@ -203,17 +203,17 @@ class ResumeClassifierTest {
         assertEquals("c", result.inFlightStep().get().stepName());
     }
 
-    private static Plan fakePlan() {
+    private static WorkflowDefinition fakePlan() {
 
-        return Plan.builder("t").description("")
-                .step(new PlanStepAgent("research", "researcher", "do it",
+        return WorkflowDefinition.builder("t").description("")
+                .step(new WorkflowStepAgent("research", "researcher", "do it",
                         List.of(), false, List.of(), List.of()))
                 .build();
     }
 
-    private static TaskLog taskWithInFlightTurn(java.util.function.Consumer<TurnLog> setup) {
+    private static WorkflowRunLog taskWithInFlightTurn(java.util.function.Consumer<TurnLog> setup) {
 
-        var taskLog = new TaskLog("t-1", "t", null, Map.of());
+        var taskLog = new WorkflowRunLog("t-1", "t", null, Map.of());
         var step = new StepLog(Ids.generate(), "research");
         taskLog.addStep("research", step);
         var run = new RunLog(Ids.generate(), 0, "Researcher");

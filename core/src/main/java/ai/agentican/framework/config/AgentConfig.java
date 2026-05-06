@@ -4,13 +4,20 @@ import ai.agentican.framework.util.Ids;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import java.time.Duration;
+
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AgentConfig(
         String id,
         String name,
         String role,
         String llm,
-        String externalId) {
+        String runner,
+        Integer maxTurns,
+        Duration timeout) {
+
+    public static final String RUNNER_SMAC = "smac";
+    public static final String RUNNER_REACT = "react";
 
     public AgentConfig {
 
@@ -26,8 +33,8 @@ public record AgentConfig(
         if (llm == null || llm.isBlank())
             llm = LlmConfig.DEFAULT;
 
-        if (externalId != null && externalId.isBlank())
-            externalId = null;
+        if (runner == null || runner.isBlank())
+            runner = RUNNER_SMAC;
     }
 
     public static AgentConfigBuilder builder() {
@@ -41,17 +48,21 @@ public record AgentConfig(
         private String name;
         private String role;
         private String llm;
-        private String externalId;
+        private String runner;
+        private Integer maxTurns;
+        private Duration timeout;
 
-        public AgentConfigBuilder id(String id) { this.id = id; return this; }
-        public AgentConfigBuilder name(String name) { this.name = name; return this; }
-        public AgentConfigBuilder role(String role) { this.role = role; return this; }
-        public AgentConfigBuilder llm(String llm) { this.llm = llm; return this; }
-        public AgentConfigBuilder externalId(String externalId) { this.externalId = externalId; return this; }
+        public AgentConfigBuilder id(String id)              { this.id = id; return this; }
+        public AgentConfigBuilder name(String name)          { this.name = name; return this; }
+        public AgentConfigBuilder role(String role)          { this.role = role; return this; }
+        public AgentConfigBuilder llm(String llm)            { this.llm = llm; return this; }
+        public AgentConfigBuilder runner(String runner)      { this.runner = runner; return this; }
+        public AgentConfigBuilder maxTurns(Integer maxTurns) { this.maxTurns = maxTurns; return this; }
+        public AgentConfigBuilder timeout(Duration timeout)  { this.timeout = timeout; return this; }
 
         public AgentConfig build() {
 
-            return new AgentConfig(id, name, role, llm, externalId);
+            return new AgentConfig(id, name, role, llm, runner, maxTurns, timeout);
         }
     }
 }

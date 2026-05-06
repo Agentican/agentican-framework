@@ -25,19 +25,21 @@ public class SecurityAdvisory {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config())
-                .hitlManager(new HitlManager(new CliHitlNotifier()))
-                .build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
 
-            var draft = agentican.agentTask(TASK_NAME)
+                .hitlManager(new HitlManager(new CliHitlNotifier()))
+        .build()) {
+
+            var draft = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(VulnerabilityReport.class)
-                    .output(AdvisoryDraft.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(VulnerabilityReport.class)
+                    .output(AdvisoryDraft.class)
                     .build();
 
-            var advisory = draft.runAsync(report()).join();
+            var advisory = draft.start(report()).future().join();
 
             print(advisory);
         }

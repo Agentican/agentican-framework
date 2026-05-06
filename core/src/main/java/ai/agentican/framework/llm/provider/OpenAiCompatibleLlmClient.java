@@ -11,10 +11,15 @@ import com.openai.models.FunctionDefinition;
 import com.openai.models.FunctionParameters;
 import com.openai.models.ResponseFormatJsonSchema;
 import com.openai.models.chat.completions.ChatCompletion;
+import com.openai.models.chat.completions.ChatCompletionAssistantMessageParam;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionFunctionTool;
+import com.openai.models.chat.completions.ChatCompletionMessageFunctionToolCall;
+import com.openai.models.chat.completions.ChatCompletionMessageParam;
+import com.openai.models.chat.completions.ChatCompletionMessageToolCall;
 import com.openai.models.chat.completions.ChatCompletionSystemMessageParam;
 import com.openai.models.chat.completions.ChatCompletionTool;
+import com.openai.models.chat.completions.ChatCompletionToolMessageParam;
 import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
 
 import org.slf4j.Logger;
@@ -104,10 +109,14 @@ public class OpenAiCompatibleLlmClient {
                 .maxCompletionTokens(maxTokens)
                 .addMessage(ChatCompletionSystemMessageParam.builder()
                         .content(request.systemPrompt())
-                        .build())
-                .addMessage(ChatCompletionUserMessageParam.builder()
-                        .content(buildUserText(request))
                         .build());
+
+        if (request.messages().isEmpty())
+            paramsBuilder.addMessage(ChatCompletionUserMessageParam.builder()
+                    .content(buildUserText(request))
+                    .build());
+        else
+            translateMessages(request.messages()).forEach(paramsBuilder::addMessage);
 
         if (temperature != null) paramsBuilder.temperature(temperature);
 
@@ -157,6 +166,83 @@ public class OpenAiCompatibleLlmClient {
                 .build();
 
         return ResponseFormatJsonSchema.builder().jsonSchema(jsonSchema).build();
+    }
+
+    private static List<ChatCompletionMessageParam> translateMessages(List<Message> messages) {
+
+        var out = new ArrayList<ChatCompletionMessageParam>(messages.size());
+
+        for (var msg : messages) {
+
+            if (msg.role() == Message.Role.USER) {
+
+                var toolResultBlocks = msg.blocks().stream()
+                        .filter(b -> b instanceof Message.ToolResultBlock)
+                        .map(b -> (Message.ToolResultBlock) b)
+                        .toList();
+
+                for (var tr : toolResultBlocks)
+                    out.add(ChatCompletionMessageParam.ofTool(ChatCompletionToolMessageParam.builder()
+                            .toolCallId(tr.toolUseId())
+                            .content(tr.content())
+                            .build()));
+
+                var text = msg.blocks().stream()
+                        .filter(b -> b instanceof Message.TextBlock)
+                        .map(b -> ((Message.TextBlock) b).text())
+                        .filter(t -> !t.isBlank())
+                        .reduce((a, b) -> a + "\n\n" + b)
+                        .orElse(null);
+
+                if (text != null)
+                    out.add(ChatCompletionMessageParam.ofUser(ChatCompletionUserMessageParam.builder()
+                            .content(text)
+                            .build()));
+            }
+            else {
+
+                var assistantBuilder = ChatCompletionAssistantMessageParam.builder();
+
+                var text = msg.blocks().stream()
+                        .filter(b -> b instanceof Message.TextBlock)
+                        .map(b -> ((Message.TextBlock) b).text())
+                        .filter(t -> !t.isBlank())
+                        .reduce((a, b) -> a + "\n\n" + b)
+                        .orElse(null);
+
+                if (text != null) assistantBuilder.content(text);
+
+                msg.blocks().stream()
+                        .filter(b -> b instanceof Message.ToolUseBlock)
+                        .map(b -> (Message.ToolUseBlock) b)
+                        .forEach(tu -> {
+                            var argsJson = toJson(tu.args());
+                            var fn = ChatCompletionMessageFunctionToolCall.Function.builder()
+                                    .name(tu.toolName())
+                                    .arguments(argsJson)
+                                    .build();
+                            var fnCall = ChatCompletionMessageFunctionToolCall.builder()
+                                    .id(tu.id())
+                                    .function(fn)
+                                    .build();
+                            assistantBuilder.addToolCall(ChatCompletionMessageToolCall.ofFunction(fnCall));
+                        });
+
+                out.add(ChatCompletionMessageParam.ofAssistant(assistantBuilder.build()));
+            }
+        }
+
+        return out;
+    }
+
+    private static String toJson(Map<String, Object> args) {
+
+        try {
+            return MAPPER.writeValueAsString(args != null ? args : Map.of());
+        }
+        catch (Exception e) {
+            return "{}";
+        }
     }
 
     private static String buildUserText(LlmRequest request) {

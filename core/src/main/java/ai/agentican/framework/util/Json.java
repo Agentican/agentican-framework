@@ -35,6 +35,25 @@ public class Json {
         return MAPPER.readValue(json, type);
     }
 
+    public static String unwrapMarkdownFences(String raw) {
+
+        if (raw == null) return null;
+
+        var trimmed = raw.strip();
+
+        if (!trimmed.startsWith("```")) return trimmed;
+
+        var firstNewline = trimmed.indexOf('\n');
+        var inner = firstNewline > 0 ? trimmed.substring(firstNewline + 1) : trimmed.substring(3);
+
+        inner = inner.strip();
+
+        if (inner.endsWith("```"))
+            inner = inner.substring(0, inner.length() - 3).strip();
+
+        return inner;
+    }
+
     public static String pretty(Object obj) {
 
         try {

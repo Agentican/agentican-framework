@@ -6,9 +6,9 @@ import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.agent.SmacAgentRunner;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
-import ai.agentican.framework.store.TaskStateStoreMemory;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
+import ai.agentican.framework.store.WorkflowRunStoreMemory;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 import ai.agentican.framework.registry.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -48,19 +48,19 @@ class TaskRunnerLoopTest {
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("loop-task")
+        var task = WorkflowDefinition.builder("loop-task")
                 .step("produce", "producer-agent", "Produce a JSON array")
                 .loop("loop-step", loop -> loop
                         .over("produce")
-                        .step(new PlanStepAgent("process", "body-agent",
+                        .step(new WorkflowStepAgent("process", "body-agent",
                                 "Process {{item.name}}", null, false, null, null)))
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         assertEquals(2, result.stepResults().size());
 
         var loopOutput = result.stepResults().get(1).output();
@@ -78,19 +78,19 @@ class TaskRunnerLoopTest {
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", new MockLlmClient()));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("empty-loop-task")
+        var task = WorkflowDefinition.builder("empty-loop-task")
                 .step("produce", "producer-agent", "Produce an empty array")
                 .loop("loop-step", loop -> loop
                         .over("produce")
-                        .step(new PlanStepAgent("process", "body-agent",
+                        .step(new WorkflowStepAgent("process", "body-agent",
                                 "Process {{item}}", null, false, null, null)))
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
 
         var loopStepResult = result.stepResults().get(1);
         assertEquals("", loopStepResult.output());
@@ -109,19 +109,19 @@ class TaskRunnerLoopTest {
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("placeholder-loop-task")
+        var task = WorkflowDefinition.builder("placeholder-loop-task")
                 .step("produce", "producer-agent", "Produce items")
                 .loop("loop-step", loop -> loop
                         .over("produce")
-                        .step(new PlanStepAgent("process", "body-agent",
+                        .step(new WorkflowStepAgent("process", "body-agent",
                                 "Process item {{item.id}} titled {{item.title}}", null, false, null, null)))
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
         assertTrue(result.stepResults().get(1).output().contains("Done with 123"));
     }
 
@@ -139,19 +139,19 @@ class TaskRunnerLoopTest {
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("aggregate-loop-task")
+        var task = WorkflowDefinition.builder("aggregate-loop-task")
                 .step("produce", "producer-agent", "Produce items")
                 .loop("loop-step", loop -> loop
                         .over("produce")
-                        .step(new PlanStepAgent("process", "body-agent",
+                        .step(new WorkflowStepAgent("process", "body-agent",
                                 "Process item {{item.id}}", null, false, null, null)))
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.COMPLETED, result.status());
+        assertEquals(WorkflowRunStatus.COMPLETED, result.status());
 
         var loopOutput = result.stepResults().get(1).output();
         assertTrue(loopOutput.contains("## Iteration 1"), "Expected iteration 1 header in: " + loopOutput);
@@ -168,18 +168,18 @@ class TaskRunnerLoopTest {
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", new MockLlmClient()));
 
-        var runner = new TaskRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new TaskStateStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
-        var task = Plan.builder("missing-upstream-task")
+        var task = WorkflowDefinition.builder("missing-upstream-task")
                 .step("produce", "producer-agent", "Produce something")
                 .loop("loop-step", loop -> loop
                         .over("nonexistent")
-                        .step(new PlanStepAgent("process", "body-agent",
+                        .step(new WorkflowStepAgent("process", "body-agent",
                                 "Process {{item}}", null, false, null, null)))
                 .build();
 
         var result = runner.run(task);
 
-        assertEquals(TaskStatus.FAILED, result.status());
+        assertEquals(WorkflowRunStatus.FAILED, result.status());
     }
 }

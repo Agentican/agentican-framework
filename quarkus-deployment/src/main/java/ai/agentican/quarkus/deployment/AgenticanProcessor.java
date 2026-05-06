@@ -6,7 +6,7 @@ import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.config.McpConfig;
 import ai.agentican.framework.config.RuntimeConfig;
 import ai.agentican.framework.config.SkillConfig;
-import ai.agentican.framework.config.PlanConfig;
+import ai.agentican.framework.config.WorkflowConfig;
 import ai.agentican.framework.config.WorkerConfig;
 import ai.agentican.framework.hitl.HitlCheckpoint;
 import ai.agentican.framework.hitl.HitlResponse;
@@ -17,21 +17,21 @@ import ai.agentican.framework.llm.LlmRequest;
 import ai.agentican.framework.llm.LlmResponse;
 import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.llm.ToolCall;
-import ai.agentican.framework.orchestration.model.Plan;
-import ai.agentican.framework.orchestration.model.PlanParam;
-import ai.agentican.framework.orchestration.execution.TaskStatus;
-import ai.agentican.framework.orchestration.model.PlanStep;
-import ai.agentican.framework.orchestration.model.PlanStepAgent;
-import ai.agentican.framework.orchestration.model.PlanStepBranch;
-import ai.agentican.framework.orchestration.model.PlanStepLoop;
-import ai.agentican.quarkus.AgentTask;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.orchestration.model.WorkflowParam;
+import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
+import ai.agentican.framework.orchestration.model.WorkflowStep;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
+import ai.agentican.framework.orchestration.model.WorkflowStepBranch;
+import ai.agentican.framework.orchestration.model.WorkflowStepLoop;
+import ai.agentican.quarkus.Task;
 import ai.agentican.quarkus.AgenticanBeansProducer;
 import ai.agentican.quarkus.AgenticanConfig;
 import ai.agentican.quarkus.AgenticanProducer;
-import ai.agentican.quarkus.AgenticanTaskProducer;
+import ai.agentican.quarkus.WorkflowProducer;
 import ai.agentican.quarkus.AgentProducer;
-import ai.agentican.quarkus.ReactiveAgenticanTaskProducer;
-import ai.agentican.quarkus.WorkflowTask;
+import ai.agentican.quarkus.ReactiveWorkflowProducer;
+import ai.agentican.quarkus.Workflow;
 import ai.agentican.quarkus.devui.AgenticanDevUIService;
 import ai.agentican.quarkus.event.CdiEventBridge;
 import ai.agentican.quarkus.health.AgenticanLivenessCheck;
@@ -55,8 +55,8 @@ class AgenticanProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(AgenticanProcessor.class);
     private static final String FEATURE = "agentican";
 
-    private static final DotName AGENT_TASK_DOT    = DotName.createSimple(AgentTask.class.getName());
-    private static final DotName WORKFLOW_TASK_DOT = DotName.createSimple(WorkflowTask.class.getName());
+    private static final DotName TASK_DOT    = DotName.createSimple(Task.class.getName());
+    private static final DotName WORKFLOW_DOT = DotName.createSimple(ai.agentican.quarkus.Workflow.class.getName());
 
     @BuildStep
     FeatureBuildItem feature() {
@@ -72,8 +72,8 @@ class AgenticanProcessor {
                         AgenticanProducer.class,
                         AgenticanBeansProducer.class,
                         AgentProducer.class,
-                        AgenticanTaskProducer.class,
-                        ReactiveAgenticanTaskProducer.class,
+                        WorkflowProducer.class,
+                        ReactiveWorkflowProducer.class,
                         CdiEventBridge.class,
                         AgenticanDevUIService.class,
                         AgenticanLivenessCheck.class,
@@ -89,8 +89,8 @@ class AgenticanProcessor {
                 AgenticanProducer.class.getName(),
                 AgenticanBeansProducer.class.getName(),
                 AgentProducer.class.getName(),
-                AgenticanTaskProducer.class.getName(),
-                ReactiveAgenticanTaskProducer.class.getName(),
+                WorkflowProducer.class.getName(),
+                ReactiveWorkflowProducer.class.getName(),
                 CdiEventBridge.class.getName(),
                 AgenticanDevUIService.class.getName(),
                 AgenticanConfig.class.getName(),
@@ -99,51 +99,17 @@ class AgenticanProcessor {
     }
 
     @BuildStep
-    void validateTaskInjectionPoints(CombinedIndexBuildItem indexItem, AgenticanConfig config) {
+    void logTaskInjectionPoints(CombinedIndexBuildItem indexItem) {
 
         var index = indexItem.getIndex();
 
-        var declaredAgents = new HashSet<String>();
-        config.agents().forEach(a -> {
-            declaredAgents.add(a.name());
-            a.externalId().ifPresent(declaredAgents::add);
-        });
+        for (var ann : index.getAnnotations(TASK_DOT))
+            LOG.debug("@Task at {} references agent '{}'; resolution happens at runtime",
+                    ann.target(), ann.value("agent").asString());
 
-        var declaredSkills = new HashSet<String>();
-        config.skills().forEach(s -> {
-            declaredSkills.add(s.name());
-            s.externalId().ifPresent(declaredSkills::add);
-        });
-
-        for (var ann : index.getAnnotations(AGENT_TASK_DOT)) {
-
-            var agent = ann.value("agent").asString();
-
-            if (!agent.isEmpty() && !declaredAgents.isEmpty() && !declaredAgents.contains(agent))
-                LOG.warn("@AgentTask at {} references agent '{}' not declared in agentican.agents; "
-                        + "will fail at bean resolution unless registered programmatically",
-                        ann.target(), agent);
-
-            var skillsValue = ann.value("skills");
-
-            if (skillsValue != null && !declaredSkills.isEmpty()) {
-
-                for (var skill : skillsValue.asStringArray()) {
-                    if (!skill.isEmpty() && !declaredSkills.contains(skill))
-                        LOG.warn("@AgentTask at {} references skill '{}' not declared in agentican.skills",
-                                ann.target(), skill);
-                }
-            }
-        }
-
-        for (var ann : index.getAnnotations(WORKFLOW_TASK_DOT)) {
-
-            var planName = ann.value("plan").asString();
-
-            if (!planName.isEmpty())
-                LOG.debug("@WorkflowTask at {} references plan '{}'; build-time validation skipped "
-                        + "(plans may be registered at runtime)", ann.target(), planName);
-        }
+        for (var ann : index.getAnnotations(WORKFLOW_DOT))
+            LOG.debug("@ai.agentican.quarkus.Workflow at {} references definition '{}'; resolution happens at runtime",
+                    ann.target(), ann.value("definition").asString());
     }
 
     @BuildStep
@@ -157,15 +123,15 @@ class AgenticanProcessor {
                 ComposioConfig.class,
                 WorkerConfig.class,
                 SkillConfig.class,
-                PlanConfig.class,
-                Plan.class,
-                PlanStep.class,
-                PlanStepAgent.class,
-                PlanStepLoop.class,
-                PlanStepBranch.class,
-                PlanStepBranch.Path.class,
-                PlanParam.class,
-                TaskStatus.class,
+                WorkflowConfig.class,
+                WorkflowDefinition.class,
+                WorkflowStep.class,
+                WorkflowStepAgent.class,
+                WorkflowStepLoop.class,
+                WorkflowStepBranch.class,
+                WorkflowStepBranch.Path.class,
+                WorkflowParam.class,
+                WorkflowRunStatus.class,
                 LlmRequest.class,
                 LlmResponse.class,
                 ToolCall.class,
@@ -180,4 +146,5 @@ class AgenticanProcessor {
                 .fields()
                 .build();
     }
+
 }

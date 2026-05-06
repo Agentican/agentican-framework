@@ -28,21 +28,21 @@ class JpaSkillRegistryTest {
     @Test
     void registerPersistsAndExposesInMemory() {
 
-        var skill = new SkillConfig("sk-" + Ids.generate(), "Summarize", "Condense a passage", null);
+        var skill = new SkillConfig("sk-" + Ids.generate(), "Summarize", "Condense a passage");
 
         registry.register(skill);
 
-        assertTrue(registry.isRegistered(skill.id()));
-        assertTrue(registry.isRegisteredByName("Summarize"));
-        assertEquals(skill, registry.get(skill.id()));
+        assertTrue(registry.hasById(skill.id()));
+        assertTrue(registry.hasByName("Summarize"));
+        assertEquals(skill, registry.byId(skill.id()));
     }
 
     @Test
     void registerIfAbsentKeepsFirstWrite() {
 
         var id = "sk-" + Ids.generate();
-        var first = new SkillConfig(id, "Outline", "first description", null);
-        var second = new SkillConfig(id, "Outline", "second description", null);
+        var first = new SkillConfig(id, "Outline", "first description");
+        var second = new SkillConfig(id, "Outline", "second description");
 
         var stored = registry.registerIfAbsent(first);
         assertEquals(first, stored);
@@ -55,12 +55,12 @@ class JpaSkillRegistryTest {
     void seedRehydratesFromCatalog() {
 
         var id = "sk-" + Ids.generate();
-        registry.register(new SkillConfig(id, "Translate", "Translate between languages", null));
+        registry.register(new SkillConfig(id, "Translate", "Translate between languages"));
 
         var fresh = new JpaSkillRegistry();
         fresh.seed();
 
-        var rehydrated = fresh.get(id);
+        var rehydrated = fresh.byId(id);
         assertNotNull(rehydrated);
         assertEquals("Translate", rehydrated.name());
         assertEquals("Translate between languages", rehydrated.instructions());

@@ -32,7 +32,10 @@ class AgenticanVectorIndexTest {
     void builderRegistersRetrievalToolkitAndCodeStep() {
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
                 .vectorIndex(docsKb())
                 .build()) {
@@ -45,7 +48,7 @@ class AgenticanVectorIndexTest {
             assertTrue(toolNames.contains("search_docs"),
                     "search_docs tool must be present: " + toolNames);
 
-            var kb = agentican.registry().vectorIndexes().get("docs");
+            var kb = agentican.registry().indexes().get("docs");
             assertNotNull(kb, "docs KB must be in registry");
             assertEquals("docs", kb.name());
         }
@@ -55,12 +58,15 @@ class AgenticanVectorIndexTest {
     void noVectorIndexsMeansNoAutoRegistration() {
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
                 .build()) {
 
             assertNull(agentican.registry().toolkits().get(RetrievalToolkit.SLUG));
-            assertEquals(0, agentican.registry().vectorIndexes().size());
+            assertEquals(0, agentican.registry().indexes().size());
         }
     }
 
@@ -71,7 +77,9 @@ class AgenticanVectorIndexTest {
         var second = docsKb();
 
         var builder = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
                 .vectorIndex(first);
 
@@ -82,7 +90,10 @@ class AgenticanVectorIndexTest {
     void userToolkitCollidingWithRetrievalSlugThrowsAtBuild() {
 
         var builder = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
                 .toolkit(RetrievalToolkit.SLUG, new Toolkit() {
                     @Override public java.util.List<ai.agentican.framework.tools.Tool> tools()
@@ -103,7 +114,10 @@ class AgenticanVectorIndexTest {
         var supportKb = new DefaultVectorIndex("support", "support", emb, new RecordingVectorStore(8), new SlidingChunker());
 
         try (var agentican = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
                 .vectorIndex(docsKb)
                 .vectorIndex(supportKb)
@@ -122,7 +136,10 @@ class AgenticanVectorIndexTest {
     void retrieveCodeStepSlugReservedWhenKbConfigured() {
 
         var builder = Agentican.builder()
-                .llm(LlmConfig.builder().apiKey("mock").build())
+
+                .configuration().api()
+                    .llm(LlmConfig.builder().apiKey("mock").build())
+                    .end()
                 .llm("default", request -> endTurn("ok"))
                 .codeStep(RetrieveCodeStep.SLUG, Void.class, Void.class, (input, ctx) -> null)
                 .vectorIndex(docsKb());

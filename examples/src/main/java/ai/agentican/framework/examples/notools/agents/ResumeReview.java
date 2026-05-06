@@ -24,17 +24,19 @@ public class ResumeReview {
 
     static void main() throws Exception {
 
-        try (var agentican = Agentican.builder(config()).build()) {
+        try (var agentican = Agentican.builder()
+        .registry().yaml().path(config()).end()
+        .build()) {
 
-            var critic = agentican.agentTask(TASK_NAME)
+            var critic = agentican.task(TASK_NAME)
                     .agent(AGENT_NAME)
-                    .input(Submission.class)
-                    .output(Critique.class)
                     .skills(SKILL_NAME)
                     .instructions(INSTRUCTIONS)
+                    .input(Submission.class)
+                    .output(Critique.class)
                     .build();
 
-            var critique = critic.runAsync(input()).join();
+            var critique = critic.start(input()).future().join();
 
             print(critique);
         }

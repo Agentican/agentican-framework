@@ -3,7 +3,7 @@ package ai.agentican.quarkus.devui;
 import ai.agentican.framework.Agentican;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.store.KnowledgeStore;
-import ai.agentican.framework.store.TaskStateStore;
+import ai.agentican.framework.store.WorkflowRunStore;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -17,7 +17,7 @@ public class AgenticanDevUIService {
     Agentican agentican;
 
     @Inject
-    TaskStateStore taskStateStore;
+    WorkflowRunStore workflowRunStore;
 
     @Inject
     HitlManager hitlManager;
@@ -27,7 +27,7 @@ public class AgenticanDevUIService {
 
     public List<Map<String, Object>> getAgents() {
 
-        return agentican.registry().agents().getAll().stream()
+        return agentican.registry().agents().list().stream()
                 .map(agent -> Map.<String, Object>of(
                         "name", agent.name(),
                         "role", agent.role()))
@@ -36,7 +36,7 @@ public class AgenticanDevUIService {
 
     public List<Map<String, Object>> getSkills() {
 
-        return agentican.registry().skills().getAll().stream()
+        return agentican.registry().skills().list().stream()
                 .map(skill -> Map.<String, Object>of(
                         "name", skill.name(),
                         "instructions", skill.instructions()))
@@ -45,7 +45,7 @@ public class AgenticanDevUIService {
 
     public List<Map<String, Object>> getTasks() {
 
-        return taskStateStore.list().stream()
+        return workflowRunStore.list().stream()
                 .map(log -> Map.<String, Object>of(
                         "taskId", log.taskId(),
                         "taskName", log.taskName(),
@@ -61,7 +61,7 @@ public class AgenticanDevUIService {
                 .map(cp -> Map.<String, Object>of(
                         "id", cp.id(),
                         "type", cp.type().name(),
-                        "stepName", cp.stepName(),
+                        "name", cp.stepName(),
                         "description", cp.description()))
                 .toList();
     }

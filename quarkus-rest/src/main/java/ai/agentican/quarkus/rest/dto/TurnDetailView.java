@@ -46,7 +46,7 @@ public record TurnDetailView(
                     var result = resultsByCallId.get(tc.id());
                     return new ToolCallView(
                             tc.id(),
-                            tc.toolName(),
+                            tc.name(),
                             tc.args(),
                             result != null ? result.content() : null,
                             result != null && result.isError());

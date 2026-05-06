@@ -1,5 +1,5 @@
 package ai.agentican.quarkus.rest.dto;
 
-import ai.agentican.framework.orchestration.model.Plan;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 
-public record UpsertPlanRequest(Plan plan) {}
+public record UpsertPlanRequest(WorkflowDefinition definition) {}
