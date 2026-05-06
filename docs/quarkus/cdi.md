@@ -95,20 +95,6 @@ String summary = researcher.start("vector databases").await();
 
 The producer constructs a single-step `WorkflowDefinition` from the annotation parameters at injection time.
 
-## `@AgenticanAgent` qualifier
-
-Inject pre-registered agents by name without going through the registry:
-
-```java
-@Inject
-@AgenticanAgent("researcher")
-ai.agentican.framework.agent.Agent researcher;
-
-log.info("Agent: {} — {}", researcher.name(), researcher.role());
-```
-
-The agent must be declared in `agentican.agents[*]` configuration or the catalog.
-
 ## ReactiveAgentican
 
 Mutiny-native wrapper for reactive Quarkus applications. Returns `Uni<T>` for natural

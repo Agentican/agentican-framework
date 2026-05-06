@@ -30,7 +30,6 @@ import ai.agentican.quarkus.AgenticanBeansProducer;
 import ai.agentican.quarkus.AgenticanConfig;
 import ai.agentican.quarkus.AgenticanProducer;
 import ai.agentican.quarkus.WorkflowProducer;
-import ai.agentican.quarkus.AgentProducer;
 import ai.agentican.quarkus.ReactiveWorkflowProducer;
 import ai.agentican.quarkus.AgenticanWorkflow;
 import ai.agentican.quarkus.devui.AgenticanDevUIService;
@@ -72,7 +71,6 @@ class AgenticanProcessor {
                 .addBeanClasses(
                         AgenticanProducer.class,
                         AgenticanBeansProducer.class,
-                        AgentProducer.class,
                         WorkflowProducer.class,
                         ReactiveWorkflowProducer.class,
                         CdiEventBridge.class,
@@ -89,7 +87,6 @@ class AgenticanProcessor {
         return new AdditionalIndexedClassesBuildItem(
                 AgenticanProducer.class.getName(),
                 AgenticanBeansProducer.class.getName(),
-                AgentProducer.class.getName(),
                 WorkflowProducer.class.getName(),
                 ReactiveWorkflowProducer.class.getName(),
                 CdiEventBridge.class.getName(),

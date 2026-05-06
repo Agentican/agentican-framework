@@ -40,7 +40,6 @@ That's it. The framework plans, executes, and returns — with CDI lifecycle, he
 
 - **`@Inject Agentican`** — singleton CDI bean with full lifecycle management.
 - **`@Inject AgenticanRecovery`** — server-side recovery surface (`resumeInterrupted`, `reapOrphans`); produced from the injected `Agentican` and disposed alongside it.
-- **`@AgenticanAgent("name")`** — qualifier for injecting individual agents by name.
 - **`@AgenticanWorkflow(name = "...")`** — qualifier for injecting typed `Workflow<P, R>` handles bound to registered workflows.
 - **`@AgenticanTask(name, agent, instructions, ...)`** — qualifier for one-shot single-step `Workflow<P, R>` injections without a pre-registered definition.
 - **`ReactiveAgentican`** — Mutiny `Uni`-based API for reactive / Vert.x callers.
