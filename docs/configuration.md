@@ -471,7 +471,7 @@ Agentican.builder()
 
 ## Identity
 
-Agents, skills, and workflows are identified by **name** within their respective registries. Names must be unique per registry and are the canonical reference everywhere — YAML files, the planner's reuse output, workflow steps' `agentName` field, the Quarkus `@Workflow(name = "...")` qualifier. The internal `id` field is auto-generated if not supplied; it's an implementation detail used by persistence stores.
+Agents, skills, and workflows are identified by **name** within their respective registries. Names must be unique per registry and are the canonical reference everywhere — YAML files, the planner's reuse output, workflow steps' `agentName` field, the Quarkus `@AgenticanWorkflow(name = "...")` qualifier. The `id` field is required at construction time and is what persistence stores key on.
 
 ## Environment Variables
 

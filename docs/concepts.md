@@ -127,7 +127,7 @@ Failure modes from `await()`:
 In Quarkus, inject by workflow name with both type parameters:
 
 ```java
-@Inject @Workflow(name = "triage")
+@Inject @AgenticanWorkflow(name = "triage")
 Workflow<TriageParams, TriageOutput> triage;
 ```
 

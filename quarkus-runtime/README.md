@@ -41,8 +41,8 @@ That's it. The framework plans, executes, and returns — with CDI lifecycle, he
 - **`@Inject Agentican`** — singleton CDI bean with full lifecycle management.
 - **`@Inject AgenticanRecovery`** — server-side recovery surface (`resumeInterrupted`, `reapOrphans`); produced from the injected `Agentican` and disposed alongside it.
 - **`@AgenticanAgent("name")`** — qualifier for injecting individual agents by name.
-- **`@Workflow(name = "...")`** — qualifier for injecting typed `Workflow<P, R>` handles bound to registered workflows.
-- **`@Task(name, agent, instructions, ...)`** — qualifier for one-shot single-step `Workflow<P, R>` injections without a pre-registered definition.
+- **`@AgenticanWorkflow(name = "...")`** — qualifier for injecting typed `Workflow<P, R>` handles bound to registered workflows.
+- **`@AgenticanTask(name, agent, instructions, ...)`** — qualifier for one-shot single-step `Workflow<P, R>` injections without a pre-registered definition.
 - **`ReactiveAgentican`** — Mutiny `Uni`-based API for reactive / Vert.x callers.
 - **Config binding** — `EngineConfig` (engine wiring) and `CatalogConfig` (catalog seeds) produced as CDI beans. Engine config merges typed `agentican.*` properties with an optional `agentican.engine.yaml` (YAML wins). Catalog config loads from `agentican.catalog.yaml` or the JPA registries depending on `agentican.catalog-source`.
 - **Lifecycle events** — `StartupEvent` / `ShutdownEvent` observers drive `Agentican` construction and `AutoCloseable` teardown.

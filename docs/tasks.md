@@ -318,7 +318,7 @@ If the workflow fails, `await()` throws `WorkflowOutputException` (carries the `
 Under Quarkus, inject the typed handle directly:
 
 ```java
-@Inject @Workflow(name = "triage")
+@Inject @AgenticanWorkflow(name = "triage")
 Workflow<TriageParams, TriageOutput> triage;
 ```
 
