@@ -48,11 +48,11 @@ reference wiring.
 
 | Bean | Implementation | Replaces |
 |---|---|---|
-| `WorkflowRunStore` | `JpaWfRunStore` | `InMemoryWfRunStore` |
+| `WorkflowRunStore` | `JpaWfRunStore` | `WorkflowRunStoreMemory` |
 | `KnowledgeStore` | `JpaKnowledgeStore` | `KnowledgeStoreMemory` |
 | `AgentRegistry` | `JpaAgentRegistry` | `AgentRegistryMemory` |
 | `SkillRegistry` | `JpaSkillRegistry` | `SkillRegistryMemory` |
-| `WorkflowRegistry` | `JpaWorkflowRegistry` | `InMemoryWfRegistry` |
+| `WorkflowRegistry` | `JpaWorkflowRegistry` | `WorkflowRegistryMemory` |
 
 All beans are gated with:
 

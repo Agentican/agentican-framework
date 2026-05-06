@@ -152,10 +152,10 @@ The following beans are produced with `@DefaultBean` — override by producing y
 |---|---|---|
 | `HitlManager` | Logging notifier | `@Produces HitlManager` |
 | `KnowledgeStore` | `KnowledgeStoreMemory` | `@Produces KnowledgeStore` |
-| `WorkflowRunStore` | `InMemoryWfRunStore` | `@Produces WorkflowRunStore` |
+| `WorkflowRunStore` | `WorkflowRunStoreMemory` | `@Produces WorkflowRunStore` |
 | `AgentRegistry` | `AgentRegistryMemory` | `@Produces AgentRegistry` |
 | `SkillRegistry` | `SkillRegistryMemory` | `@Produces SkillRegistry` |
-| `WorkflowRegistry` | `InMemoryWfRegistry` | `@Produces WorkflowRegistry` |
+| `WorkflowRegistry` | `WorkflowRegistryMemory` | `@Produces WorkflowRegistry` |
 
 With `agentican-quarkus-store-jpa` on the classpath, JPA-backed implementations
 of all six registries/stores auto-activate and supersede these defaults.

@@ -6,7 +6,7 @@ A `WorkflowDefinition` is a structured workflow. You can create one by hand or l
 
 ```java
 record WorkflowDefinition(
-    String id,              // auto-generated if not supplied
+    String id,              // required — stable identifier; recommend slug-style
     String name,            // unique within the WorkflowRegistry
     String description,
     List<WorkflowParam> params,
@@ -244,7 +244,7 @@ Condition sources use the same `{{step.X.output}}` and `{{param.name}}` placehol
 
 ## Building Workflows Manually
 
-Use `WorkflowDefinition.builder()` for a fluent API:
+Use `WorkflowDefinition.builder(id, name)` for a fluent API:
 
 ```java
 var workflow = WorkflowDefinition.builder("research-task", "Research task")

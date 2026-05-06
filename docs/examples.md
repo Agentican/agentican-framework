@@ -319,7 +319,7 @@ try (var agentican = Agentican.builder()
 After a task runs, the `TaskLog` contains the full execution history:
 
 ```java
-var taskStateStore = new InMemoryWfRunStore();
+var taskStateStore = new WorkflowRunStoreMemory();
 
 try (var agentican = Agentican.builder()
         .workflowRunStore(taskStateStore)

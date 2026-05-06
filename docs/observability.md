@@ -105,7 +105,7 @@ onTaskCompleted(taskId, COMPLETED)
 
 ## How Events Are Emitted
 
-Events are a side effect of `WorkflowRunStore` mutations. The framework wraps your store with `NotifyingWfRunStore`, a decorator that:
+Events are a side effect of `WorkflowRunStore` mutations. The framework wraps your store with `WorkflowRunStoreNotifying`, a decorator that:
 
 1. Delegates the mutation to the underlying store (state is persisted first)
 2. Fires the corresponding `WorkflowRunListener` event
@@ -113,7 +113,7 @@ Events are a side effect of `WorkflowRunStore` mutations. The framework wraps yo
 ```
 TaskRunner calls → taskStateStore.stepStarted(taskId, stepId, stepName)
                        ↓
-              NotifyingWfRunStore
+              WorkflowRunStoreNotifying
                   ├── delegate.stepStarted(...)   ← state persisted
                   └── listener.onStepStarted(taskId, stepId)  ← event fired
 ```

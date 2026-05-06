@@ -119,13 +119,13 @@ public Uni<String> research(String topic) {
 All workflow execution runs on the framework's virtual thread executor, never on the Vert.x
 event loop.
 
-## Typed reactive workflow — `ReactiveWorkflowAdapter<P, R>`
+## Typed reactive workflow — `ReactiveWorkflow<P, R>`
 
 The reactive counterpart to `@AgenticanWorkflow(name = "...") Workflow<P, R>`. Same qualifier, same generic params, just returns `Uni<...>` so you can compose without blocking:
 
 ```java
 @Inject @AgenticanWorkflow(name = "triage")
-ReactiveWorkflowAdapter<TriageParams, TriageOutput> triage;
+ReactiveWorkflow<TriageParams, TriageOutput> triage;
 
 @GET
 @Path("/triage/{customer}")
@@ -222,10 +222,10 @@ public HitlManager myHitlManager() {
 |---|---|---|
 | `HitlManager` | Logging notifier | your `@Produces HitlManager` |
 | `KnowledgeStore` | `KnowledgeStoreMemory` | `JpaKnowledgeStore` (store-jpa) or your own |
-| `WorkflowRunStore` | `InMemoryWfRunStore` | `JpaWfRunStore` (store-jpa) or your own |
+| `WorkflowRunStore` | `WorkflowRunStoreMemory` | `JpaWfRunStore` (store-jpa) or your own |
 | `AgentRegistry` | `AgentRegistryMemory` | `JpaAgentRegistry` (store-jpa) or your own |
 | `SkillRegistry` | `SkillRegistryMemory` | `JpaSkillRegistry` (store-jpa) or your own |
-| `WorkflowRegistry` | `InMemoryWfRegistry` | `JpaWorkflowRegistry` (store-jpa) or your own |
+| `WorkflowRegistry` | `WorkflowRegistryMemory` | `JpaWorkflowRegistry` (store-jpa) or your own |
 
 The JPA beans in `agentican-quarkus-store-jpa` are gated with
 `@IfBuildProperty(name = "agentican.store.backend", stringValue = "jpa",

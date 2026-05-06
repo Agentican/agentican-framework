@@ -461,7 +461,7 @@ Agentican.builder()
 
 ### Custom WorkflowRunStore
 
-If not provided, Agentican creates an `InMemoryWfRunStore`. Implement your own for durable storage — the `WorkflowRunStore` interface uses granular mutation methods (`taskStarted()`, `stepStarted()`, `runStarted()`, `turnStarted()`, `messageSent()`, etc.) plus query methods `load(taskId)` and `list()`.
+If not provided, Agentican creates a `WorkflowRunStoreMemory`. Implement your own for durable storage — the `WorkflowRunStore` interface uses granular mutation methods (`taskStarted()`, `stepStarted()`, `runStarted()`, `turnStarted()`, `messageSent()`, etc.) plus query methods `load(taskId)` and `list()`.
 
 ```java
 Agentican.builder()

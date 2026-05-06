@@ -31,7 +31,7 @@ try (var agentican = Agentican.builder()
 }
 ```
 
-No agents, skills, or plans registered — the built-in `PlannerAgent` creates them from the task description. For declarative workflows, use the `WorkflowConfig` builder (loops, branches, typed code steps, HITL checkpoints, parallel steps).
+No agents, skills, or plans registered — the built-in `WorkflowPlannerAgent` creates them from the task description. For declarative workflows, use the `WorkflowConfig` builder (loops, branches, typed code steps, HITL checkpoints, parallel steps).
 
 ## What's in the box
 
@@ -75,7 +75,7 @@ Everything is under `ai.agentican.framework.*`.
 - `store.KnowledgeStore`, `store.KnowledgeStoreMemory`, `knowledge.KnowledgeIngestor`, `knowledge.LlmKnowledgeExtractor` — persistent agent facts + `RECALL_KNOWLEDGE` tool.
 
 **State** (`store`, `orchestration.execution`)
-- `store.WorkflowRunStore`, `store.InMemoryWfRunStore`, `orchestration.execution.NotifyingWfRunStore` — the durable record of every task → step → run → turn → tool call.
+- `store.WorkflowRunStore`, `store.WorkflowRunStoreMemory`, `store.WorkflowRunStoreNotifying` — the durable record of every task → step → run → turn → tool call.
 
 **Config** (`config`) — plain records:
 - `EngineConfig` (engine wiring — llm/mcp/composio/agentRunner/strict, with YAML loader) · `CatalogConfig` (catalog seeds — agents/skills/workflows, with YAML loader)

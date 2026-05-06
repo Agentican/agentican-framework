@@ -49,8 +49,8 @@ The store interface uses granular mutation methods mirroring the execution hiera
 public interface WorkflowRunStore {
 
     // Task lifecycle
-    void taskStarted(String taskId, String taskName, Plan plan, Map<String, String> params);
-    void taskStarted(String taskId, String taskName, Plan plan, Map<String, String> params,
+    void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params);
+    void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params,
                      String parentTaskId, String parentStepId, int iterationIndex);
     void taskCompleted(String taskId, WorkflowRunStatus status);
 
@@ -103,12 +103,12 @@ new TurnLog(id, index, messageId, request,
             startedAt, completedAt);
 ```
 
-## InMemoryWfRunStore
+## WorkflowRunStoreMemory
 
 The default in-memory implementation. Stores `TaskLog` objects in a `ConcurrentHashMap` keyed by task ID. Uses ID-based lookup to navigate the hierarchy:
 
 ```java
-var store = new InMemoryWfRunStore();
+var store = new WorkflowRunStoreMemory();
 
 // After a task runs:
 var taskLog = store.load("a3cc1bf2");
@@ -194,11 +194,11 @@ Agentican.builder()
         .build();
 ```
 
-If no store is provided, Agentican creates a `InMemoryWfRunStore`.
+If no store is provided, Agentican creates a `WorkflowRunStoreMemory`.
 
 ## Event Emission
 
-The store itself does not emit events. `NotifyingWfRunStore` is a decorator that wraps any `WorkflowRunStore` and fires `WorkflowRunListener` events after each mutation. Agentican applies this decorator automatically — you don't need to wrap your store manually.
+The store itself does not emit events. `WorkflowRunStoreNotifying` is a decorator that wraps any `WorkflowRunStore` and fires `WorkflowRunListener` events after each mutation. Agentican applies this decorator automatically — you don't need to wrap your store manually.
 
 See [Observability](observability.md) for the event system.
 

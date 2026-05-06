@@ -51,7 +51,7 @@ you want a global prefix.
 
 Two submission modes:
 
-**Planner mode** — let the framework's `TaskPlannerAgent` build the task graph from a
+**Planner mode** — let the framework's `WorkflowPlannerAgent` build the task graph from a
 natural-language description:
 
 ```bash

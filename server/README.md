@@ -96,7 +96,7 @@ Defaults live in `src/main/resources/application.properties`:
 - Composio toolkits bound to `$COMPOSIO_API_KEY` / `$COMPOSIO_USER_ID` when present.
 - CORS wide-open (useful for playground experimentation; tighten for production).
 - OTel enabled; 1s span batch flush for responsive live traces.
-- Verbose logging on `LlmClient`, `SmacAgentRunner`, and `PlannerAgent` for diagnosing recall loops, tool-argument drift, and planner behavior. Flip to `INFO` when no longer needed.
+- Verbose logging on `LlmClient`, `SmacAgentRunner`, and `WorkflowPlannerAgent` for diagnosing recall loops, tool-argument drift, and planner behavior. Flip to `INFO` when no longer needed.
 - `quarkus.index-dependency.*` entries register each Agentican module with Jandex so beans, config mappers, and CDI producers are discovered.
 
 Override any of it via environment variables or your own `application.properties`.

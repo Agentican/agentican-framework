@@ -277,7 +277,7 @@ TaskLog
                     └── toolResults
 ```
 
-A `WorkflowRunStore` persists execution state. `InMemoryWfRunStore` is provided; you can implement your own for durable storage.
+A `WorkflowRunStore` persists execution state. `WorkflowRunStoreMemory` is provided; you can implement your own for durable storage.
 
 `TaskLog`, `StepLog`, `TurnLog`, and `KnowledgeEntry` all have constructors that accept full state (timestamps, ids, status) so a persistent store can round-trip an instance without stamping fresh values on rehydrate.
 
@@ -291,7 +291,7 @@ All five registries are bundled on `agentican.registry()` (an `AgenticanRegistry
 - **`ToolkitRegistry`** — slug → Toolkit. Populated from MCP, Composio, custom toolkits, and built-ins. Access via `agentican.registry().toolkits()`.
 - **`VectorIndexRegistry`** — name → VectorIndex. Populated from `.vectorIndex(...)` on the Builder. Access via `agentican.registry().indexes()`.
 
-`AgentRegistry`, `SkillRegistry`, and `WorkflowRegistry` are **interfaces** with `InMemory*` implementations as the default. A persistent backend (e.g., the JPA-backed registries in `agentican-quarkus-store-jpa`) plugs in via the Builder:
+`AgentRegistry`, `SkillRegistry`, and `WorkflowRegistry` are **interfaces** with `*Memory` implementations (`AgentRegistryMemory`, `SkillRegistryMemory`, `WorkflowRegistryMemory`) as the default. A persistent backend (e.g., the JPA-backed registries in `agentican-quarkus-store-jpa`) plugs in via the Builder:
 
 ```java
 Agentican.builder()
@@ -305,7 +305,7 @@ Each interface has a `default seed()` hook the framework calls once at boot. `Ag
 
 ### Identity by name
 
-Agents, skills, and workflows are looked up by **name** within their respective registries — names are unique per registry. The internal `id` field on each config record is auto-generated if not supplied; it's an implementation detail used by persistence stores. Plans authored programmatically, in YAML, or by the planner all reference agents and workflows by name.
+Agents, skills, and workflows are looked up by **name** within their respective registries — names are unique per registry. The `id` field on each config record is **required** at construction time (the compact constructors throw on null/blank); it's the stable identifier persistence stores key on. Plans authored programmatically, in YAML, or by the planner all reference agents and workflows by name.
 
 ## Execution Flow
 
