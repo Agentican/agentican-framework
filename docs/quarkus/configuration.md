@@ -50,25 +50,24 @@ Complete list of all `agentican.*` configuration properties across all Quarkus m
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `agentican.agents[*].id` | string | auto | Internal primary key (omit; generated) |
-| `agentican.agents[*].external-id` | string | **required** | Stable business key for persistence |
-| `agentican.agents[*].name` | string | **required** | Agent name |
+| `agentican.agents[*].id` | string | auto | Auto-generated if omitted |
+| `agentican.agents[*].name` | string | **required** | Agent name (unique within `AgentRegistry`) |
 | `agentican.agents[*].role` | string | **required** | Agent role description |
 | `agentican.agents[*].llm` | string | `default` | LLM client name to use |
+| `agentican.agents[*].runner` | string | `smac` | `smac` or `react` |
+| `agentican.agents[*].max-turns` | int | — | Override `WorkerConfig.maxTurns` for this agent |
+| `agentican.agents[*].timeout` | duration | — | Override `WorkerConfig.timeout` for this agent |
 
 ### Pre-registered Skills
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `agentican.skills[*].id` | string | auto | Internal primary key (omit; generated) |
-| `agentican.skills[*].external-id` | string | **required** | Stable business key for persistence |
-| `agentican.skills[*].name` | string | **required** | Skill name |
+| `agentican.skills[*].id` | string | auto | Auto-generated if omitted |
+| `agentican.skills[*].name` | string | **required** | Skill name (unique within `SkillRegistry`) |
 | `agentican.skills[*].instructions` | string | **required** | Skill instructions |
 
-> `external-id` is enforced at boot. Any config-declared agent or skill without
-> one causes Agentican to throw `IllegalStateException` during
-> `Agentican.builder().build()`. Planner-created entities don't carry one —
-> they exist only within the lifetime of the process / DB row.
+> Agents, skills, and workflows are identified by **name**. Persistent stores
+> upsert rows keyed by name across redeploys.
 
 ### Store backend selection
 
@@ -137,7 +136,7 @@ The following beans are produced with `@DefaultBean` — override by producing y
 | `WorkflowRunStore` | `InMemoryWfRunStore` | `@Produces WorkflowRunStore` |
 | `AgentRegistry` | `AgentRegistryMemory` | `@Produces AgentRegistry` |
 | `SkillRegistry` | `SkillRegistryMemory` | `@Produces SkillRegistry` |
-| `WorkflowRegistry` | `PlanRegistryMemory` | `@Produces WorkflowRegistry` |
+| `WorkflowRegistry` | `InMemoryWfRegistry` | `@Produces WorkflowRegistry` |
 
 With `agentican-quarkus-store-jpa` on the classpath, JPA-backed implementations
 of all six registries/stores auto-activate and supersede these defaults.

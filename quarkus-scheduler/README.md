@@ -22,7 +22,6 @@ Requires `agentican-quarkus-runtime` (for the `Agentican` bean) and `quarkus-sch
 # An agent to do the work
 agentican.agents[0].name=analyst
 agentican.agents[0].role=Reads the overnight queue and summarizes anomalies
-agentican.agents[0].external-id=analyst
 
 # A scheduled task
 agentican.scheduled[0].name=nightly-digest
@@ -53,7 +52,7 @@ Quartz syntax — six fields: `second minute hour day-of-month month day-of-week
 
 ## How it works
 
-On `@PostConstruct`, [`AgenticanScheduler`](src/main/java/ai/agentican/quarkus/scheduler/AgenticanScheduler.java) reads [`ScheduledTaskConfig`](src/main/java/ai/agentican/quarkus/scheduler/ScheduledTaskConfig.java) and registers each enabled entry with the Quarkus `Scheduler`. On fire, the job calls `agentican.run(description)` and attaches a completion log to `handle.resultAsync()` — fire-and-forget from the scheduler's perspective. If you need retry, backpressure, or persistence of scheduled runs, compose it with the framework's `WorkerConfig`, `WorkflowRunListener`, or [`quarkus-store-jpa`](../quarkus-store-jpa/).
+On `@PostConstruct`, [`AgenticanScheduler`](src/main/java/ai/agentican/quarkus/scheduler/AgenticanScheduler.java) reads [`ScheduledTaskConfig`](src/main/java/ai/agentican/quarkus/scheduler/ScheduledTaskConfig.java) and registers each enabled entry with the Quarkus `Scheduler`. On fire, the job calls `agentican.run(description)` and attaches a completion log to `run.untypedFuture()` — fire-and-forget from the scheduler's perspective. If you need retry, backpressure, or persistence of scheduled runs, compose it with the framework's `WorkerConfig`, `WorkflowRunListener`, or [`quarkus-store-jpa`](../quarkus-store-jpa/).
 
 ## Related
 

@@ -36,7 +36,6 @@ agentican.llm[0].api-key=${ANTHROPIC_API_KEY}
 agentican.llm[0].model=claude-sonnet-4-5
 agentican.agents[0].name=researcher
 agentican.agents[0].role=Expert at finding information
-agentican.agents[0].external-id=researcher
 ```
 
 That's it — the REST endpoints are auto-discovered.

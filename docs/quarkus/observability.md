@@ -83,7 +83,7 @@ quarkus.otel.exporter.otlp.endpoint=http://localhost:4317
 
 ```
 [POST /agentican/tasks]                         ← Quarkus auto
-  └── [agentican.step research]                 ← TracedStepListener
+  └── [agentican.step research]                 ← TracedWorkflowRunListener
        └── [agentican.run]                      ← TracedTurnListener
             ├── [agentican.turn 0]              ← TracedTurnListener
             │    ├── [agentican.llm.call]        ← TracedLlmClient

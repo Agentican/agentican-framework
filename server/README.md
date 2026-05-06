@@ -106,11 +106,9 @@ Override any of it via environment variables or your own `application.properties
 Config-declared agents and skills require a stable `external-id` — the business key that maps the logical item to its DB catalog row across deploys. Without it, the server refuses to boot.
 
 ```properties
-agentican.agents[0].external-id=researcher
 agentican.agents[0].name=researcher
 agentican.agents[0].role=Expert at finding information
 
-agentican.skills[0].external-id=source-triangulation
 agentican.skills[0].name=Source Triangulation
 agentican.skills[0].instructions=Cross-verify claims against ≥3 independent primary sources.
 ```

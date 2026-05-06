@@ -124,10 +124,9 @@ agentican.llm[0].model=claude-sonnet-4-5
 # agentican.llm[8].api-key=ollama
 # agentican.llm[8].model=llama3.3:70b
 
-# Optional: pre-register agents (external-id is required when declared in config)
+# Optional: pre-register agents
 agentican.agents[0].name=researcher
 agentican.agents[0].role=Expert at finding and synthesizing information
-agentican.agents[0].external-id=researcher
 
 # Optional: tune the agent runner
 agentican.agent-runner.max-turns=15
@@ -233,12 +232,12 @@ You should see `agentican` in the liveness check and `agentican-readiness` in th
 If `agentican-quarkus-deployment` is on the classpath, visit the Dev UI at
 `http://localhost:8080/q/dev-ui` and look for the Agentican card.
 
-## Plan reuse across restarts
+## Workflow reuse across restarts
 
-With `agentican-quarkus-store-jpa` on the classpath, `PlannerAgent` reuses
-persisted plans. The first run materializes and stores the plan under its
-`external_id`; subsequent runs with a matching `external_id` load the prior
-definition instead of re-planning. Without the JPA store, plans are held in
+With `agentican-quarkus-store-jpa` on the classpath, `WorkflowPlannerAgent` reuses
+persisted workflows. The first run materializes and stores the workflow under its
+**name**; subsequent runs whose planner output cites the same name load the stored
+definition instead of re-planning. Without the JPA store, workflows are held in
 memory and disappear on restart.
 
 ## Next steps

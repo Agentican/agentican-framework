@@ -51,9 +51,9 @@ task → step → run → turn → llm call / tool call
 ```
 [POST /agentican/tasks]                              <- auto by Quarkus
   |
-  +-- [agentican.step research]                      <- TracedStepListener
+  +-- [agentican.step research]                      <- TracedWorkflowRunListener
   |     |
-  |     +-- [agentican.run 0]                        <- TracedStepListener
+  |     +-- [agentican.run 0]                        <- TracedWorkflowRunListener
   |     |     |
   |     |     +-- [agentican.turn 0]
   |     |     |     +-- [agentican.llm.call]         <- TracedLlmClient
@@ -159,8 +159,8 @@ Same pattern as `agentican-quarkus-metrics`. The `TracingAutoConfiguration` prod
 
 ### Step listener
 
-The framework's `StepListener` interface (added in this sprint) is called synchronously
-on the step's virtual thread. `TracedStepListener` creates a span on `onStepStarted` and
+The framework's `WorkflowRunListener` interface (added in this sprint) is called synchronously
+on the step's virtual thread. `TracedWorkflowRunListener` creates a span on `onStepStarted` and
 ends it on `onStepCompleted`. Because the span is made current via `Span.makeCurrent()`,
 any LLM calls within the step become children of the step span.
 

@@ -8,18 +8,22 @@ from your `agentican.*` config at startup and disposed on shutdown.
 ```java
 @Inject Agentican agentican;
 
-var handle = agentican.run("Find papers on agents");
-var taskId = handle.taskId();      // available immediately
-var result = handle.result();       // blocks until done
+var run = agentican.run("Find papers on agents");
+var taskId = run.id();              // 8-char id, available immediately
+var output = run.await();           // blocks; returns the typed String output
+var result = run.untypedResult();   // blocks; returns the full WorkflowRunResult
 ```
 
 ### Async access
 
-`WorkflowRun.resultAsync()` returns a `CompletableFuture<WorkflowRunResult>`:
+`WorkflowRun.future()` returns a `CompletableFuture<R>` (typed); `untypedFuture()` returns the full `WorkflowRunResult`:
 
 ```java
-agentican.run(task).resultAsync()
-    .thenAccept(result -> log.info("Done: {}", result.status()));
+agentican.run(description).future()
+    .thenAccept(output -> log.info("Done: {}", output));
+
+agentican.run(description).untypedFuture()
+    .thenAccept(result -> log.info("Status: {}", result.status()));
 ```
 
 ## `@Inject AgenticanRecovery`
@@ -91,13 +95,13 @@ String summary = researcher.start("vector databases").await();
 
 The producer constructs a single-step `WorkflowDefinition` from the annotation parameters at injection time.
 
-## `@Agent` qualifier
+## `@AgenticanAgent` qualifier
 
 Inject pre-registered agents by name without going through the registry:
 
 ```java
 @Inject
-@Agent(name = "researcher")
+@AgenticanAgent("researcher")
 ai.agentican.framework.agent.Agent researcher;
 
 log.info("Agent: {} — {}", researcher.name(), researcher.role());
@@ -171,7 +175,7 @@ The default `HitlManager` producer auto-detects a CDI bean of either type (prefe
 
 ## CDI lifecycle events
 
-Events are fired by the `CdiEventBridge`, which bridges framework `StepListener` callbacks
+Events are fired by the `CdiEventBridge`, which bridges framework `WorkflowRunListener` callbacks
 to CDI events. Each lifecycle callback fires the corresponding CDI event exactly once.
 Observe them with `@Observes`:
 
@@ -235,7 +239,7 @@ public HitlManager myHitlManager() {
 | `WorkflowRunStore` | `InMemoryWfRunStore` | `JpaWfRunStore` (store-jpa) or your own |
 | `AgentRegistry` | `AgentRegistryMemory` | `JpaAgentRegistry` (store-jpa) or your own |
 | `SkillRegistry` | `SkillRegistryMemory` | `JpaSkillRegistry` (store-jpa) or your own |
-| `WorkflowRegistry` | `PlanRegistryMemory` | `JpaPlanRegistry` (store-jpa) or your own |
+| `WorkflowRegistry` | `InMemoryWfRegistry` | `JpaWorkflowRegistry` (store-jpa) or your own |
 
 The JPA beans in `agentican-quarkus-store-jpa` are gated with
 `@IfBuildProperty(name = "agentican.store.backend", stringValue = "jpa",

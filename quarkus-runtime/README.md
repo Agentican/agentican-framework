@@ -23,19 +23,15 @@ agentican.llm[0].model=claude-sonnet-4-5
 
 agentican.agents[0].name=researcher
 agentican.agents[0].role=Expert at finding and synthesizing information
-agentican.agents[0].external-id=researcher
 ```
 
-> **External IDs are required** for every agent and skill declared in config.
-> They're the stable key that maps config-declared entities to persisted rows
-> (see the store-jpa module). Agentican throws `IllegalStateException` at boot
-> if one is missing.
+Agents, skills, and workflows are identified by **name** within their respective registries. Persistent stores upsert by name on each boot.
 
 ```java
 @Inject Agentican agentican;
 
-var handle = agentican.run("Find papers on agent frameworks");
-var result = handle.result();
+var run = agentican.run("Find papers on agent frameworks");
+var output = run.await();   // blocks; returns the typed String output
 ```
 
 That's it. The framework plans, executes, and returns — with CDI lifecycle, health checks, and config validation wired automatically.
@@ -44,7 +40,7 @@ That's it. The framework plans, executes, and returns — with CDI lifecycle, he
 
 - **`@Inject Agentican`** — singleton CDI bean with full lifecycle management.
 - **`@Inject AgenticanRecovery`** — server-side recovery surface (`resumeInterrupted`, `reapOrphans`); produced from the injected `Agentican` and disposed alongside it.
-- **`@Agent(name = "...")`** — qualifier for injecting individual agents by name.
+- **`@AgenticanAgent("name")`** — qualifier for injecting individual agents by name.
 - **`@Workflow(name = "...")`** — qualifier for injecting typed `Workflow<P, R>` handles bound to registered workflows.
 - **`@Task(name, agent, instructions, ...)`** — qualifier for one-shot single-step `Workflow<P, R>` injections without a pre-registered definition.
 - **`ReactiveAgentican`** — Mutiny `Uni`-based API for reactive / Vert.x callers.

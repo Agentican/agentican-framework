@@ -31,8 +31,8 @@ class MyTest {
     @Test
     void plansAndRuns() {
         llm.queueEndTurn("done");
-        var handle = agentican.run("say hello");
-        assertThat(handle.result().status()).isEqualTo(WorkflowRunStatus.COMPLETED);
+        var run = agentican.run("say hello");
+        assertThat(run.untypedResult().status()).isEqualTo(WorkflowRunStatus.COMPLETED);
     }
 }
 ```
@@ -47,14 +47,14 @@ If the queue is empty, `send()` returns `"[mock: no queued response]"` with `END
 
 ## `TestTaskBuilder`
 
-Two static helpers for building `Plan` objects in tests without wiring the full `WorkflowConfig` DSL.
+Two static helpers for building `WorkflowDefinition` objects in tests without wiring the full `WorkflowConfig` DSL.
 
 ```java
-Plan single = TestTaskBuilder.singleStep("t1", "researcher", "find X");
-Plan chain  = TestTaskBuilder.twoStepSequential("t2", "researcher", "find X", "summarize X");
+WorkflowDefinition single = TestTaskBuilder.singleStep("t1", "researcher", "find X");
+WorkflowDefinition chain  = TestTaskBuilder.twoStepSequential("t2", "researcher", "find X", "summarize X");
 ```
 
-Both produce minimal valid plans (no skills, no params, `enabled=true`) — good for wiring tests, not for exercising planner behavior.
+Both produce minimal valid workflows (no skills, no params) — good for wiring tests, not for exercising planner behavior.
 
 ## Related
 

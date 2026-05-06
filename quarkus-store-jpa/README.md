@@ -52,7 +52,7 @@ reference wiring.
 | `KnowledgeStore` | `JpaKnowledgeStore` | `KnowledgeStoreMemory` |
 | `AgentRegistry` | `JpaAgentRegistry` | `AgentRegistryMemory` |
 | `SkillRegistry` | `JpaSkillRegistry` | `SkillRegistryMemory` |
-| `WorkflowRegistry` | `JpaPlanRegistry` | `PlanRegistryMemory` |
+| `WorkflowRegistry` | `JpaWorkflowRegistry` | `InMemoryWfRegistry` |
 
 All beans are gated with:
 
