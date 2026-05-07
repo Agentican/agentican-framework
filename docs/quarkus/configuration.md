@@ -8,14 +8,14 @@ Complete list of all `agentican.*` configuration properties across all Quarkus m
 
 The Quarkus runtime produces two CDI beans from your config:
 
-- **`EngineConfig`** — engine wiring (LLMs, MCP, Composio, agent runner, strict). Built by merging typed `agentican.*` properties below with an optional YAML at `agentican.engine-config` (default: `agentican.engine.yaml`). YAML wins when both are set; if no YAML is present, properties alone are used.
-- **`CatalogConfig`** — catalog data (agents, skills, workflows). Loaded from the YAML at `agentican.catalog-config` (default: `agentican.catalog.yaml`) when `agentican.catalog-source=yaml`, or supplied by JPA-backed registries when `agentican.catalog-source=database`.
+- **`EngineConfig`** — engine wiring (LLMs, MCP, Composio, agent runner, strict). Built by merging typed `agentican.*` properties below with an optional YAML at `agentican.engine-config` (default: `agentican-engine.yaml`). YAML wins when both are set; if no YAML is present, properties alone are used.
+- **`CatalogConfig`** — catalog data (agents, skills, workflows). Loaded from the YAML at `agentican.catalog-config` (default: `agentican-catalog.yaml`) when `agentican.catalog-source=yaml`, or supplied by JPA-backed registries when `agentican.catalog-source=database`.
 
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `agentican.catalog-source` | enum | `yaml` | `yaml` or `database` |
-| `agentican.engine-config` | string | `agentican.engine.yaml` | Classpath resource for the engine YAML (optional file) |
-| `agentican.catalog-config` | string | `agentican.catalog.yaml` | Classpath resource for the catalog YAML (consulted when `catalog-source=yaml`) |
+| `agentican.engine-config` | string | `agentican-engine.yaml` | Classpath resource for the engine YAML (optional file) |
+| `agentican.catalog-config` | string | `agentican-catalog.yaml` | Classpath resource for the catalog YAML (consulted when `catalog-source=yaml`) |
 
 A single YAML can feed both axes — point both `engine-config` and `catalog-config` at the same path. `EngineConfig` and `CatalogConfig` ignore each other's top-level keys.
 
@@ -29,13 +29,18 @@ A single YAML can feed both axes — point both `engine-config` and `catalog-con
 | `agentican.llm[*].api-key` | string | **required** | API key |
 | `agentican.llm[*].max-tokens` | int | `16384` | Max output tokens per call |
 
-### Agent Runner
+### Agent
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `agentican.agent-runner.max-turns` | int | `10` | Max LLM turns per agent step |
-| `agentican.agent-runner.timeout` | Duration | `PT30M` | Per-step timeout |
-| `agentican.agent-runner.task-timeout` | Duration | — | Per-task overall timeout (omit for no limit) |
+| `agentican.agent.max-turns` | int | `10` | Default max LLM turns per agent step. Caps the multi-turn tool-calling loop inside one step. Override per-agent on `AgentConfig`. |
+
+### Workflow
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `agentican.workflow.step-timeout` | Duration | `PT30M` | Per-step timeout — ceiling on a single agent step's full multi-turn loop. Override per-step on `WorkflowStepAgent`. |
+| `agentican.workflow.timeout` | Duration | — | Per-workflow-run timeout — caps the whole end-to-end execution across every step. Omit for no overall ceiling. |
 
 ### Recovery
 
@@ -64,19 +69,19 @@ A single YAML can feed both axes — point both `engine-config` and `catalog-con
 ### Pre-registered Agents, Skills, Workflows
 
 Catalog data does not have a property surface — it lives entirely in
-`agentican.catalog.yaml` (when `agentican.catalog-source=yaml`) or in the JPA
+`agentican-catalog.yaml` (when `agentican.catalog-source=yaml`) or in the JPA
 catalog tables (when `agentican.catalog-source=database`).
 
 ```yaml
-# agentican.catalog.yaml
+# agentican-catalog.yaml
 agents:
   - id: researcher
     name: researcher
     role: Expert at finding and synthesizing information
     llm: default              # LLM name from agentican.llm[*].name
     runner: smac              # smac | react
-    maxTurns: 15              # optional, overrides agent-runner.max-turns
-    timeout: PT10M            # optional, overrides agent-runner.timeout
+    maxTurns: 15              # optional, overrides agentican.agent.max-turns
+    timeout: PT10M            # optional, overrides agentican.workflow.step-timeout
 
 skills:
   - id: citations

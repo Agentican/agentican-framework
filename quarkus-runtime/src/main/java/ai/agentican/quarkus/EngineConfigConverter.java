@@ -21,7 +21,7 @@ final class EngineConfigConverter {
         source.llm().forEach(llm -> llms.add(toLlmConfig(llm)));
         source.mcp().forEach(mcp -> mcps.add(toMcpConfig(mcp)));
 
-        var worker = source.agentRunner().map(EngineConfigConverter::toWorkerConfig).orElse(null);
+        var worker = toWorkerConfig(source);
         var composio = source.composio().map(EngineConfigConverter::toComposioConfig).orElse(null);
 
         return new EngineConfig(llms, mcps, composio, worker, source.strict());
@@ -56,13 +56,23 @@ final class EngineConfigConverter {
         return builder.build();
     }
 
-    private static WorkerConfig toWorkerConfig(AgenticanConfig.AgentRunnerConfig source) {
+    /**
+     * Merges {@code agentican.agent.*} (max-turns) and {@code agentican.workflow.*} (step-timeout, timeout)
+     * into the framework's single {@link WorkerConfig}. Returns {@code null} only when neither group is set —
+     * which is rare since both have @WithDefault.
+     */
+    private static WorkerConfig toWorkerConfig(AgenticanConfig source) {
 
-        var builder = WorkerConfig.builder()
-                .maxTurns(source.maxTurns())
-                .timeout(source.timeout());
+        if (source.agent().isEmpty() && source.workflow().isEmpty())
+            return null;
 
-        source.taskTimeout().ifPresent(builder::taskTimeout);
+        var builder = WorkerConfig.builder();
+
+        source.agent().ifPresent(a -> builder.maxTurns(a.maxTurns()));
+        source.workflow().ifPresent(w -> {
+            builder.timeout(w.stepTimeout());
+            w.timeout().ifPresent(builder::taskTimeout);
+        });
 
         return builder.build();
     }

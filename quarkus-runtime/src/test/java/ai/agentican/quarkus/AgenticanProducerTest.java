@@ -51,7 +51,7 @@ class AgenticanProducerTest {
 
         var registered = agentican.registry().agents().byName("researcher");
 
-        assertNotNull(registered, "Agent loaded from agentican.catalog.yaml should be registered");
+        assertNotNull(registered, "Agent loaded from agentican-catalog.yaml should be registered");
         assertEquals("Expert at finding information", registered.role());
     }
 }
