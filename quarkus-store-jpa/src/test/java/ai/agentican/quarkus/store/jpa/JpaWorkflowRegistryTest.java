@@ -34,11 +34,11 @@ class JpaWorkflowRegistryTest {
     @Test
     void registerRoundTripsSimplePlan() {
 
-        var step = new WorkflowStepAgent("research", "agent-x", "do research",
-                List.of(), false, List.of("skill-1"), List.of("tool-a"));
-
         var plan = WorkflowDefinition.builder("p-" + Ids.generate(), "Research").description("desc")
-                .param(new WorkflowParam("topic", null, null, true)).step(step).build();
+                .param().name("topic").required(true).end()
+                .step().name("research").agent("agent-x").instructions("do research")
+                        .skills("skill-1").tools("tool-a").end()
+                .build();
         registry.register(plan);
 
         assertSame(plan, registry.byId(plan.id()));
@@ -122,9 +122,8 @@ class JpaWorkflowRegistryTest {
 
     private static WorkflowDefinition makePlan(String name, String id, String description) {
 
-        var step = new WorkflowStepAgent("s1", "a1", "do work",
-                List.of(), false, List.of(), List.of());
-
-        return WorkflowDefinition.builder(id, name).description(description).step(step).build();
+        return WorkflowDefinition.builder(id, name).description(description)
+                .step().name("s1").agent("a1").instructions("do work").end()
+                .build();
     }
 }

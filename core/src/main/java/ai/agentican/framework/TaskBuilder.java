@@ -137,7 +137,7 @@ public final class TaskBuilder {
 
             var workflow = WorkflowDefinition.builder(ai.agentican.framework.util.Ids.generate(), parent.taskName)
                     .params(params)
-                    .step(step)
+                    .steps(List.of(step))
                     .outputStep(STEP_NAME)
                     .build();
 

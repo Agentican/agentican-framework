@@ -202,9 +202,8 @@ class PlannerAgentTest {
 
         var existing = WorkflowDefinition.builder("definition-cataloged-id", "Research WorkflowDefinition")
                 .description("Research any topic")
-                .param(new WorkflowParam("topic", null, null, true))
-                .step(new WorkflowStepAgent("research", "researcher", "research {{param.topic}}",
-                        List.of(), false, List.of(), List.of()))
+                .param().name("topic").required(true).end()
+                .step().name("research").agent("researcher").instructions("research {{param.topic}}").end()
                 .build();
 
         var workflowRegistry = new WorkflowRegistryMemory();

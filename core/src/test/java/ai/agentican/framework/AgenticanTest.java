@@ -74,7 +74,7 @@ class AgenticanTest {
                 .build()) {
 
             var task = WorkflowDefinition.builder("test-task", "test-task").description("")
-                    .step(new WorkflowStepAgent("step-a", "test-agent", "Do the thing", List.of(), false, List.of(), List.of()))
+                    .step().name("step-a").agent("test-agent").instructions("Do the thing").end()
                     .build();
 
             var handle = agentican.workflow(task).input(Void.class).build().start();
@@ -546,7 +546,7 @@ class AgenticanTest {
                 .registry().api()
                     .workflow()
                         .id("fluent-plan").name("fluent-plan").description("desc")
-                        .step("s1", s -> s.agent("noop").instructions("do nothing"))
+                        .step().name("s1").agent("noop").instructions("do nothing").end()
                         .end()
                     .end()
                 .build()) {
@@ -668,11 +668,10 @@ class AgenticanTest {
             var runId = ai.agentican.framework.util.Ids.generate();
             var turnId = ai.agentican.framework.util.Ids.generate();
 
-            var step = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
-                    "do-work", "worker", "Run to completion after resume",
-                    List.of(), false, List.of(), List.of());
             var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Resume Task", "Resume Task")
-                    .description("test").step(step).build();
+                    .description("test")
+                    .step().name("do-work").agent("worker").instructions("Run to completion after resume").end()
+                    .build();
 
             agentican.registry().workflows().register(plan);
 
@@ -777,10 +776,10 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var step = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
-                    "do", "worker", "do it", List.of(), false, List.of(), List.of());
             var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Bounded Resume", "Bounded Resume")
-                    .description("test").step(step).build();
+                    .description("test")
+                    .step().name("do").agent("worker").instructions("do it").end()
+                    .build();
             agentican.registry().workflows().register(plan);
 
             for (int i = 0; i < 3; i++) {
@@ -1001,7 +1000,7 @@ class AgenticanTest {
             store.branchPathChosen(taskId, stepId, "A");
 
             var childPlan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("choose-A", "choose-A")
-                    .description("").step(pathBodyStep).build();
+                    .description("").steps(List.of(pathBodyStep)).build();
             store.taskStarted(childId, "choose-A", childPlan, Map.of(), taskId, stepId, 0);
             store.stepStarted(childId, childStepId, "path-body");
             store.stepCompleted(childId, childStepId, WorkflowRunStatus.COMPLETED, "prerecorded path output");
@@ -1085,7 +1084,7 @@ class AgenticanTest {
             store.stepStarted(taskId, loopStepId, "each");
 
             var iterPlan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("each-iter-1", "each-iter-1")
-                    .description("").step(bodyStep).build();
+                    .description("").steps(List.of(bodyStep)).build();
             store.taskStarted(iter0Id, "each-iter-1", iterPlan, Map.of(), taskId, loopStepId, 0);
             store.stepStarted(iter0Id, iter0StepId, "iter-body");
             store.stepCompleted(iter0Id, iter0StepId, WorkflowRunStatus.COMPLETED, "iter-0 prerecorded");
@@ -1138,10 +1137,10 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var step = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
-                    "review", "worker", "review draft", List.of(), true, List.of(), List.of());
             var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Rejected-Output Resume", "Rejected-Output Resume")
-                    .description("test").step(step).build();
+                    .description("test")
+                    .step().name("review").agent("worker").instructions("review draft").hitl().end()
+                    .build();
 
             agentican.registry().workflows().register(plan);
 

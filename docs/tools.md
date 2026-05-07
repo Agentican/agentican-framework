@@ -204,9 +204,11 @@ WorkflowStepAgent.builder("create-page")
 Equivalent fluent forms on the `WorkflowConfig` step builder:
 
 ```java
-.step("create-page", s -> s.agent("documentation-specialist")
+.step()
+    .name("create-page").agent("documentation-specialist")
     .instructions("Create a Notion page")
-    .tools("create_page", "append_block"))
+    .tools("create_page", "append_block")
+    .end()
 ```
 
 The agent only sees the listed tools (plus the always-available scratchpad and ASK_QUESTION). Keeping the list tight focuses the LLM's tool-selection and reduces hallucinated calls.

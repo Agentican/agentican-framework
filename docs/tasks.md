@@ -171,20 +171,22 @@ Agentican.builder()
 WorkflowConfig.builder()
     .id("payment-enrichment")
     .name("payment-enrichment")
-    .step("fetch-customer", s -> s
-        .code("http-get")
+    .step()
+        .name("fetch-customer").code("http-get")
         .input(new HttpInput(
             "https://api.internal/customers/{{param.customer_id}}",
-            "GET")))
-    .step("decide", s -> s
-        .agent("Risk Analyst")
+            "GET"))
+        .end()
+    .step()
+        .name("decide").agent("Risk Analyst")
         .instructions("Customer record:\n{{step.fetch-customer.output.body}}\n\n"
                     + "HTTP status was {{step.fetch-customer.output.status}}.")
-        .dependencies("fetch-customer"))
+        .dependencies("fetch-customer")
+        .end()
     .build();
 ```
 
-A single `.step(name, ...)` entry covers both modes. Calling `.agent(...)` or `.code(...)` inside the lambda narrows to an `AgentStepBuilder` or `CodeStepBuilder` respectively — IDE completion shows only methods relevant to that mode, and calling both fails fast at build time.
+A single `.step()` entry covers both modes. Calling `.agent(...)` narrows the chain to an `AgentStepEntry`; calling `.code(...)` narrows to a `CodeStepEntry`. IDE completion shows only methods relevant to that mode, and calling both fails fast at build time.
 
 The framework at dispatch time:
 
@@ -249,10 +251,16 @@ Use `WorkflowDefinition.builder(id, name)` for a fluent API:
 ```java
 var workflow = WorkflowDefinition.builder("research-task", "Research task")
         .description("Research and summarize")
-        .param("topic", "What to research", "AI")
-        .step("research", "researcher", "Research {{param.topic}}")
-        .step("summarize", "writer", "Summarize {{step.research.output}}",
-                List.of("research"))
+        .param().name("topic").description("What to research").defaultValue("AI").end()
+        .step()
+            .name("research").agent("researcher")
+            .instructions("Research {{param.topic}}")
+            .end()
+        .step()
+            .name("summarize").agent("writer")
+            .instructions("Summarize {{step.research.output}}")
+            .dependencies("research")
+            .end()
         .outputStep("summarize")
         .build();
 
@@ -263,14 +271,19 @@ For loops and branches, use the inner builders:
 
 ```java
 var workflow = WorkflowDefinition.builder("multi-page", "Multi-page")
-        .step("plan", "planner", "List 3 topics as JSON array")
-        .loop("create-pages", loop -> loop
-                .over("plan")
-                .step(WorkflowStepAgent.builder("create-page")
-                        .agent("writer")
-                        .instructions("Create page about {{item}}")
-                        .tools(List.of("create_page", "append_block"))
-                        .build()))
+        .step()
+            .name("plan").agent("planner")
+            .instructions("List 3 topics as JSON array")
+            .end()
+        .loop()
+            .name("create-pages")
+            .over("plan")
+            .step()
+                .name("create-page").agent("writer")
+                .instructions("Create page about {{item}}")
+                .tools("create_page", "append_block")
+                .end()
+            .end()
         .build();
 ```
 
@@ -300,13 +313,13 @@ For multi-step plans, declare which step's output the typed result comes from:
 
 ```java
 WorkflowDefinition.builder("triage", "Triage")
-    .param("customer_id", "The customer to triage", null, true)
-    .step("gather", ...)
-    .step(WorkflowStepAgent.builder("classify")
-            .agent("triage")
-            .instructions("Respond with JSON: {classification, reason}")
-            .dependency("gather")
-            .build())
+    .param().name("customer_id").description("The customer to triage").required(true).end()
+    .step().name("gather").agent("researcher").instructions("Gather context").end()
+    .step()
+        .name("classify").agent("triage")
+        .instructions("Respond with JSON: {classification, reason}")
+        .dependencies("gather")
+        .end()
     .outputStep("classify")
     .build();
 ```

@@ -16,7 +16,7 @@ class MemTaskStateStoreTest {
     private WorkflowDefinition dummyTask() {
 
         return WorkflowDefinition.builder("test-task", "test-task").description("desc")
-                .step(new WorkflowStepAgent("step-1", "agent-1", "do it", null, false, null, null))
+                .step().name("step-1").agent("agent-1").instructions("do it").end()
                 .build();
     }
 

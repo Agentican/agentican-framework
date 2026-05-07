@@ -56,8 +56,7 @@ class TracingIntegrationTest {
         mockLlm.queueEndTurn("Traced result");
 
         var task = WorkflowDefinition.builder("otel-test", "otel-test").description("test")
-                .step(new WorkflowStepAgent("research", "researcher", "do something",
-                        List.of(), false, List.of(), List.of()))
+                .step().name("research").agent("researcher").instructions("do something").end()
                 .build();
 
         var handle = agentican.workflow(task).raw().start(java.util.Map.of());

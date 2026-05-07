@@ -14,10 +14,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record  WorkflowConfig(
+public record WorkflowConfig(
         String id,
         String name,
         String description,
@@ -50,15 +49,14 @@ public record  WorkflowConfig(
 
     public WorkflowDefinition toDefinition(CodeStepRegistry codeStepRegistry) {
 
-        var builder = WorkflowDefinition.builder(id, name)
+        var resolvedSteps = steps.stream().map(s -> s.toWorkflowStep(codeStepRegistry)).toList();
+
+        return WorkflowDefinition.builder(id, name)
                 .description(description)
-                .outputStep(outputStep);
-
-        params.forEach(p -> builder.param(p.toWorkflowParam()));
-
-        steps.forEach(s -> builder.step(s.toWorkflowStep(codeStepRegistry)));
-
-        return builder.build();
+                .outputStep(outputStep)
+                .params(params.stream().map(PlanParamConfig::toWorkflowParam).toList())
+                .steps(resolvedSteps)
+                .build();
     }
 
     public static WorkflowConfigBuilder builder() {
@@ -77,248 +75,232 @@ public record  WorkflowConfig(
 
         private String outputStep;
 
-        public WorkflowConfigBuilder id(String id) { this.id = id; return this; }
-        public WorkflowConfigBuilder name(String name) { this.name = name; return this; }
-        public WorkflowConfigBuilder description(String description) { this.description = description; return this; }
-        public WorkflowConfigBuilder outputStep(String stepName) { this.outputStep = stepName; return this; }
-        public WorkflowConfigBuilder param(PlanParamConfig param) { this.params.add(param); return this; }
-        public WorkflowConfigBuilder step(PlanStepConfig step) { this.steps.add(step); return this; }
-        public WorkflowConfigBuilder steps(List<PlanStepConfig> steps) { this.steps.addAll(steps); return this; }
+        public WorkflowConfigBuilder id(String id)                          { this.id = id; return this; }
+        public WorkflowConfigBuilder name(String name)                      { this.name = name; return this; }
+        public WorkflowConfigBuilder description(String description)        { this.description = description; return this; }
+        public WorkflowConfigBuilder outputStep(String stepName)            { this.outputStep = stepName; return this; }
 
-        public WorkflowConfigBuilder param(String name, String description, String defaultValue, boolean required) {
-
-            this.params.add(new PlanParamConfig(name, description, defaultValue, required));
-
-            return this;
-        }
-
-        public WorkflowConfigBuilder step(String name, Consumer<StepBuilder> config) {
-
-            var builder = new StepBuilder(name);
-
-            config.accept(builder);
-
-            this.steps.add(builder.build());
-
-            return this;
-        }
-
-        public WorkflowConfigBuilder loop(String name, Consumer<LoopBuilder> config) {
-
-            var builder = new LoopBuilder(name);
-
-            config.accept(builder);
-
-            this.steps.add(builder.build());
-
-            return this;
-        }
-
-        public WorkflowConfigBuilder branch(String name, Consumer<BranchBuilder> config) {
-
-            var builder = new BranchBuilder(name);
-
-            config.accept(builder);
-
-            this.steps.add(builder.build());
-
-            return this;
-        }
+        public ParamEntry param()   { return new ParamEntry(); }
+        public StepEntry<WorkflowConfigBuilder> step() { return new StepEntry<>(this, steps); }
+        public LoopEntry loop()     { return new LoopEntry(); }
+        public BranchEntry branch() { return new BranchEntry(); }
 
         public WorkflowConfig build() {
 
             return new WorkflowConfig(id, name, description, params, steps, outputStep);
         }
-    }
 
-    public static class StepBuilder {
+        public final class ParamEntry {
 
-        private final String name;
+            private String paramName;
+            private String description;
+            private String defaultValue;
+            private boolean required;
 
-        private String agent;
-        private String instructions;
-        private List<String> skills = List.of();
-        private List<String> tools = List.of();
+            ParamEntry() {}
 
-        private String codeSlug;
-        private Object input;
+            public ParamEntry name(String name)                 { this.paramName = name; return this; }
+            public ParamEntry description(String description)   { this.description = description; return this; }
+            public ParamEntry defaultValue(String defaultValue) { this.defaultValue = defaultValue; return this; }
+            public ParamEntry required(boolean required)        { this.required = required; return this; }
 
-        private List<String> dependencies = List.of();
+            public WorkflowConfigBuilder end() {
 
-        private boolean hitl;
+                params.add(new PlanParamConfig(paramName, description, defaultValue, required));
 
-        StepBuilder(String name) { this.name = name; }
-
-        PlanStepConfig build() {
-
-            if (agent != null)
-                return new PlanStepConfig(name, "agent", agent, instructions, dependencies, hitl, skills, tools,
-                        null, null, null, null, null, null, null);
-
-            if (codeSlug != null)
-                return new PlanStepConfig(name, "code", null, null, dependencies, false, null,
-                        null, null, null, null, null, null, codeSlug, input);
-
-            throw new IllegalStateException(
-                    "Step '" + name + "' must declare either .agent(\"...\") or .code(\"slug\")");
+                return WorkflowConfigBuilder.this;
+            }
         }
 
-        public AgentStepBuilder agent(String agent) {
+        public final class LoopEntry {
 
-            if (codeSlug != null)
-                throw new IllegalStateException(
-                        "Step '" + name + "' already declared code('" + codeSlug + "'); cannot also call agent()");
+            private String loopName;
+            private String over;
+            private List<String> dependencies = List.of();
+            private boolean hitl;
 
+            private final List<PlanStepConfig> bodySteps = new ArrayList<>();
+
+            LoopEntry() {}
+
+            public LoopEntry name(String name)                  { this.loopName = name; return this; }
+            public LoopEntry over(String stepName)              { this.over = stepName; return this; }
+            public LoopEntry dependencies(String... deps)       { this.dependencies = List.of(deps); return this; }
+            public LoopEntry dependencies(List<String> deps)    { this.dependencies = deps; return this; }
+            public LoopEntry hitl(boolean hitl)                 { this.hitl = hitl; return this; }
+            public LoopEntry hitl()                             { this.hitl = true; return this; }
+
+            public StepEntry<LoopEntry> step() { return new StepEntry<>(this, bodySteps); }
+
+            public WorkflowConfigBuilder end() {
+
+                steps.add(new PlanStepConfig(loopName, "loop", null, null, dependencies, hitl, null,
+                        null, over, null, null, null, bodySteps, null, null));
+
+                return WorkflowConfigBuilder.this;
+            }
+        }
+
+        public final class BranchEntry {
+
+            private String branchName;
+            private String from;
+            private String defaultPath;
+            private List<String> dependencies = List.of();
+            private boolean hitl;
+
+            private final List<BranchPathConfig> pathConfigs = new ArrayList<>();
+
+            BranchEntry() {}
+
+            public BranchEntry name(String name)                { this.branchName = name; return this; }
+            public BranchEntry from(String stepName)            { this.from = stepName; return this; }
+            public BranchEntry defaultPath(String pathName)     { this.defaultPath = pathName; return this; }
+            public BranchEntry dependencies(String... deps)     { this.dependencies = List.of(deps); return this; }
+            public BranchEntry dependencies(List<String> deps)  { this.dependencies = deps; return this; }
+            public BranchEntry hitl(boolean hitl)               { this.hitl = hitl; return this; }
+            public BranchEntry hitl()                           { this.hitl = true; return this; }
+
+            public PathEntry path() { return new PathEntry(); }
+
+            public WorkflowConfigBuilder end() {
+
+                steps.add(new PlanStepConfig(branchName, "branch", null, null, dependencies, hitl, null, null,
+                        null, from, pathConfigs, defaultPath, null, null, null));
+
+                return WorkflowConfigBuilder.this;
+            }
+
+            public final class PathEntry {
+
+                private String pathName;
+                private String agent;
+                private String instructions;
+                private List<String> tools = List.of();
+                private List<String> skills = List.of();
+
+                private final List<PlanStepConfig> bodySteps = new ArrayList<>();
+
+                PathEntry() {}
+
+                public PathEntry name(String name)              { this.pathName = name; return this; }
+                public PathEntry agent(String agent)            { this.agent = agent; return this; }
+                public PathEntry instructions(String instr)     { this.instructions = instr; return this; }
+                public PathEntry tools(String... tools)         { this.tools = List.of(tools); return this; }
+                public PathEntry tools(List<String> tools)      { this.tools = tools; return this; }
+                public PathEntry skills(String... skills)       { this.skills = List.of(skills); return this; }
+                public PathEntry skills(List<String> skills)    { this.skills = skills; return this; }
+
+                public StepEntry<PathEntry> step() { return new StepEntry<>(this, bodySteps); }
+
+                public BranchEntry end() {
+
+                    pathConfigs.add(new BranchPathConfig(pathName, agent, instructions, tools, skills,
+                            bodySteps.isEmpty() ? null : bodySteps));
+
+                    return BranchEntry.this;
+                }
+            }
+        }
+    }
+
+    /** Generic step entry — discriminates via {@code .agent(...)} / {@code .code(...)}. */
+    public static final class StepEntry<P> {
+
+        private final P parent;
+        private final List<PlanStepConfig> sink;
+
+        private String stepName;
+
+        StepEntry(P parent, List<PlanStepConfig> sink) {
+
+            this.parent = parent;
+            this.sink = sink;
+        }
+
+        public StepEntry<P> name(String name) { this.stepName = name; return this; }
+
+        public AgentStepEntry<P> agent(String agent) {
+
+            return new AgentStepEntry<>(parent, sink, stepName, agent);
+        }
+
+        public CodeStepEntry<P> code(String slug) {
+
+            return new CodeStepEntry<>(parent, sink, stepName, slug);
+        }
+    }
+
+    public static final class AgentStepEntry<P> {
+
+        private final P parent;
+        private final List<PlanStepConfig> sink;
+
+        private final String stepName;
+        private final String agent;
+
+        private String instructions;
+        private List<String> dependencies = List.of();
+        private List<String> skills = List.of();
+        private List<String> tools = List.of();
+        private boolean hitl;
+
+        AgentStepEntry(P parent, List<PlanStepConfig> sink, String stepName, String agent) {
+
+            this.parent = parent;
+            this.sink = sink;
+            this.stepName = stepName;
             this.agent = agent;
-
-            return new AgentStepBuilder(this);
         }
 
-        public CodeStepBuilder code(String slug) {
+        public AgentStepEntry<P> instructions(String instructions) { this.instructions = instructions; return this; }
+        public AgentStepEntry<P> dependencies(String... deps)      { this.dependencies = List.of(deps); return this; }
+        public AgentStepEntry<P> dependencies(List<String> deps)   { this.dependencies = deps; return this; }
+        public AgentStepEntry<P> skills(String... skills)          { this.skills = List.of(skills); return this; }
+        public AgentStepEntry<P> skills(List<String> skills)       { this.skills = skills; return this; }
+        public AgentStepEntry<P> tools(String... tools)            { this.tools = List.of(tools); return this; }
+        public AgentStepEntry<P> tools(List<String> tools)         { this.tools = tools; return this; }
+        public AgentStepEntry<P> hitl(boolean hitl)                { this.hitl = hitl; return this; }
+        public AgentStepEntry<P> hitl()                            { this.hitl = true; return this; }
 
-            if (agent != null)
-                throw new IllegalStateException(
-                        "Step '" + name + "' already declared agent('" + agent + "'); cannot also call code()");
+        public P end() {
 
-            this.codeSlug = slug;
+            sink.add(new PlanStepConfig(stepName, "agent", agent, instructions, dependencies, hitl, skills, tools,
+                    null, null, null, null, null, null, null));
 
-            return new CodeStepBuilder(this);
+            return parent;
         }
     }
 
-    public static class AgentStepBuilder {
+    public static final class CodeStepEntry<P> {
 
-        private final StepBuilder parent;
+        private final P parent;
+        private final List<PlanStepConfig> sink;
 
-        AgentStepBuilder(StepBuilder parent) { this.parent = parent; }
+        private final String stepName;
+        private final String slug;
 
-        public AgentStepBuilder instructions(String instructions) { parent.instructions = instructions; return this; }
-        public AgentStepBuilder dependencies(String... deps) { parent.dependencies = List.of(deps); return this; }
-        public AgentStepBuilder dependencies(List<String> deps) { parent.dependencies = deps; return this; }
-        public AgentStepBuilder hitl(boolean hitl) { parent.hitl = hitl; return this; }
-        public AgentStepBuilder hitl() { parent.hitl = true; return this; }
-        public AgentStepBuilder skills(String... skills) { parent.skills = List.of(skills); return this; }
-        public AgentStepBuilder skills(List<String> skills) { parent.skills = skills; return this; }
-        public AgentStepBuilder tools(String... tools) { parent.tools = List.of(tools); return this; }
-        public AgentStepBuilder tools(List<String> tools) { parent.tools = tools; return this; }
-    }
-
-    public static class CodeStepBuilder {
-
-        private final StepBuilder parent;
-
-        CodeStepBuilder(StepBuilder parent) { this.parent = parent; }
-
-        public <I> CodeStepBuilder input(I input) { parent.input = input; return this; }
-        public CodeStepBuilder dependencies(String... deps) { parent.dependencies = List.of(deps); return this; }
-        public CodeStepBuilder dependencies(List<String> deps) { parent.dependencies = deps; return this; }
-    }
-
-    public static class LoopBuilder {
-
-        private final String name;
-        private String over;
+        private Object input;
         private List<String> dependencies = List.of();
-        private boolean hitl;
-        private final List<PlanStepConfig> steps = new ArrayList<>();
 
-        LoopBuilder(String name) { this.name = name; }
+        CodeStepEntry(P parent, List<PlanStepConfig> sink, String stepName, String slug) {
 
-        public LoopBuilder over(String stepName) { this.over = stepName; return this; }
-        public LoopBuilder dependencies(String... deps) { this.dependencies = List.of(deps); return this; }
-        public LoopBuilder dependencies(List<String> deps) { this.dependencies = deps; return this; }
-        public LoopBuilder hitl(boolean hitl) { this.hitl = hitl; return this; }
-        public LoopBuilder hitl() { this.hitl = true; return this; }
-        public LoopBuilder step(PlanStepConfig step) { steps.add(step); return this; }
-
-        public LoopBuilder step(String name, Consumer<StepBuilder> config) {
-
-            var builder = new StepBuilder(name);
-
-            config.accept(builder);
-
-            steps.add(builder.build());
-
-            return this;
+            this.parent = parent;
+            this.sink = sink;
+            this.stepName = stepName;
+            this.slug = slug;
         }
 
-        PlanStepConfig build() {
+        public <I> CodeStepEntry<P> input(I input)              { this.input = input; return this; }
+        public CodeStepEntry<P> dependencies(String... deps)    { this.dependencies = List.of(deps); return this; }
+        public CodeStepEntry<P> dependencies(List<String> deps) { this.dependencies = deps; return this; }
 
-            return new PlanStepConfig(name, "loop", null, null, dependencies, hitl, null,
-                    null, over, null, null, null, steps, null, null);
-        }
-    }
+        public P end() {
 
-    public static class BranchBuilder {
+            sink.add(new PlanStepConfig(stepName, "code", null, null, dependencies, false, null,
+                    null, null, null, null, null, null, slug, input));
 
-        private final String name;
-        private String from;
-        private String defaultPath;
-        private List<String> dependencies = List.of();
-        private boolean hitl;
-        private final List<BranchPathConfig> pathConfigs = new ArrayList<>();
-
-        BranchBuilder(String name) { this.name = name; }
-
-        public BranchBuilder from(String stepName) { this.from = stepName; return this; }
-        public BranchBuilder defaultPath(String pathName) { this.defaultPath = pathName; return this; }
-        public BranchBuilder dependencies(String... deps) { this.dependencies = List.of(deps); return this; }
-        public BranchBuilder dependencies(List<String> deps) { this.dependencies = deps; return this; }
-        public BranchBuilder hitl(boolean hitl) { this.hitl = hitl; return this; }
-        public BranchBuilder hitl() { this.hitl = true; return this; }
-        public BranchBuilder path(BranchPathConfig path) { pathConfigs.add(path); return this; }
-
-        public BranchBuilder path(String pathName, Consumer<PathBuilder> config) {
-
-            var builder = new PathBuilder(pathName);
-
-            config.accept(builder);
-
-            pathConfigs.add(builder.build());
-
-            return this;
-        }
-
-        PlanStepConfig build() {
-
-            return new PlanStepConfig(name, "branch", null, null, dependencies, hitl, null, null,
-                    null, from, pathConfigs, defaultPath, null, null, null);
-        }
-    }
-
-    public static class PathBuilder {
-
-        private final String pathName;
-        private String agent;
-        private String instructions;
-        private List<String> tools = List.of();
-        private List<String> skills = List.of();
-        private final List<PlanStepConfig> steps = new ArrayList<>();
-
-        PathBuilder(String pathName) { this.pathName = pathName; }
-
-        public PathBuilder agent(String agent) { this.agent = agent; return this; }
-        public PathBuilder instructions(String instructions) { this.instructions = instructions; return this; }
-        public PathBuilder tools(String... tools) { this.tools = List.of(tools); return this; }
-        public PathBuilder tools(List<String> tools) { this.tools = tools; return this; }
-        public PathBuilder skills(String... skills) { this.skills = List.of(skills); return this; }
-        public PathBuilder skills(List<String> skills) { this.skills = skills; return this; }
-        public PathBuilder step(PlanStepConfig step) { steps.add(step); return this; }
-
-        public PathBuilder step(String name, Consumer<StepBuilder> config) {
-
-            var builder = new StepBuilder(name);
-
-            config.accept(builder);
-
-            steps.add(builder.build());
-
-            return this;
-        }
-
-        BranchPathConfig build() {
-
-            return new BranchPathConfig(pathName, agent, instructions, tools, skills, steps.isEmpty() ? null : steps);
+            return parent;
         }
     }
 

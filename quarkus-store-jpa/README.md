@@ -90,56 +90,57 @@ created entities also live in the catalog, indexed by name.
 
 ## Schema
 
-Flyway migration `V1__init.sql` creates:
+Flyway migrations create:
 
-- **Catalog** — `agents`, `skills`, `tools` (reusable across plans)
-- **Plans** — `plans` (top-level row plus full `definition_json` serialization)
-- **Task execution** — `tasks`, `task_steps`, `runs`, `turns`, `tool_results`
+- **Catalog** — `agents`, `skills`, `tools` (reusable across workflows)
+- **Workflows** — `workflows` (top-level row plus full `definition_json` serialization)
+- **Run execution** — `workflow_runs`, `workflow_run_steps`, `agent_runs`, `turns`, `tool_results`
 - **Knowledge** — `knowledge_entries`, `knowledge_facts`
 
-Tasks carry a `plan_snapshot_json` so the plan shape at dispatch time survives
-even if the plan row is later overwritten.
+Workflow runs carry a `workflow_snapshot_json` so the workflow shape at dispatch time survives
+even if the workflow row is later overwritten.
 
 ## Planner reuse
 
-Because plans live in Postgres keyed by `external_id`, the `PlannerAgent` can
-reuse persisted plans across restarts. The first run materializes the plan;
-subsequent runs with matching `external_id` load the prior definition instead
+Because workflows live in Postgres keyed by `id`, the `WorkflowPlannerAgent` can
+reuse persisted workflows across restarts. The first run materializes the workflow;
+subsequent runs with matching `id` load the prior definition instead
 of re-planning.
 
 ## Resume after restart
 
-When persistence is enabled, any task left RUNNING when the server dies is automatically resumed on next startup. No user action required.
+When persistence is enabled, any workflow run left RUNNING when the server dies is automatically resumed on next startup. No user action required.
 
 Behavior:
 - Completed steps are **skipped**; their outputs are reused from the log.
 - An in-flight agent step is resumed at **turn-boundary granularity**:
   - If the LLM call hadn't returned, the turn is marked `ABANDONED` and re-issued.
   - If the response arrived but tools hadn't all run, the response is **replayed in-process** (no second LLM call) and only the *missing* tool calls execute. Completed tool calls are not re-run.
-- An in-flight loop step resumes child-by-child: completed iterations keep their outputs, running iterations are recursively resumed, missing iterations dispatch. The `UNIQUE (parent_task_id, iteration_index)` constraint prevents duplicates.
-- An in-flight branch step skips classifier re-evaluation — the chosen path is persisted in `task_steps.branch_chosen_path` and used verbatim.
+- An in-flight loop step resumes child-by-child: completed iterations keep their outputs, running iterations are recursively resumed, missing iterations dispatch. The `UNIQUE (parent_workflow_run_id, iteration_index)` constraint prevents duplicates.
+- An in-flight branch step skips classifier re-evaluation — the chosen path is persisted in `workflow_run_steps.branch_chosen_path` and used verbatim.
 - Pending HITL checkpoints are rehydrated so the UI's Approve/Reject buttons still work after restart.
 - Completed steps re-fire `KnowledgeIngestor` in case extraction didn't finish pre-crash (the extractor dedupes, so this is safe to run).
 - Spans emitted during resume carry `agentican.resumed=true` so the trace waterfall shows which spans came from post-restart execution.
 
-Tasks that can't be resumed (missing plan, status already terminal) are reaped — marked FAILED with a structured cause so the UI's Recent Tasks panel doesn't show zombie RUNNING rows.
+Workflow runs that can't be resumed (missing workflow, status already terminal) are reaped — marked FAILED with a structured cause so the UI's recent runs panel doesn't show zombie RUNNING rows.
 
 Controlled by `agentican.resume-on-start` (default `true`).
 
-### Plan snapshot preference (stale-plan semantics)
+### Workflow snapshot preference (stale-workflow semantics)
 
-On resume, the task is rehydrated from `tasks.plan_snapshot_json` — the plan shape
-captured at dispatch time — **not** from the current plan in the registry. This is
-deliberate: the shape of the plan is part of the task's durable state, and swapping
-shapes mid-flight produces non-deterministic behavior (step names referenced in
-completed outputs may no longer exist, branch paths may have moved, etc.).
+On resume, the run is rehydrated from `workflow_runs.workflow_snapshot_json` — the
+workflow shape captured at dispatch time — **not** from the current workflow in
+the registry. This is deliberate: the shape of the workflow is part of the run's
+durable state, and swapping shapes mid-flight produces non-deterministic
+behavior (step names referenced in completed outputs may no longer exist, branch
+paths may have moved, etc.).
 
-Consequence: if you intentionally edit a registered plan expecting in-flight tasks
-to pick up the edit, **they won't**. The snapshot wins. New tasks started after the
-edit use the updated plan; interrupted tasks finish on the shape they started with.
-If the snapshot blob is corrupt and can't be deserialized, the classifier reaps
-the task with `reason=PLAN_CORRUPT` rather than silently falling back to the
-registry.
+Consequence: if you intentionally edit a registered workflow expecting in-flight
+runs to pick up the edit, **they won't**. The snapshot wins. New runs started
+after the edit use the updated workflow; interrupted runs finish on the shape they
+started with. If the snapshot blob is corrupt and can't be deserialized, the
+classifier reaps the run with `reason=PLAN_CORRUPT` rather than silently
+falling back to the registry.
 
 ### Known at-least-once window
 
@@ -161,6 +162,6 @@ quarkus.flyway.locations=classpath:db/migration
 
 - Retention / pruning — rows accumulate forever. Add a scheduled cleanup job if
   you need it.
-- Cross-registry analytics ("which plans use agent X") — plan bodies are stored
+- Cross-registry analytics ("which workflows use agent X") — workflow bodies are stored
   as JSON, not decomposed into relations.
 - Multi-tenancy — single-tenant schema.

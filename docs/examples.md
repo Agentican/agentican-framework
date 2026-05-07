@@ -24,11 +24,16 @@ Skip the planner and run a hand-built plan:
 ```java
 var task = WorkflowDefinition.builder("research-and-summarize", "Research and summarize")
         .description("Research a topic and summarize")
-        .param("topic", "What to research", "AI")
-        .step("research", "researcher", "Research {{param.topic}} using web search")
-        .step("summarize", "writer",
-                "Summarize the research:\n\n{{step.research.output}}",
-                List.of("research"))
+        .param().name("topic").description("What to research").defaultValue("AI").end()
+        .step()
+            .name("research").agent("researcher")
+            .instructions("Research {{param.topic}} using web search")
+            .end()
+        .step()
+            .name("summarize").agent("writer")
+            .instructions("Summarize the research:\n\n{{step.research.output}}")
+            .dependencies("research")
+            .end()
         .build();
 
 agentican.run(task, Map.of("topic", "fusion energy")).result();
@@ -206,15 +211,19 @@ Process a list in parallel by composing a producer step with a loop:
 
 ```java
 var task = WorkflowDefinition.builder("create-report-cards", "Create report cards")
-        .step("get-students", "data-fetcher",
-                "Fetch all students as a JSON array with name and grades")
-        .loop("create-cards", loop -> loop
-                .over("get-students")
-                .step(WorkflowStepAgent.builder("create-card")
-                        .agent("report-writer")
-                        .instructions("Create a report card for {{item.name}} with grades {{item.grades}}")
-                        .tools(List.of("create_page", "append_block"))
-                        .build()))
+        .step()
+            .name("get-students").agent("data-fetcher")
+            .instructions("Fetch all students as a JSON array with name and grades")
+            .end()
+        .loop()
+            .name("create-cards")
+            .over("get-students")
+            .step()
+                .name("create-card").agent("report-writer")
+                .instructions("Create a report card for {{item.name}} with grades {{item.grades}}")
+                .tools("create_page", "append_block")
+                .end()
+            .end()
         .build();
 
 agentican.run(task).result();
@@ -228,20 +237,27 @@ Route work based on a classifier step's output:
 
 ```java
 var task = WorkflowDefinition.builder("triage", "Triage")
-        .step("classify", "classifier",
-                "Classify this email: {{param.email}}. Return one word: 'urgent', 'normal', or 'spam'")
-        .branch("route", branch -> branch
-                .from("classify")
-                .path("urgent",
-                        WorkflowStepAgent.builder("alert").agent("notifier")
-                                .instructions("Alert the team about an urgent email").build())
-                .path("normal",
-                        WorkflowStepAgent.builder("queue").agent("queue-manager")
-                                .instructions("Add to normal queue").build())
-                .path("spam",
-                        WorkflowStepAgent.builder("discard").agent("logger")
-                                .instructions("Log and discard").build())
-                .defaultPath("normal"))
+        .step()
+            .name("classify").agent("classifier")
+            .instructions("Classify this email: {{param.email}}. Return one word: 'urgent', 'normal', or 'spam'")
+            .end()
+        .branch()
+            .name("route")
+            .from("classify")
+            .defaultPath("normal")
+            .path()
+                .name("urgent")
+                .step().name("alert").agent("notifier").instructions("Alert the team about an urgent email").end()
+                .end()
+            .path()
+                .name("normal")
+                .step().name("queue").agent("queue-manager").instructions("Add to normal queue").end()
+                .end()
+            .path()
+                .name("spam")
+                .step().name("discard").agent("logger").instructions("Log and discard").end()
+                .end()
+            .end()
         .build();
 ```
 
@@ -269,17 +285,19 @@ var agentican = Agentican.builder()
             .workflow()
                     .id("payment-enrichment")
                     .name("payment-enrichment")
-                    .param("customer_id", "Customer to enrich", null, true)
-                    .step("fetch-customer", s -> s
-                            .code("http-get")
-                            .input(new HttpInput(
-                                    "https://api.internal/customers/{{param.customer_id}}",
-                                    "GET")))
-                    .step("decide", s -> s
-                            .agent("Risk Analyst")
-                            .instructions("Customer record:\n{{step.fetch-customer.output.body}}\n\n"
-                                        + "HTTP status was {{step.fetch-customer.output.status}}.")
-                            .dependencies("fetch-customer"))
+                    .param().name("customer_id").description("Customer to enrich").required(true).end()
+                    .step()
+                        .name("fetch-customer").code("http-get")
+                        .input(new HttpInput(
+                                "https://api.internal/customers/{{param.customer_id}}",
+                                "GET"))
+                        .end()
+                    .step()
+                        .name("decide").agent("Risk Analyst")
+                        .instructions("Customer record:\n{{step.fetch-customer.output.body}}\n\n"
+                                    + "HTTP status was {{step.fetch-customer.output.status}}.")
+                        .dependencies("fetch-customer")
+                        .end()
                     .end()
             .end()
         .build();

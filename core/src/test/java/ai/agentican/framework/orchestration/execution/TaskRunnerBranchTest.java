@@ -8,7 +8,6 @@ import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.store.WorkflowRunStoreMemory;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
-import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 import ai.agentican.framework.registry.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -54,13 +53,19 @@ class TaskRunnerBranchTest {
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("branch-task", "branch-task")
-                .step("decide", "producer-agent", "Pick a path")
-                .branch("branch-step", branch -> branch
+                .step().name("decide").agent("producer-agent").instructions("Pick a path").end()
+                .branch()
+                        .name("branch-step")
                         .from("decide")
-                        .path("path-a", new WorkflowStepAgent("do-a", "path-a-agent",
-                                "Execute path A", null, false, null, null))
-                        .path("path-b", new WorkflowStepAgent("do-b", "path-b-agent",
-                                "Execute path B", null, false, null, null)))
+                        .path()
+                                .name("path-a")
+                                .step().name("do-a").agent("path-a-agent").instructions("Execute path A").end()
+                                .end()
+                        .path()
+                                .name("path-b")
+                                .step().name("do-b").agent("path-b-agent").instructions("Execute path B").end()
+                                .end()
+                        .end()
                 .build();
 
         var result = runner.run(task);
@@ -89,14 +94,20 @@ class TaskRunnerBranchTest {
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("default-branch-task", "default-branch-task")
-                .step("decide", "producer-agent", "Pick a path")
-                .branch("branch-step", branch -> branch
+                .step().name("decide").agent("producer-agent").instructions("Pick a path").end()
+                .branch()
+                        .name("branch-step")
                         .from("decide")
-                        .path("path-a", new WorkflowStepAgent("do-a", "path-a-agent",
-                                "Execute path A", null, false, null, null))
-                        .path("path-b", new WorkflowStepAgent("do-b", "path-b-agent",
-                                "Execute path B", null, false, null, null))
-                        .defaultPath("path-b"))
+                        .defaultPath("path-b")
+                        .path()
+                                .name("path-a")
+                                .step().name("do-a").agent("path-a-agent").instructions("Execute path A").end()
+                                .end()
+                        .path()
+                                .name("path-b")
+                                .step().name("do-b").agent("path-b-agent").instructions("Execute path B").end()
+                                .end()
+                        .end()
                 .build();
 
         var result = runner.run(task);
@@ -125,13 +136,19 @@ class TaskRunnerBranchTest {
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("no-match-branch-task", "no-match-branch-task")
-                .step("decide", "producer-agent", "Pick a path")
-                .branch("branch-step", branch -> branch
+                .step().name("decide").agent("producer-agent").instructions("Pick a path").end()
+                .branch()
+                        .name("branch-step")
                         .from("decide")
-                        .path("path-a", new WorkflowStepAgent("do-a", "path-a-agent",
-                                "Execute path A", null, false, null, null))
-                        .path("path-b", new WorkflowStepAgent("do-b", "path-b-agent",
-                                "Execute path B", null, false, null, null)))
+                        .path()
+                                .name("path-a")
+                                .step().name("do-a").agent("path-a-agent").instructions("Execute path A").end()
+                                .end()
+                        .path()
+                                .name("path-b")
+                                .step().name("do-b").agent("path-b-agent").instructions("Execute path B").end()
+                                .end()
+                        .end()
                 .build();
 
         var result = runner.run(task);
@@ -159,13 +176,19 @@ class TaskRunnerBranchTest {
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("json-array-branch-task", "json-array-branch-task")
-                .step("decide", "producer-agent", "Pick a path")
-                .branch("branch-step", branch -> branch
+                .step().name("decide").agent("producer-agent").instructions("Pick a path").end()
+                .branch()
+                        .name("branch-step")
                         .from("decide")
-                        .path("path-a", new WorkflowStepAgent("do-a", "path-a-agent",
-                                "Execute path A", null, false, null, null))
-                        .path("path-b", new WorkflowStepAgent("do-b", "path-b-agent",
-                                "Execute path B", null, false, null, null)))
+                        .path()
+                                .name("path-a")
+                                .step().name("do-a").agent("path-a-agent").instructions("Execute path A").end()
+                                .end()
+                        .path()
+                                .name("path-b")
+                                .step().name("do-b").agent("path-b-agent").instructions("Execute path B").end()
+                                .end()
+                        .end()
                 .build();
 
         var result = runner.run(task);
@@ -194,13 +217,19 @@ class TaskRunnerBranchTest {
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("contains-branch-task", "contains-branch-task")
-                .step("decide", "producer-agent", "Pick a path")
-                .branch("branch-step", branch -> branch
+                .step().name("decide").agent("producer-agent").instructions("Pick a path").end()
+                .branch()
+                        .name("branch-step")
                         .from("decide")
-                        .path("path-a", new WorkflowStepAgent("do-a", "path-a-agent",
-                                "Execute path A", null, false, null, null))
-                        .path("path-b", new WorkflowStepAgent("do-b", "path-b-agent",
-                                "Execute path B", null, false, null, null)))
+                        .path()
+                                .name("path-a")
+                                .step().name("do-a").agent("path-a-agent").instructions("Execute path A").end()
+                                .end()
+                        .path()
+                                .name("path-b")
+                                .step().name("do-b").agent("path-b-agent").instructions("Execute path B").end()
+                                .end()
+                        .end()
                 .build();
 
         var result = runner.run(task);

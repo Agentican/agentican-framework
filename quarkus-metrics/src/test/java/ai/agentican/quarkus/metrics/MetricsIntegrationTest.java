@@ -34,9 +34,9 @@ class MetricsIntegrationTest {
 
         mockLlm.queueEndTurn("Test result");
 
-        var step = new WorkflowStepAgent("research", "researcher", "do something",
-                List.of(), false, List.of(), List.of());
-        var task = WorkflowDefinition.builder("metrics-test", "metrics-test").description("test").step(step).build();
+        var task = WorkflowDefinition.builder("metrics-test", "metrics-test").description("test")
+                .step().name("research").agent("researcher").instructions("do something").end()
+                .build();
 
         var handle = agentican.workflow(task).raw().start(java.util.Map.of());
         handle.await();

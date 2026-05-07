@@ -10,13 +10,10 @@ import ai.agentican.framework.orchestration.code.CodeStep;
 import ai.agentican.framework.orchestration.code.CodeStepRegistry;
 import ai.agentican.framework.orchestration.code.CodeStepSpec;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
-import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
-import ai.agentican.framework.orchestration.model.WorkflowStepCode;
 import ai.agentican.framework.store.WorkflowRunStoreMemory;
 import ai.agentican.framework.registry.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Map;
 
 import static ai.agentican.framework.MockLlmClient.endTurn;
@@ -67,14 +64,12 @@ class StepCodeRunnerTest {
         var runner = taskRunner(agents, codeSteps);
 
         var plan = WorkflowDefinition.builder("typed-test", "typed-test")
-                .param("amount")
-                .step(WorkflowStepCode.<AmountIn>builder("produce")
-                        .code("make-output")
-                        .input(new AmountIn("{{param.amount}}"))
-                        .build())
-                .step(new WorkflowStepAgent("finalize", "collector",
-                        "Process {{step.produce.output}}", List.of("produce"),
-                        false, null, null))
+                .param().name("amount").end()
+                .step().name("produce").code("make-output")
+                        .input(new AmountIn("{{param.amount}}")).end()
+                .step().name("finalize").agent("collector")
+                        .instructions("Process {{step.produce.output}}")
+                        .dependencies("produce").end()
                 .build();
 
         var result = runner.run(plan, java.util.Map.of("amount", "100"));
@@ -102,7 +97,7 @@ class StepCodeRunnerTest {
         var runner = taskRunner(agents, codeSteps);
 
         var plan = WorkflowDefinition.builder("http-test", "http-test")
-                .step(new WorkflowStepCode<>("call", "http", null, List.of()))
+                .step().name("call").code("http").end()
                 .build();
 
         var result = runner.run(plan);
@@ -129,10 +124,10 @@ class StepCodeRunnerTest {
         var runner = taskRunner(agents, codeSteps);
 
         var plan = WorkflowDefinition.builder("field-access", "field-access")
-                .step(new WorkflowStepCode<>("produce", "make", null, List.of()))
-                .step(new WorkflowStepAgent("read", "reader",
-                        "body={{step.produce.output.body}} status={{step.produce.output.status}}",
-                        List.of("produce"), false, null, null))
+                .step().name("produce").code("make").end()
+                .step().name("read").agent("reader")
+                        .instructions("body={{step.produce.output.body}} status={{step.produce.output.status}}")
+                        .dependencies("produce").end()
                 .build();
 
         var result = runner.run(plan);
@@ -160,10 +155,8 @@ class StepCodeRunnerTest {
         var runner = taskRunner(agents, codeSteps);
 
         var plan = WorkflowDefinition.builder("raw-map", "raw-map")
-                .step(WorkflowStepCode.<Map<String, Object>>builder("step")
-                        .code("raw")
-                        .input(Map.of("key", "value"))
-                        .build())
+                .step().name("step").code("raw")
+                        .input(Map.of("key", "value")).end()
                 .build();
 
         var result = runner.run(plan);
@@ -186,7 +179,7 @@ class StepCodeRunnerTest {
         var runner = taskRunner(agents, codeSteps);
 
         var plan = WorkflowDefinition.builder("void-test", "void-test")
-                .step(new WorkflowStepCode<>("noop-step", "noop", null, List.of()))
+                .step().name("noop-step").code("noop").end()
                 .build();
 
         var result = runner.run(plan);
@@ -205,7 +198,7 @@ class StepCodeRunnerTest {
         var runner = taskRunner(agents, codeSteps);
 
         var plan = WorkflowDefinition.builder("missing-test", "missing-test")
-                .step(new WorkflowStepCode<>("missing", "not-registered", null, List.of()))
+                .step().name("missing").code("not-registered").end()
                 .build();
 
         var result = runner.run(plan);
@@ -229,7 +222,7 @@ class StepCodeRunnerTest {
         var runner = taskRunner(agents, codeSteps);
 
         var plan = WorkflowDefinition.builder("boom-test", "boom-test")
-                .step(new WorkflowStepCode<>("explode", "boom", null, List.of()))
+                .step().name("explode").code("boom").end()
                 .build();
 
         var result = runner.run(plan);
@@ -249,7 +242,7 @@ class StepCodeRunnerTest {
         var runner = taskRunner(agents, codeSteps);
 
         var plan = WorkflowDefinition.builder("string-out", "string-out")
-                .step(new WorkflowStepCode<>("say", "speak", null, List.of()))
+                .step().name("say").code("speak").end()
                 .build();
 
         var result = runner.run(plan);

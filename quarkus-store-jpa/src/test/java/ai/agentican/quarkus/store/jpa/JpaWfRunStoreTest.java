@@ -211,10 +211,10 @@ class JpaWfRunStoreTest {
     @Test
     void planSnapshotIsPersistedOnTaskStarted() {
 
-        var step = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
-                "work", "worker-agent", "do it", List.of(), false, List.of(), List.of());
         var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Snapshot WorkflowDefinition", "Snapshot WorkflowDefinition")
-                .description("test").step(step).build();
+                .description("test")
+                .step().name("work").agent("worker-agent").instructions("do it").end()
+                .build();
 
         var taskId = "t-" + Ids.generate();
         store.taskStarted(taskId, "snap", plan, Map.of());

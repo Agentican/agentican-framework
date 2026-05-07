@@ -19,7 +19,9 @@ class SseEventTypesTest {
     @Test
     void mapsEachLifecycleEventToWireName() {
 
-        var task = WorkflowDefinition.builder("demo", "demo").description("d").step("s", "a", "i").build();
+        var task = WorkflowDefinition.builder("demo", "demo").description("d")
+                .step().name("s").agent("a").instructions("i").end()
+                .build();
         var log = new WorkflowRunLog("t1", "demo", task, Map.of());
 
         assertEquals(SseEventTypes.TASK_STARTED,

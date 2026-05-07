@@ -2,7 +2,6 @@ package ai.agentican.framework.orchestration.model;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 
 public record WorkflowDefinition(
         String id,
@@ -58,118 +57,217 @@ public record WorkflowDefinition(
         public Builder description(String description) { this.description = description; return this; }
         public Builder outputStep(String stepName) { this.outputStep = stepName; return this; }
 
-        public Builder param(String paramName) { params.add(new WorkflowParam(paramName, null, null, true)); return this; }
-        public Builder param(String paramName, String description) { params.add(new WorkflowParam(paramName, description, null, true)); return this; }
-        public Builder param(String paramName, String description, String defaultValue) { params.add(new WorkflowParam(paramName, description, defaultValue, false)); return this; }
-        public Builder param(WorkflowParam param) { params.add(param); return this; }
-        public Builder params(List<WorkflowParam> planParams) { this.params.addAll(planParams); return this; }
+        public ParamEntry param() { return new ParamEntry(); }
+        public StepEntry<Builder> step() { return new StepEntry<>(this, steps); }
+        public LoopEntry loop() { return new LoopEntry(); }
+        public BranchEntry branch() { return new BranchEntry(); }
 
-        public Builder step(WorkflowStep node) { steps.add(node); return this; }
+        /** Bulk-add pre-resolved steps. Used by the runtime when materialising loop iterations or branch paths. */
         public Builder steps(List<WorkflowStep> bodySteps) { this.steps.addAll(bodySteps); return this; }
 
-        public Builder step(String stepName, String agentName, String instructions) {
-
-            steps.add(new WorkflowStepAgent(stepName, agentName, instructions, null, false, null, null));
-            return this;
-        }
-
-        public Builder step(String stepName, String agentName, String instructions, boolean hitl) {
-
-            steps.add(new WorkflowStepAgent(stepName, agentName, instructions, null, hitl, null, null));
-            return this;
-        }
-
-        public Builder step(String stepName, String agentName, String instructions, List<String> dependencies) {
-
-            steps.add(new WorkflowStepAgent(stepName, agentName, instructions, dependencies, false, null, null));
-            return this;
-        }
-
-        public Builder loop(String stepName, Consumer<LoopBuilder> config) {
-
-            var builder = new LoopBuilder(stepName);
-
-            config.accept(builder);
-
-            steps.add(builder.build());
-
-            return this;
-        }
-
-        public Builder branch(String stepName, Consumer<BranchBuilder> config) {
-
-            var builder = new BranchBuilder(stepName);
-
-            config.accept(builder);
-
-            steps.add(builder.build());
-
-            return this;
-        }
+        /** Bulk-add pre-resolved params. Used by {@code WorkflowConfig.toDefinition} and equivalent loaders. */
+        public Builder params(List<WorkflowParam> planParams) { this.params.addAll(planParams); return this; }
 
         public WorkflowDefinition build() {
 
             return new WorkflowDefinition(id, name, description, params, steps, outputStep);
         }
+
+        public final class ParamEntry {
+
+            private String paramName;
+            private String description;
+            private String defaultValue;
+            private boolean required;
+
+            ParamEntry() {}
+
+            public ParamEntry name(String name)                { this.paramName = name; return this; }
+            public ParamEntry description(String description)  { this.description = description; return this; }
+            public ParamEntry defaultValue(String defaultValue) { this.defaultValue = defaultValue; return this; }
+            public ParamEntry required(boolean required)       { this.required = required; return this; }
+
+            public Builder end() {
+
+                params.add(new WorkflowParam(paramName, description, defaultValue, required));
+
+                return Builder.this;
+            }
+        }
+
+        public final class LoopEntry {
+
+            private String loopName;
+            private String over;
+            private List<String> dependencies = List.of();
+            private boolean hitl;
+
+            private final List<WorkflowStep> bodySteps = new ArrayList<>();
+
+            LoopEntry() {}
+
+            public LoopEntry name(String name)                  { this.loopName = name; return this; }
+            public LoopEntry over(String stepName)              { this.over = stepName; return this; }
+            public LoopEntry dependencies(String... deps)       { this.dependencies = List.of(deps); return this; }
+            public LoopEntry dependencies(List<String> deps)    { this.dependencies = deps; return this; }
+            public LoopEntry hitl(boolean hitl)                 { this.hitl = hitl; return this; }
+            public LoopEntry hitl()                             { this.hitl = true; return this; }
+
+            public StepEntry<LoopEntry> step() { return new StepEntry<>(this, bodySteps); }
+
+            public Builder end() {
+
+                steps.add(new WorkflowStepLoop(loopName, over, bodySteps, dependencies, hitl));
+
+                return Builder.this;
+            }
+        }
+
+        public final class BranchEntry {
+
+            private String branchName;
+            private String from;
+            private String defaultPath;
+            private List<String> dependencies = List.of();
+            private boolean hitl;
+
+            private final List<WorkflowStepBranch.Path> paths = new ArrayList<>();
+
+            BranchEntry() {}
+
+            public BranchEntry name(String name)                { this.branchName = name; return this; }
+            public BranchEntry from(String stepName)            { this.from = stepName; return this; }
+            public BranchEntry defaultPath(String pathName)     { this.defaultPath = pathName; return this; }
+            public BranchEntry dependencies(String... deps)     { this.dependencies = List.of(deps); return this; }
+            public BranchEntry dependencies(List<String> deps)  { this.dependencies = deps; return this; }
+            public BranchEntry hitl(boolean hitl)               { this.hitl = hitl; return this; }
+            public BranchEntry hitl()                           { this.hitl = true; return this; }
+
+            public PathEntry path() { return new PathEntry(); }
+
+            public Builder end() {
+
+                steps.add(new WorkflowStepBranch(branchName, from, paths, defaultPath, dependencies, hitl));
+
+                return Builder.this;
+            }
+
+            public final class PathEntry {
+
+                private String pathName;
+                private final List<WorkflowStep> bodySteps = new ArrayList<>();
+
+                PathEntry() {}
+
+                public PathEntry name(String name) { this.pathName = name; return this; }
+
+                public StepEntry<PathEntry> step() { return new StepEntry<>(this, bodySteps); }
+
+                public BranchEntry end() {
+
+                    paths.add(new WorkflowStepBranch.Path(pathName, bodySteps));
+
+                    return BranchEntry.this;
+                }
+            }
+        }
     }
 
-    public static class LoopBuilder {
+    /** Generic agent/code step entry — discriminates via {@code .agent(...)} / {@code .code(...)}. */
+    public static final class StepEntry<P> {
 
-        private final String name;
+        private final P parent;
+        private final List<WorkflowStep> sink;
 
-        private final List<WorkflowStep> steps = new ArrayList<>();
+        private String stepName;
 
-        private boolean hitl;
+        StepEntry(P parent, List<WorkflowStep> sink) {
 
-        private String over;
-
-        private List<String> dependencies = List.of();
-
-        LoopBuilder(String name) {
-
-            this.name = name;
+            this.parent = parent;
+            this.sink = sink;
         }
 
-        public LoopBuilder over(String stepName) { this.over = stepName; return this; }
-        public LoopBuilder step(WorkflowStep step) { this.steps.add(step); return this; }
-        public LoopBuilder dependencies(List<String> dependencies) { this.dependencies = dependencies; return this; }
-        public LoopBuilder hitl(boolean hitl) { this.hitl = hitl; return this; }
+        public StepEntry<P> name(String name) { this.stepName = name; return this; }
 
-        WorkflowStepLoop build() {
+        public AgentStepEntry<P> agent(String agent) {
 
-            return new WorkflowStepLoop(name, over, steps, dependencies, hitl);
+            return new AgentStepEntry<>(parent, sink, stepName, agent);
+        }
+
+        public CodeStepEntry<P> code(String slug) {
+
+            return new CodeStepEntry<>(parent, sink, stepName, slug);
         }
     }
 
-    public static class BranchBuilder {
+    public static final class AgentStepEntry<P> {
 
-        private final String name;
+        private final P parent;
+        private final List<WorkflowStep> sink;
 
-        private final List<WorkflowStepBranch.Path> paths = new ArrayList<>();
+        private final String stepName;
+        private final String agent;
 
+        private String instructions;
+        private List<String> dependencies = List.of();
+        private List<String> skills = List.of();
+        private List<String> tools = List.of();
         private boolean hitl;
 
-        private String from;
-        private String defaultPath;
+        AgentStepEntry(P parent, List<WorkflowStep> sink, String stepName, String agent) {
 
-        private List<String> dependencies = List.of();
-
-        BranchBuilder(String name) {
-
-            this.name = name;
+            this.parent = parent;
+            this.sink = sink;
+            this.stepName = stepName;
+            this.agent = agent;
         }
 
-        public BranchBuilder from(String stepName) { this.from = stepName; return this; }
-        public BranchBuilder defaultPath(String pathName) { this.defaultPath = pathName; return this; }
-        public BranchBuilder dependencies(List<String> dependencies) { this.dependencies = dependencies; return this; }
-        public BranchBuilder hitl(boolean hitl) { this.hitl = hitl; return this; }
+        public AgentStepEntry<P> instructions(String instructions) { this.instructions = instructions; return this; }
+        public AgentStepEntry<P> dependencies(String... deps)      { this.dependencies = List.of(deps); return this; }
+        public AgentStepEntry<P> dependencies(List<String> deps)   { this.dependencies = deps; return this; }
+        public AgentStepEntry<P> skills(String... skills)          { this.skills = List.of(skills); return this; }
+        public AgentStepEntry<P> skills(List<String> skills)       { this.skills = skills; return this; }
+        public AgentStepEntry<P> tools(String... tools)            { this.tools = List.of(tools); return this; }
+        public AgentStepEntry<P> tools(List<String> tools)         { this.tools = tools; return this; }
+        public AgentStepEntry<P> hitl(boolean hitl)                { this.hitl = hitl; return this; }
+        public AgentStepEntry<P> hitl()                            { this.hitl = true; return this; }
 
-        public BranchBuilder path(String pathName, WorkflowStep... bodySteps) {
-            paths.add(new WorkflowStepBranch.Path(pathName, List.of(bodySteps))); return this; }
+        public P end() {
 
-        WorkflowStepBranch build() {
+            sink.add(new WorkflowStepAgent(stepName, agent, instructions, dependencies, hitl, skills, tools));
 
-            return new WorkflowStepBranch(name, from, paths, defaultPath, dependencies, hitl);
+            return parent;
+        }
+    }
+
+    public static final class CodeStepEntry<P> {
+
+        private final P parent;
+        private final List<WorkflowStep> sink;
+
+        private final String stepName;
+        private final String slug;
+
+        private Object input;
+        private List<String> dependencies = List.of();
+
+        CodeStepEntry(P parent, List<WorkflowStep> sink, String stepName, String slug) {
+
+            this.parent = parent;
+            this.sink = sink;
+            this.stepName = stepName;
+            this.slug = slug;
+        }
+
+        public <I> CodeStepEntry<P> input(I input)               { this.input = input; return this; }
+        public CodeStepEntry<P> dependencies(String... deps)     { this.dependencies = List.of(deps); return this; }
+        public CodeStepEntry<P> dependencies(List<String> deps)  { this.dependencies = deps; return this; }
+
+        public P end() {
+
+            sink.add(new WorkflowStepCode<>(stepName, slug, input, dependencies));
+
+            return parent;
         }
     }
 }

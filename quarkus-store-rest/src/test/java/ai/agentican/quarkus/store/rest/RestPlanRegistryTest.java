@@ -33,10 +33,7 @@ class RestPlanRegistryTest {
     private static WorkflowDefinition samplePlan(String name) {
 
         return WorkflowDefinition.builder(name, name)
-                .step(WorkflowStepAgent.builder("do")
-                        .agent("analyst")
-                        .instructions("do the thing")
-                        .build())
+                .step().name("do").agent("analyst").instructions("do the thing").end()
                 .build();
     }
 

@@ -4,8 +4,6 @@ import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
-import ai.agentican.framework.orchestration.model.WorkflowParam;
-import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 
 import org.junit.jupiter.api.Test;
 
@@ -38,12 +36,11 @@ class AgenticanTypedTest {
                 .build()) {
 
             var plan = WorkflowDefinition.builder("triage", "triage")
-                    .param(new WorkflowParam("customer_id", "Customer ID", null, true))
-                    .param(new WorkflowParam("priority", "Priority", "NORMAL", false))
-                    .step(WorkflowStepAgent.builder("classify")
-                            .agent("triage")
+                    .param().name("customer_id").description("Customer ID").required(true).end()
+                    .param().name("priority").description("Priority").defaultValue("NORMAL").end()
+                    .step().name("classify").agent("triage")
                             .instructions("Triage customer {{param.customer_id}} priority {{param.priority}}")
-                            .build())
+                            .end()
                     .build();
 
             Workflow<TriageParams, Void> triage = runtime.workflow(plan).input(TriageParams.class).build();
@@ -74,12 +71,11 @@ class AgenticanTypedTest {
                 .build()) {
 
             var plan = WorkflowDefinition.builder("triage-by-name", "triage-by-name")
-                    .param(new WorkflowParam("customer_id", "Customer ID", null, true))
-                    .param(new WorkflowParam("priority", "Priority", "NORMAL", false))
-                    .step(WorkflowStepAgent.builder("classify")
-                            .agent("triage")
+                    .param().name("customer_id").description("Customer ID").required(true).end()
+                    .param().name("priority").description("Priority").defaultValue("NORMAL").end()
+                    .step().name("classify").agent("triage")
                             .instructions("Triage {{param.customer_id}} priority {{param.priority}}")
-                            .build())
+                            .end()
                     .build();
 
             runtime.registry().workflows().register(plan);
@@ -127,12 +123,11 @@ class AgenticanTypedTest {
                 .build()) {
 
             var plan = WorkflowDefinition.builder("late-definition", "late-definition")
-                    .param(new WorkflowParam("customer_id", "Customer ID", null, true))
-                    .param(new WorkflowParam("priority", "Priority", "NORMAL", false))
-                    .step(WorkflowStepAgent.builder("classify")
-                            .agent("triage")
+                    .param().name("customer_id").description("Customer ID").required(true).end()
+                    .param().name("priority").description("Priority").defaultValue("NORMAL").end()
+                    .step().name("classify").agent("triage")
                             .instructions("Late-registered run with {{param.customer_id}}")
-                            .build())
+                            .end()
                     .build();
 
             runtime.registry().workflows().register(plan);
@@ -163,10 +158,9 @@ class AgenticanTypedTest {
                 .build()) {
 
             var plan = WorkflowDefinition.builder("no-params", "no-params")
-                    .step(WorkflowStepAgent.builder("do")
-                            .agent("noparam")
+                    .step().name("do").agent("noparam")
                             .instructions("Run without params")
-                            .build())
+                            .end()
                     .build();
 
             Workflow<Void, Void> invoker = runtime.workflow(plan).input(Void.class).build();
@@ -195,11 +189,10 @@ class AgenticanTypedTest {
                 .build()) {
 
             var plan = WorkflowDefinition.builder("map-definition", "map-definition")
-                    .param(new WorkflowParam("customer_id", "Customer ID", null, true))
-                    .step(WorkflowStepAgent.builder("do")
-                            .agent("triage")
+                    .param().name("customer_id").description("Customer ID").required(true).end()
+                    .step().name("do").agent("triage")
                             .instructions("Map-based {{param.customer_id}}")
-                            .build())
+                            .end()
                     .build();
 
             @SuppressWarnings({"rawtypes", "unchecked"})
@@ -231,11 +224,10 @@ class AgenticanTypedTest {
             record AccountParams(String accountId) {}
 
             var plan = WorkflowDefinition.builder("acct-definition", "acct-definition")
-                    .param(new WorkflowParam("account_id", "Account ID", null, true))
-                    .step(WorkflowStepAgent.builder("do")
-                            .agent("acct")
+                    .param().name("account_id").description("Account ID").required(true).end()
+                    .step().name("do").agent("acct")
                             .instructions("Snake params {{param.account_id}}")
-                            .build())
+                            .end()
                     .build();
 
             Workflow<AccountParams, Void> invoker = runtime.workflow(plan).input(AccountParams.class).build();
@@ -268,11 +260,10 @@ class AgenticanTypedTest {
                 .build()) {
 
             var plan = WorkflowDefinition.builder("typed-triage", "typed-triage")
-                    .param(new WorkflowParam("customer_id", "Customer ID", null, true))
-                    .step(WorkflowStepAgent.builder("classify")
-                            .agent("triage")
+                    .param().name("customer_id").description("Customer ID").required(true).end()
+                    .step().name("classify").agent("triage")
                             .instructions("Respond JSON for {{param.customer_id}}")
-                            .build())
+                            .end()
                     .build();
 
             Workflow<TriageParams, TriageOutput> triage =
@@ -305,10 +296,9 @@ class AgenticanTypedTest {
                 .build()) {
 
             var plan = WorkflowDefinition.builder("bad-output", "bad-output")
-                    .step(WorkflowStepAgent.builder("classify")
-                            .agent("triage")
+                    .step().name("classify").agent("triage")
                             .instructions("respond")
-                            .build())
+                            .end()
                     .build();
 
             Workflow<Void, TriageOutput> triage =
@@ -335,9 +325,9 @@ class AgenticanTypedTest {
                 .build()) {
 
             var plan = WorkflowDefinition.builder("multi", "multi")
-                    .step(WorkflowStepAgent.builder("a").agent("triage").instructions("a").build())
-                    .step(WorkflowStepAgent.builder("b").agent("triage").instructions("b")
-                            .dependencies(java.util.List.of("a")).build())
+                    .step().name("a").agent("triage").instructions("a").end()
+                    .step().name("b").agent("triage").instructions("b")
+                            .dependencies("a").end()
                     .build();
 
             assertThrows(IllegalStateException.class,
@@ -369,10 +359,9 @@ class AgenticanTypedTest {
                 .build()) {
 
             var plan = WorkflowDefinition.builder("schema-injection", "schema-injection")
-                    .step(WorkflowStepAgent.builder("classify")
-                            .agent("triage")
+                    .step().name("classify").agent("triage")
                             .instructions("Classify this")
-                            .build())
+                            .end()
                     .build();
 
             Workflow<Void, TriageOutput> triage =
@@ -413,7 +402,7 @@ class AgenticanTypedTest {
                 .build()) {
 
             var plan = WorkflowDefinition.builder("no-schema", "no-schema")
-                    .step(WorkflowStepAgent.builder("do").agent("triage").instructions("go").build())
+                    .step().name("do").agent("triage").instructions("go").end()
                     .build();
 
             Workflow<Void, Void> invoker = runtime.workflow(plan).input(Void.class).output(Void.class).build();
@@ -452,9 +441,9 @@ class AgenticanTypedTest {
 
             var plan = WorkflowDefinition.builder("multi", "multi")
                     .outputStep("b")
-                    .step(WorkflowStepAgent.builder("a").agent("triage").instructions("a").build())
-                    .step(WorkflowStepAgent.builder("b").agent("triage").instructions("b")
-                            .dependencies(java.util.List.of("a")).build())
+                    .step().name("a").agent("triage").instructions("a").end()
+                    .step().name("b").agent("triage").instructions("b")
+                            .dependencies("a").end()
                     .build();
 
             Workflow<Void, TriageOutput> triage =

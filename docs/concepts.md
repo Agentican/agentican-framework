@@ -111,10 +111,12 @@ Chain `.input(P.class)` (required), then `.output(R.class)` (optional; defaults 
 ```java
 WorkflowDefinition.builder("triage", "Triage")
     .outputStep("classify")     // ← which step's output IS the plan's output
-    .step(...)
-    .step(WorkflowStepAgent.builder("classify").agent("triage")
-            .instructions("Respond with JSON: {classification, reason}")
-            .build())
+    .step().name("gather").agent("researcher").instructions("Gather context").end()
+    .step()
+        .name("classify").agent("triage")
+        .instructions("Respond with JSON: {classification, reason}")
+        .dependencies("gather")
+        .end()
     .build();
 ```
 

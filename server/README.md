@@ -101,19 +101,21 @@ Defaults live in `src/main/resources/application.properties`:
 
 Override any of it via environment variables or your own `application.properties`.
 
-### Adding agents, skills, or plans via config
+### Adding agents, skills, or workflows via config
 
-Config-declared agents and skills require a stable `external-id` — the business key that maps the logical item to its DB catalog row across deploys. Without it, the server refuses to boot.
+Config-declared agents, skills, and workflows require a stable `id` — the business key that maps the logical item to its DB catalog row across deploys. Without it, the framework refuses to boot.
 
 ```properties
+agentican.agents[0].id=researcher
 agentican.agents[0].name=researcher
 agentican.agents[0].role=Expert at finding information
 
+agentican.skills[0].id=source-triangulation
 agentican.skills[0].name=Source Triangulation
 agentican.skills[0].instructions=Cross-verify claims against ≥3 independent primary sources.
 ```
 
-Planner-generated agents and skills legitimately have no `external-id` — only user-declared entries require it.
+The planner generates `id`s for any agent, skill, or workflow it manufactures from a natural-language task — they're slug-style and stable across registry lookups.
 
 ## REST API
 

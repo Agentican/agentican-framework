@@ -34,10 +34,10 @@ public record WorkflowPlanned(
         var builder = WorkflowDefinition.builder(workflowId, name).description(description);
 
         if (params != null)
-            params.forEach(p -> builder.param(p.toWorkflowParam()));
+            builder.params(params.stream().map(WorkflowConfig.PlanParamConfig::toWorkflowParam).toList());
 
         if (steps != null)
-            steps.forEach(s -> builder.step(s.toWorkflowStep()));
+            builder.steps(steps.stream().map(WorkflowConfig.PlanStepConfig::toWorkflowStep).toList());
 
         var resolvedAgents = agents == null ? List.<AgentConfig>of()
                 : agents.stream().map(PlannedAgent::toAgentConfig).toList();

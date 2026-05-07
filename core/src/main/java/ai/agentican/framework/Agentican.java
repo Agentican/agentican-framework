@@ -60,7 +60,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.function.Consumer;
 
 public class Agentican implements AutoCloseable {
 
@@ -679,33 +678,228 @@ public class Agentican implements AutoCloseable {
 
                     WorkflowEntry() {}
 
-                    public WorkflowEntry id(String id)                                  { delegate.id(id); return this; }
-                    public WorkflowEntry name(String name)                              { delegate.name(name); return this; }
-                    public WorkflowEntry description(String description)                { delegate.description(description); return this; }
-                    public WorkflowEntry outputStep(String stepName)                    { delegate.outputStep(stepName); return this; }
+                    public WorkflowEntry id(String id)                          { delegate.id(id); return this; }
+                    public WorkflowEntry name(String name)                      { delegate.name(name); return this; }
+                    public WorkflowEntry description(String description)        { delegate.description(description); return this; }
+                    public WorkflowEntry outputStep(String stepName)            { delegate.outputStep(stepName); return this; }
 
-                    public WorkflowEntry param(WorkflowConfig.PlanParamConfig param)    { delegate.param(param); return this; }
-                    public WorkflowEntry param(String name, String description, String defaultValue, boolean required) {
-                        delegate.param(name, description, defaultValue, required);
-                        return this;
-                    }
-
-                    public WorkflowEntry step(WorkflowConfig.PlanStepConfig step)       { delegate.step(step); return this; }
-                    public WorkflowEntry steps(List<WorkflowConfig.PlanStepConfig> steps) { delegate.steps(steps); return this; }
-                    public WorkflowEntry step(String name, Consumer<WorkflowConfig.StepBuilder> config) {
-                        delegate.step(name, config);
-                        return this;
-                    }
-                    public WorkflowEntry loop(String name, Consumer<WorkflowConfig.LoopBuilder> config) {
-                        delegate.loop(name, config);
-                        return this;
-                    }
-                    public WorkflowEntry branch(String name, Consumer<WorkflowConfig.BranchBuilder> config) {
-                        delegate.branch(name, config);
-                        return this;
-                    }
+                    public ParamEntry param()       { return new ParamEntry(); }
+                    public StepEntry step()         { return new StepEntry(); }
+                    public LoopEntry loop()         { return new LoopEntry(); }
+                    public BranchEntry branch()     { return new BranchEntry(); }
 
                     public Api end() { workflows.add(delegate.build()); return Api.this; }
+
+                    public final class ParamEntry {
+
+                        private final WorkflowConfig.WorkflowConfigBuilder.ParamEntry inner = delegate.param();
+
+                        ParamEntry() {}
+
+                        public ParamEntry name(String name)                 { inner.name(name); return this; }
+                        public ParamEntry description(String description)   { inner.description(description); return this; }
+                        public ParamEntry defaultValue(String defaultValue) { inner.defaultValue(defaultValue); return this; }
+                        public ParamEntry required(boolean required)        { inner.required(required); return this; }
+
+                        public WorkflowEntry end() { inner.end(); return WorkflowEntry.this; }
+                    }
+
+                    public final class StepEntry {
+
+                        private final WorkflowConfig.StepEntry<WorkflowConfig.WorkflowConfigBuilder> inner = delegate.step();
+
+                        StepEntry() {}
+
+                        public StepEntry name(String name)              { inner.name(name); return this; }
+                        public AgentStepEntry agent(String agent)       { return new AgentStepEntry(inner.agent(agent)); }
+                        public CodeStepEntry code(String slug)          { return new CodeStepEntry(inner.code(slug)); }
+                    }
+
+                    public final class AgentStepEntry {
+
+                        private final WorkflowConfig.AgentStepEntry<WorkflowConfig.WorkflowConfigBuilder> inner;
+
+                        AgentStepEntry(WorkflowConfig.AgentStepEntry<WorkflowConfig.WorkflowConfigBuilder> inner) { this.inner = inner; }
+
+                        public AgentStepEntry instructions(String instructions) { inner.instructions(instructions); return this; }
+                        public AgentStepEntry dependencies(String... deps)      { inner.dependencies(deps); return this; }
+                        public AgentStepEntry dependencies(List<String> deps)   { inner.dependencies(deps); return this; }
+                        public AgentStepEntry skills(String... skills)          { inner.skills(skills); return this; }
+                        public AgentStepEntry skills(List<String> skills)       { inner.skills(skills); return this; }
+                        public AgentStepEntry tools(String... tools)            { inner.tools(tools); return this; }
+                        public AgentStepEntry tools(List<String> tools)         { inner.tools(tools); return this; }
+                        public AgentStepEntry hitl(boolean hitl)                { inner.hitl(hitl); return this; }
+                        public AgentStepEntry hitl()                            { inner.hitl(); return this; }
+
+                        public WorkflowEntry end() { inner.end(); return WorkflowEntry.this; }
+                    }
+
+                    public final class CodeStepEntry {
+
+                        private final WorkflowConfig.CodeStepEntry<WorkflowConfig.WorkflowConfigBuilder> inner;
+
+                        CodeStepEntry(WorkflowConfig.CodeStepEntry<WorkflowConfig.WorkflowConfigBuilder> inner) { this.inner = inner; }
+
+                        public <I> CodeStepEntry input(I input)              { inner.input(input); return this; }
+                        public CodeStepEntry dependencies(String... deps)    { inner.dependencies(deps); return this; }
+                        public CodeStepEntry dependencies(List<String> deps) { inner.dependencies(deps); return this; }
+
+                        public WorkflowEntry end() { inner.end(); return WorkflowEntry.this; }
+                    }
+
+                    public final class LoopEntry {
+
+                        private final WorkflowConfig.WorkflowConfigBuilder.LoopEntry inner = delegate.loop();
+
+                        LoopEntry() {}
+
+                        public LoopEntry name(String name)                  { inner.name(name); return this; }
+                        public LoopEntry over(String stepName)              { inner.over(stepName); return this; }
+                        public LoopEntry dependencies(String... deps)       { inner.dependencies(deps); return this; }
+                        public LoopEntry dependencies(List<String> deps)    { inner.dependencies(deps); return this; }
+                        public LoopEntry hitl(boolean hitl)                 { inner.hitl(hitl); return this; }
+                        public LoopEntry hitl()                             { inner.hitl(); return this; }
+
+                        public LoopStepEntry step() { return new LoopStepEntry(inner.step()); }
+
+                        public WorkflowEntry end() { inner.end(); return WorkflowEntry.this; }
+
+                        public final class LoopStepEntry {
+
+                            private final WorkflowConfig.StepEntry<WorkflowConfig.WorkflowConfigBuilder.LoopEntry> innerStep;
+
+                            LoopStepEntry(WorkflowConfig.StepEntry<WorkflowConfig.WorkflowConfigBuilder.LoopEntry> innerStep) {
+                                this.innerStep = innerStep;
+                            }
+
+                            public LoopStepEntry name(String name)                  { innerStep.name(name); return this; }
+                            public LoopAgentStepEntry agent(String agent)           { return new LoopAgentStepEntry(innerStep.agent(agent)); }
+                            public LoopCodeStepEntry code(String slug)              { return new LoopCodeStepEntry(innerStep.code(slug)); }
+                        }
+
+                        public final class LoopAgentStepEntry {
+
+                            private final WorkflowConfig.AgentStepEntry<WorkflowConfig.WorkflowConfigBuilder.LoopEntry> innerStep;
+
+                            LoopAgentStepEntry(WorkflowConfig.AgentStepEntry<WorkflowConfig.WorkflowConfigBuilder.LoopEntry> innerStep) {
+                                this.innerStep = innerStep;
+                            }
+
+                            public LoopAgentStepEntry instructions(String instructions) { innerStep.instructions(instructions); return this; }
+                            public LoopAgentStepEntry dependencies(String... deps)      { innerStep.dependencies(deps); return this; }
+                            public LoopAgentStepEntry dependencies(List<String> deps)   { innerStep.dependencies(deps); return this; }
+                            public LoopAgentStepEntry skills(String... skills)          { innerStep.skills(skills); return this; }
+                            public LoopAgentStepEntry skills(List<String> skills)       { innerStep.skills(skills); return this; }
+                            public LoopAgentStepEntry tools(String... tools)            { innerStep.tools(tools); return this; }
+                            public LoopAgentStepEntry tools(List<String> tools)         { innerStep.tools(tools); return this; }
+                            public LoopAgentStepEntry hitl(boolean hitl)                { innerStep.hitl(hitl); return this; }
+                            public LoopAgentStepEntry hitl()                            { innerStep.hitl(); return this; }
+
+                            public LoopEntry end() { innerStep.end(); return LoopEntry.this; }
+                        }
+
+                        public final class LoopCodeStepEntry {
+
+                            private final WorkflowConfig.CodeStepEntry<WorkflowConfig.WorkflowConfigBuilder.LoopEntry> innerStep;
+
+                            LoopCodeStepEntry(WorkflowConfig.CodeStepEntry<WorkflowConfig.WorkflowConfigBuilder.LoopEntry> innerStep) {
+                                this.innerStep = innerStep;
+                            }
+
+                            public <I> LoopCodeStepEntry input(I input)              { innerStep.input(input); return this; }
+                            public LoopCodeStepEntry dependencies(String... deps)    { innerStep.dependencies(deps); return this; }
+                            public LoopCodeStepEntry dependencies(List<String> deps) { innerStep.dependencies(deps); return this; }
+
+                            public LoopEntry end() { innerStep.end(); return LoopEntry.this; }
+                        }
+                    }
+
+                    public final class BranchEntry {
+
+                        private final WorkflowConfig.WorkflowConfigBuilder.BranchEntry inner = delegate.branch();
+
+                        BranchEntry() {}
+
+                        public BranchEntry name(String name)                { inner.name(name); return this; }
+                        public BranchEntry from(String stepName)            { inner.from(stepName); return this; }
+                        public BranchEntry defaultPath(String pathName)     { inner.defaultPath(pathName); return this; }
+                        public BranchEntry dependencies(String... deps)     { inner.dependencies(deps); return this; }
+                        public BranchEntry dependencies(List<String> deps)  { inner.dependencies(deps); return this; }
+                        public BranchEntry hitl(boolean hitl)               { inner.hitl(hitl); return this; }
+                        public BranchEntry hitl()                           { inner.hitl(); return this; }
+
+                        public PathEntry path() { return new PathEntry(inner.path()); }
+
+                        public WorkflowEntry end() { inner.end(); return WorkflowEntry.this; }
+
+                        public final class PathEntry {
+
+                            private final WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry innerPath;
+
+                            PathEntry(WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry innerPath) { this.innerPath = innerPath; }
+
+                            public PathEntry name(String name)              { innerPath.name(name); return this; }
+                            public PathEntry agent(String agent)            { innerPath.agent(agent); return this; }
+                            public PathEntry instructions(String instr)     { innerPath.instructions(instr); return this; }
+                            public PathEntry tools(String... tools)         { innerPath.tools(tools); return this; }
+                            public PathEntry tools(List<String> tools)      { innerPath.tools(tools); return this; }
+                            public PathEntry skills(String... skills)       { innerPath.skills(skills); return this; }
+                            public PathEntry skills(List<String> skills)    { innerPath.skills(skills); return this; }
+
+                            public PathStepEntry step() { return new PathStepEntry(innerPath.step()); }
+
+                            public BranchEntry end() { innerPath.end(); return BranchEntry.this; }
+
+                            public final class PathStepEntry {
+
+                                private final WorkflowConfig.StepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep;
+
+                                PathStepEntry(WorkflowConfig.StepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep) {
+                                    this.innerStep = innerStep;
+                                }
+
+                                public PathStepEntry name(String name)              { innerStep.name(name); return this; }
+                                public PathAgentStepEntry agent(String agent)       { return new PathAgentStepEntry(innerStep.agent(agent)); }
+                                public PathCodeStepEntry code(String slug)          { return new PathCodeStepEntry(innerStep.code(slug)); }
+                            }
+
+                            public final class PathAgentStepEntry {
+
+                                private final WorkflowConfig.AgentStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep;
+
+                                PathAgentStepEntry(WorkflowConfig.AgentStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep) {
+                                    this.innerStep = innerStep;
+                                }
+
+                                public PathAgentStepEntry instructions(String instructions) { innerStep.instructions(instructions); return this; }
+                                public PathAgentStepEntry dependencies(String... deps)      { innerStep.dependencies(deps); return this; }
+                                public PathAgentStepEntry dependencies(List<String> deps)   { innerStep.dependencies(deps); return this; }
+                                public PathAgentStepEntry skills(String... skills)          { innerStep.skills(skills); return this; }
+                                public PathAgentStepEntry skills(List<String> skills)       { innerStep.skills(skills); return this; }
+                                public PathAgentStepEntry tools(String... tools)            { innerStep.tools(tools); return this; }
+                                public PathAgentStepEntry tools(List<String> tools)         { innerStep.tools(tools); return this; }
+                                public PathAgentStepEntry hitl(boolean hitl)                { innerStep.hitl(hitl); return this; }
+                                public PathAgentStepEntry hitl()                            { innerStep.hitl(); return this; }
+
+                                public PathEntry end() { innerStep.end(); return PathEntry.this; }
+                            }
+
+                            public final class PathCodeStepEntry {
+
+                                private final WorkflowConfig.CodeStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep;
+
+                                PathCodeStepEntry(WorkflowConfig.CodeStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep) {
+                                    this.innerStep = innerStep;
+                                }
+
+                                public <I> PathCodeStepEntry input(I input)              { innerStep.input(input); return this; }
+                                public PathCodeStepEntry dependencies(String... deps)    { innerStep.dependencies(deps); return this; }
+                                public PathCodeStepEntry dependencies(List<String> deps) { innerStep.dependencies(deps); return this; }
+
+                                public PathEntry end() { innerStep.end(); return PathEntry.this; }
+                            }
+                        }
+                    }
                 }
             }
 

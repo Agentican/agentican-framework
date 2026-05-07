@@ -8,7 +8,6 @@ import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.store.WorkflowRunStoreMemory;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
-import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 import ai.agentican.framework.registry.ToolkitRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -51,11 +50,12 @@ class TaskRunnerLoopTest {
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("loop-task", "loop-task")
-                .step("produce", "producer-agent", "Produce a JSON array")
-                .loop("loop-step", loop -> loop
+                .step().name("produce").agent("producer-agent").instructions("Produce a JSON array").end()
+                .loop()
+                        .name("loop-step")
                         .over("produce")
-                        .step(new WorkflowStepAgent("process", "body-agent",
-                                "Process {{item.name}}", null, false, null, null)))
+                        .step().name("process").agent("body-agent").instructions("Process {{item.name}}").end()
+                        .end()
                 .build();
 
         var result = runner.run(task);
@@ -81,11 +81,12 @@ class TaskRunnerLoopTest {
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("empty-loop-task", "empty-loop-task")
-                .step("produce", "producer-agent", "Produce an empty array")
-                .loop("loop-step", loop -> loop
+                .step().name("produce").agent("producer-agent").instructions("Produce an empty array").end()
+                .loop()
+                        .name("loop-step")
                         .over("produce")
-                        .step(new WorkflowStepAgent("process", "body-agent",
-                                "Process {{item}}", null, false, null, null)))
+                        .step().name("process").agent("body-agent").instructions("Process {{item}}").end()
+                        .end()
                 .build();
 
         var result = runner.run(task);
@@ -112,11 +113,13 @@ class TaskRunnerLoopTest {
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("placeholder-loop-task", "placeholder-loop-task")
-                .step("produce", "producer-agent", "Produce items")
-                .loop("loop-step", loop -> loop
+                .step().name("produce").agent("producer-agent").instructions("Produce items").end()
+                .loop()
+                        .name("loop-step")
                         .over("produce")
-                        .step(new WorkflowStepAgent("process", "body-agent",
-                                "Process item {{item.id}} titled {{item.title}}", null, false, null, null)))
+                        .step().name("process").agent("body-agent")
+                                .instructions("Process item {{item.id}} titled {{item.title}}").end()
+                        .end()
                 .build();
 
         var result = runner.run(task);
@@ -142,11 +145,13 @@ class TaskRunnerLoopTest {
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("aggregate-loop-task", "aggregate-loop-task")
-                .step("produce", "producer-agent", "Produce items")
-                .loop("loop-step", loop -> loop
+                .step().name("produce").agent("producer-agent").instructions("Produce items").end()
+                .loop()
+                        .name("loop-step")
                         .over("produce")
-                        .step(new WorkflowStepAgent("process", "body-agent",
-                                "Process item {{item.id}}", null, false, null, null)))
+                        .step().name("process").agent("body-agent")
+                                .instructions("Process item {{item.id}}").end()
+                        .end()
                 .build();
 
         var result = runner.run(task);
@@ -171,11 +176,12 @@ class TaskRunnerLoopTest {
         var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("missing-upstream-task", "missing-upstream-task")
-                .step("produce", "producer-agent", "Produce something")
-                .loop("loop-step", loop -> loop
+                .step().name("produce").agent("producer-agent").instructions("Produce something").end()
+                .loop()
+                        .name("loop-step")
                         .over("nonexistent")
-                        .step(new WorkflowStepAgent("process", "body-agent",
-                                "Process {{item}}", null, false, null, null)))
+                        .step().name("process").agent("body-agent").instructions("Process {{item}}").end()
+                        .end()
                 .build();
 
         var result = runner.run(task);

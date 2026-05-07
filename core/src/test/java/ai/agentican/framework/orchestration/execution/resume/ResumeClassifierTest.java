@@ -206,8 +206,7 @@ class ResumeClassifierTest {
     private static WorkflowDefinition fakePlan() {
 
         return WorkflowDefinition.builder("t", "t").description("")
-                .step(new WorkflowStepAgent("research", "researcher", "do it",
-                        List.of(), false, List.of(), List.of()))
+                .step().name("research").agent("researcher").instructions("do it").end()
                 .build();
     }
 
