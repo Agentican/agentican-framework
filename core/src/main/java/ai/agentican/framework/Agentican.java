@@ -822,81 +822,75 @@ public class Agentican implements AutoCloseable {
 
                         public BranchEntry name(String name)                { inner.name(name); return this; }
                         public BranchEntry from(String stepName)            { inner.from(stepName); return this; }
-                        public BranchEntry defaultPath(String pathName)     { inner.defaultPath(pathName); return this; }
+                        public BranchEntry defaultBranch(String branchName) { inner.defaultBranch(branchName); return this; }
                         public BranchEntry dependencies(String... deps)     { inner.dependencies(deps); return this; }
                         public BranchEntry dependencies(List<String> deps)  { inner.dependencies(deps); return this; }
                         public BranchEntry hitl(boolean hitl)               { inner.hitl(hitl); return this; }
                         public BranchEntry hitl()                           { inner.hitl(); return this; }
 
-                        public PathEntry path() { return new PathEntry(inner.path()); }
+                        public Branch branch() { return new Branch(inner.branch()); }
 
                         public WorkflowEntry end() { inner.end(); return WorkflowEntry.this; }
 
-                        public final class PathEntry {
+                        public final class Branch {
 
-                            private final WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry innerPath;
+                            private final WorkflowConfig.WorkflowConfigBuilder.BranchEntry.Branch innerBranch;
 
-                            PathEntry(WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry innerPath) { this.innerPath = innerPath; }
+                            Branch(WorkflowConfig.WorkflowConfigBuilder.BranchEntry.Branch innerBranch) { this.innerBranch = innerBranch; }
 
-                            public PathEntry name(String name)              { innerPath.name(name); return this; }
-                            public PathEntry agent(String agent)            { innerPath.agent(agent); return this; }
-                            public PathEntry instructions(String instr)     { innerPath.instructions(instr); return this; }
-                            public PathEntry tools(String... tools)         { innerPath.tools(tools); return this; }
-                            public PathEntry tools(List<String> tools)      { innerPath.tools(tools); return this; }
-                            public PathEntry skills(String... skills)       { innerPath.skills(skills); return this; }
-                            public PathEntry skills(List<String> skills)    { innerPath.skills(skills); return this; }
+                            public Branch name(String name) { innerBranch.name(name); return this; }
 
-                            public PathStepEntry step() { return new PathStepEntry(innerPath.step()); }
+                            public BranchStepEntry step() { return new BranchStepEntry(innerBranch.step()); }
 
-                            public BranchEntry end() { innerPath.end(); return BranchEntry.this; }
+                            public BranchEntry end() { innerBranch.end(); return BranchEntry.this; }
 
-                            public final class PathStepEntry {
+                            public final class BranchStepEntry {
 
-                                private final WorkflowConfig.StepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep;
+                                private final WorkflowConfig.StepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.Branch> innerStep;
 
-                                PathStepEntry(WorkflowConfig.StepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep) {
+                                BranchStepEntry(WorkflowConfig.StepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.Branch> innerStep) {
                                     this.innerStep = innerStep;
                                 }
 
-                                public PathStepEntry name(String name)              { innerStep.name(name); return this; }
-                                public PathAgentStepEntry agent(String agent)       { return new PathAgentStepEntry(innerStep.agent(agent)); }
-                                public PathCodeStepEntry code(String slug)          { return new PathCodeStepEntry(innerStep.code(slug)); }
+                                public BranchStepEntry name(String name)            { innerStep.name(name); return this; }
+                                public BranchAgentStepEntry agent(String agent)     { return new BranchAgentStepEntry(innerStep.agent(agent)); }
+                                public BranchCodeStepEntry code(String slug)        { return new BranchCodeStepEntry(innerStep.code(slug)); }
                             }
 
-                            public final class PathAgentStepEntry {
+                            public final class BranchAgentStepEntry {
 
-                                private final WorkflowConfig.AgentStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep;
+                                private final WorkflowConfig.AgentStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.Branch> innerStep;
 
-                                PathAgentStepEntry(WorkflowConfig.AgentStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep) {
+                                BranchAgentStepEntry(WorkflowConfig.AgentStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.Branch> innerStep) {
                                     this.innerStep = innerStep;
                                 }
 
-                                public PathAgentStepEntry instructions(String instructions) { innerStep.instructions(instructions); return this; }
-                                public PathAgentStepEntry dependencies(String... deps)      { innerStep.dependencies(deps); return this; }
-                                public PathAgentStepEntry dependencies(List<String> deps)   { innerStep.dependencies(deps); return this; }
-                                public PathAgentStepEntry skills(String... skills)          { innerStep.skills(skills); return this; }
-                                public PathAgentStepEntry skills(List<String> skills)       { innerStep.skills(skills); return this; }
-                                public PathAgentStepEntry tools(String... tools)            { innerStep.tools(tools); return this; }
-                                public PathAgentStepEntry tools(List<String> tools)         { innerStep.tools(tools); return this; }
-                                public PathAgentStepEntry hitl(boolean hitl)                { innerStep.hitl(hitl); return this; }
-                                public PathAgentStepEntry hitl()                            { innerStep.hitl(); return this; }
+                                public BranchAgentStepEntry instructions(String instructions) { innerStep.instructions(instructions); return this; }
+                                public BranchAgentStepEntry dependencies(String... deps)      { innerStep.dependencies(deps); return this; }
+                                public BranchAgentStepEntry dependencies(List<String> deps)   { innerStep.dependencies(deps); return this; }
+                                public BranchAgentStepEntry skills(String... skills)          { innerStep.skills(skills); return this; }
+                                public BranchAgentStepEntry skills(List<String> skills)       { innerStep.skills(skills); return this; }
+                                public BranchAgentStepEntry tools(String... tools)            { innerStep.tools(tools); return this; }
+                                public BranchAgentStepEntry tools(List<String> tools)         { innerStep.tools(tools); return this; }
+                                public BranchAgentStepEntry hitl(boolean hitl)                { innerStep.hitl(hitl); return this; }
+                                public BranchAgentStepEntry hitl()                            { innerStep.hitl(); return this; }
 
-                                public PathEntry end() { innerStep.end(); return PathEntry.this; }
+                                public Branch end() { innerStep.end(); return Branch.this; }
                             }
 
-                            public final class PathCodeStepEntry {
+                            public final class BranchCodeStepEntry {
 
-                                private final WorkflowConfig.CodeStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep;
+                                private final WorkflowConfig.CodeStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.Branch> innerStep;
 
-                                PathCodeStepEntry(WorkflowConfig.CodeStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.PathEntry> innerStep) {
+                                BranchCodeStepEntry(WorkflowConfig.CodeStepEntry<WorkflowConfig.WorkflowConfigBuilder.BranchEntry.Branch> innerStep) {
                                     this.innerStep = innerStep;
                                 }
 
-                                public <I> PathCodeStepEntry input(I input)              { innerStep.input(input); return this; }
-                                public PathCodeStepEntry dependencies(String... deps)    { innerStep.dependencies(deps); return this; }
-                                public PathCodeStepEntry dependencies(List<String> deps) { innerStep.dependencies(deps); return this; }
+                                public <I> BranchCodeStepEntry input(I input)              { innerStep.input(input); return this; }
+                                public BranchCodeStepEntry dependencies(String... deps)    { innerStep.dependencies(deps); return this; }
+                                public BranchCodeStepEntry dependencies(List<String> deps) { innerStep.dependencies(deps); return this; }
 
-                                public PathEntry end() { innerStep.end(); return PathEntry.this; }
+                                public Branch end() { innerStep.end(); return Branch.this; }
                             }
                         }
                     }

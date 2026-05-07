@@ -125,47 +125,47 @@ public record WorkflowDefinition(
 
         public final class BranchEntry {
 
-            private String branchName;
+            private String branchStepName;
             private String from;
-            private String defaultPath;
+            private String defaultBranch;
             private List<String> dependencies = List.of();
             private boolean hitl;
 
-            private final List<WorkflowStepBranch.Path> paths = new ArrayList<>();
+            private final List<WorkflowStepBranch.Branch> branches = new ArrayList<>();
 
             BranchEntry() {}
 
-            public BranchEntry name(String name)                { this.branchName = name; return this; }
+            public BranchEntry name(String name)                { this.branchStepName = name; return this; }
             public BranchEntry from(String stepName)            { this.from = stepName; return this; }
-            public BranchEntry defaultPath(String pathName)     { this.defaultPath = pathName; return this; }
+            public BranchEntry defaultBranch(String branchName) { this.defaultBranch = branchName; return this; }
             public BranchEntry dependencies(String... deps)     { this.dependencies = List.of(deps); return this; }
             public BranchEntry dependencies(List<String> deps)  { this.dependencies = deps; return this; }
             public BranchEntry hitl(boolean hitl)               { this.hitl = hitl; return this; }
             public BranchEntry hitl()                           { this.hitl = true; return this; }
 
-            public PathEntry path() { return new PathEntry(); }
+            public Branch branch() { return new Branch(); }
 
             public Builder end() {
 
-                steps.add(new WorkflowStepBranch(branchName, from, paths, defaultPath, dependencies, hitl));
+                steps.add(new WorkflowStepBranch(branchStepName, from, branches, defaultBranch, dependencies, hitl));
 
                 return Builder.this;
             }
 
-            public final class PathEntry {
+            public final class Branch {
 
-                private String pathName;
+                private String branchName;
                 private final List<WorkflowStep> bodySteps = new ArrayList<>();
 
-                PathEntry() {}
+                Branch() {}
 
-                public PathEntry name(String name) { this.pathName = name; return this; }
+                public Branch name(String name) { this.branchName = name; return this; }
 
-                public StepEntry<PathEntry> step() { return new StepEntry<>(this, bodySteps); }
+                public StepEntry<Branch> step() { return new StepEntry<>(this, bodySteps); }
 
                 public BranchEntry end() {
 
-                    paths.add(new WorkflowStepBranch.Path(pathName, bodySteps));
+                    branches.add(new WorkflowStepBranch.Branch(branchName, bodySteps));
 
                     return BranchEntry.this;
                 }

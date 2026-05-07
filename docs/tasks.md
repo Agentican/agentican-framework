@@ -102,17 +102,17 @@ The `shared_context` key (and any other top-level keys) gets merged into each it
 
 ### WorkflowStepBranch
 
-Conditionally executes one of several paths based on an upstream step's output.
+Conditionally executes one of several branches based on an upstream step's output. Each branch is a named DAG of steps.
 
 ```java
 new WorkflowStepBranch(
     "route",                         // step name
     "classify",                      // 'from' — name of producer step
     List.of(
-        new WorkflowStepBranch.Path("urgent", urgentBody),
-        new WorkflowStepBranch.Path("normal", normalBody)
+        new WorkflowStepBranch.Branch("urgent", urgentSteps),
+        new WorkflowStepBranch.Branch("normal", normalSteps)
     ),
-    "normal",                        // defaultPath (optional)
+    "normal",                        // defaultBranch (optional)
     List.of(),                       // dependencies
     false                            // hitl
 );
@@ -120,11 +120,11 @@ new WorkflowStepBranch(
 
 For plan-level construction the `WorkflowConfig.builder().branch(...)` sub-builder is typically cleaner (see [Building Plans Manually](#building-plans-manually)).
 
-The producer's output is matched against path names with these strategies (in order):
+The producer's output is matched against branch names with these strategies (in order):
 1. Exact match (case-insensitive)
 2. Substring match (case-insensitive)
 3. JSON array — first element matched
-4. Default path
+4. Default branch
 
 ### WorkflowStepCode\<I\>
 

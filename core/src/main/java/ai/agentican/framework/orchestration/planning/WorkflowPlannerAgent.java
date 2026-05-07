@@ -238,7 +238,7 @@ public class WorkflowPlannerAgent {
 
                 case WorkflowStepAgent s -> tools.addAll(s.tools());
                 case WorkflowStepLoop s -> tools.addAll(collectToolNames(s.body()));
-                case WorkflowStepBranch s -> s.paths().forEach(p -> tools.addAll(collectToolNames(p.body())));
+                case WorkflowStepBranch s -> s.branches().forEach(b -> tools.addAll(collectToolNames(b.steps())));
                 case WorkflowStepCode<?> s -> {  }
             }
         }
@@ -265,8 +265,8 @@ public class WorkflowPlannerAgent {
                             s.dependencies(), s.hitl());
 
             case WorkflowStepBranch s -> new WorkflowStepBranch(s.name(), s.from(),
-                    s.paths().stream().map(p -> new WorkflowStepBranch.Path(p.pathName(),
-                            p.body().stream().map(this::reconcileStep).toList())).toList(), s.defaultPath(),
+                    s.branches().stream().map(b -> new WorkflowStepBranch.Branch(b.name(),
+                            b.steps().stream().map(this::reconcileStep).toList())).toList(), s.defaultBranch(),
                     s.dependencies(), s.hitl());
 
             case WorkflowStepCode<?> s -> s;
@@ -369,8 +369,8 @@ public class WorkflowPlannerAgent {
                             unresolvedSkills.add(skillRef);
                 }
                 case WorkflowStepLoop s -> collectUnresolvedRefs(s.body(), unresolvedAgents, unresolvedSkills);
-                case WorkflowStepBranch s -> s.paths().forEach(p ->
-                        collectUnresolvedRefs(p.body(), unresolvedAgents, unresolvedSkills));
+                case WorkflowStepBranch s -> s.branches().forEach(b ->
+                        collectUnresolvedRefs(b.steps(), unresolvedAgents, unresolvedSkills));
                 case WorkflowStepCode<?> s -> {  }
             }
         }

@@ -78,8 +78,8 @@ class JpaWorkflowRegistryTest {
                 List.of(), false, List.of(), List.of());
 
         var branch = new WorkflowStepBranch("branch-step", "work",
-                List.of(new WorkflowStepBranch.Path("yes", List.of(yesBody)),
-                        new WorkflowStepBranch.Path("no", List.of(noBody))),
+                List.of(new WorkflowStepBranch.Branch("yes", List.of(yesBody)),
+                        new WorkflowStepBranch.Branch("no", List.of(noBody))),
                 "no", List.of(), false);
 
         var plan = WorkflowDefinition.builder("p-" + Ids.generate(), "LoopAndBranch").description("shape test")
@@ -103,8 +103,8 @@ class JpaWorkflowRegistryTest {
 
         var rehydratedBranch = (WorkflowStepBranch) rehydrated.steps().get(2);
         assertEquals("work", rehydratedBranch.from());
-        assertEquals(2, rehydratedBranch.paths().size());
-        assertEquals("no", rehydratedBranch.defaultPath());
+        assertEquals(2, rehydratedBranch.branches().size());
+        assertEquals("no", rehydratedBranch.defaultBranch());
     }
 
     @Test

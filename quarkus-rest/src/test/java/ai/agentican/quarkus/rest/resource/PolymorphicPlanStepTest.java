@@ -58,12 +58,12 @@ class PolymorphicPlanStepTest {
     @Test
     void branchStepRoundTrips() throws Exception {
 
-        var pathA = new WorkflowStepBranch.Path("yes", List.of(
+        var branchA = new WorkflowStepBranch.Branch("yes", List.of(
                 new WorkflowStepAgent("a1", "researcher", "investigate", List.of(), false, List.of(), List.of())));
-        var pathB = new WorkflowStepBranch.Path("no", List.of(
+        var branchB = new WorkflowStepBranch.Branch("no", List.of(
                 new WorkflowStepAgent("b1", "writer", "skip", List.of(), false, List.of(), List.of())));
 
-        var branch = new WorkflowStepBranch("branch1", "classifier", List.of(pathA, pathB), "no", List.of(), false);
+        var branch = new WorkflowStepBranch("branch1", "classifier", List.of(branchA, branchB), "no", List.of(), false);
 
         var json = objectMapper.writeValueAsString(branch);
         var deserialized = objectMapper.readValue(json, WorkflowStep.class);
@@ -73,7 +73,7 @@ class PolymorphicPlanStepTest {
         var branchStep = (WorkflowStepBranch) deserialized;
         assertEquals("branch1", branchStep.name());
         assertEquals("classifier", branchStep.from());
-        assertEquals(2, branchStep.paths().size());
+        assertEquals(2, branchStep.branches().size());
     }
 
     @Test

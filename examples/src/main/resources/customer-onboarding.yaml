@@ -147,13 +147,15 @@ workflows:
       - name: approval
         type: branch
         from: risk-score
-        defaultPath: auto-approve
-        pathConfigs:
-          - pathName: auto-approve
-            agent: Risk Manager
-            skills: [Risk framework]
-            instructions: Low-risk customer. Approve onboarding.
-          - pathName: manual-review
+        default: auto-approve
+        branches:
+          - name: auto-approve
+            steps:
+              - name: approve
+                agent: Risk Manager
+                skills: [Risk framework]
+                instructions: Low-risk customer. Approve onboarding.
+          - name: manual-review
             steps:
               - name: review
                 agent: Risk Manager

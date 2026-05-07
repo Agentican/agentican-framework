@@ -1,13 +1,15 @@
 package ai.agentican.framework.orchestration.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public record WorkflowStepBranch(
         String name,
         String from,
-        List<Path> paths,
-        String defaultPath,
+        List<Branch> branches,
+        @JsonProperty("default") String defaultBranch,
         List<String> dependencies,
         boolean hitl) implements WorkflowStep {
 
@@ -19,10 +21,10 @@ public record WorkflowStepBranch(
         if (from == null || from.isBlank())
             throw new IllegalArgumentException("'from' step name is required for branch step '" + name + "'");
 
-        if (paths == null || paths.isEmpty())
-            throw new IllegalArgumentException("At least one path is required for branch step '" + name + "'");
+        if (branches == null || branches.isEmpty())
+            throw new IllegalArgumentException("At least one branch is required for branch step '" + name + "'");
 
-        paths = List.copyOf(paths);
+        branches = List.copyOf(branches);
 
         if (dependencies == null)
             dependencies = List.of();
@@ -36,11 +38,11 @@ public record WorkflowStepBranch(
     public static class Builder {
 
         private final String name;
-        private final List<Path> paths = new ArrayList<>();
+        private final List<Branch> branches = new ArrayList<>();
         private final List<String> dependencies = new ArrayList<>();
 
         private String from;
-        private String defaultPath;
+        private String defaultBranch;
         private boolean hitl;
 
         Builder(String name) {
@@ -49,32 +51,32 @@ public record WorkflowStepBranch(
         }
 
         public Builder from(String stepName) { this.from = stepName; return this; }
-        public Builder defaultPath(String pathName) { this.defaultPath = pathName; return this; }
+        public Builder defaultBranch(String branchName) { this.defaultBranch = branchName; return this; }
         public Builder hitl(boolean hitl) { this.hitl = hitl; return this; }
         public Builder dependency(String stepName) { this.dependencies.add(stepName); return this; }
         public Builder dependencies(List<String> stepNames) { this.dependencies.addAll(stepNames); return this; }
-        public Builder path(String pathName, WorkflowStep... body) { this.paths.add(new Path(pathName, List.of(body))); return this; }
-        public Builder path(String pathName, List<WorkflowStep> body) { this.paths.add(new Path(pathName, body)); return this; }
+        public Builder branch(String branchName, WorkflowStep... steps) { this.branches.add(new Branch(branchName, List.of(steps))); return this; }
+        public Builder branch(String branchName, List<WorkflowStep> steps) { this.branches.add(new Branch(branchName, steps)); return this; }
 
         public WorkflowStepBranch build() {
 
-            return new WorkflowStepBranch(name, from, paths, defaultPath, dependencies, hitl);
+            return new WorkflowStepBranch(name, from, branches, defaultBranch, dependencies, hitl);
         }
     }
 
-    public record Path(
-            String pathName,
-            List<WorkflowStep> body) {
+    public record Branch(
+            String name,
+            List<WorkflowStep> steps) {
 
-        public Path {
+        public Branch {
 
-            if (pathName == null || pathName.isBlank())
-                throw new IllegalArgumentException("Path name is required");
+            if (name == null || name.isBlank())
+                throw new IllegalArgumentException("Branch name is required");
 
-            if (body == null || body.isEmpty())
-                throw new IllegalArgumentException("Body is required for path '" + pathName + "'");
+            if (steps == null || steps.isEmpty())
+                throw new IllegalArgumentException("Steps are required for branch '" + name + "'");
 
-            body = List.copyOf(body);
+            steps = List.copyOf(steps);
         }
     }
 }

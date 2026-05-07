@@ -51,15 +51,17 @@ workflows:
       - name: respond
         type: branch
         from: triage
-        defaultPath: low
-        pathConfigs:
-          - pathName: low
-            agent: Software Engineer
-            skills: [Incident runbook]
-            instructions: |
-              Low-severity incident for {{param.service}}. Create a ticket and notify #ops-alerts.
-              Triage: {{step.triage.output}}
-          - pathName: high
+        default: low
+        branches:
+          - name: low
+            steps:
+              - name: low-ticket
+                agent: Software Engineer
+                skills: [Incident runbook]
+                instructions: |
+                  Low-severity incident for {{param.service}}. Create a ticket and notify #ops-alerts.
+                  Triage: {{step.triage.output}}
+          - name: high
             steps:
               - name: create-incident
                 agent: Software Engineer

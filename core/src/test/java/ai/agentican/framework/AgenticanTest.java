@@ -974,7 +974,7 @@ class AgenticanTest {
                     "source", "worker", "produce", List.of(), false, List.of(), List.of());
             var branch = new ai.agentican.framework.orchestration.model.WorkflowStepBranch(
                     "choose", "source",
-                    List.of(new ai.agentican.framework.orchestration.model.WorkflowStepBranch.Path(
+                    List.of(new ai.agentican.framework.orchestration.model.WorkflowStepBranch.Branch(
                             "A", List.of(pathBodyStep))),
                     "A", List.of(), false);
 

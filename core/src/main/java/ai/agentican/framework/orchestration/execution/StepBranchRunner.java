@@ -42,21 +42,21 @@ class StepBranchRunner {
                     List.of());
         }
 
-        var selectedPath = selectBranch(step, upstreamOutput);
+        var selectedBranch = selectBranch(step, upstreamOutput);
 
-        if (selectedPath == null) {
+        if (selectedBranch == null) {
 
             return new WorkflowStepResult(step.name(), WorkflowRunStatus.FAILED,
-                    "No matching path found in branch '" + step.name() + "'", List.of());
+                    "No matching branch found in branch step '" + step.name() + "'", List.of());
         }
 
-        LOG.info("Branch step '{}': selected path '{}'", step.name(), selectedPath.pathName());
+        LOG.info("Branch step '{}': selected branch '{}'", step.name(), selectedBranch.name());
 
-        workflowRunStore.branchPathChosen(parentTaskId, parentStepId, selectedPath.pathName());
+        workflowRunStore.branchPathChosen(parentTaskId, parentStepId, selectedBranch.name());
 
-        var subPlan = WorkflowDefinition.builder(Ids.generate(), step.name() + "-" + selectedPath.pathName())
+        var subPlan = WorkflowDefinition.builder(Ids.generate(), step.name() + "-" + selectedBranch.name())
                 .description("")
-                .steps(selectedPath.body())
+                .steps(selectedBranch.steps())
                 .build();
 
         var subResult = subPlanRunner.run(subPlan, params, cancelled, outputs, parentTaskId, parentStepId, 0);
@@ -71,17 +71,17 @@ class StepBranchRunner {
                 allAgentResults);
     }
 
-    private WorkflowStepBranch.Path selectBranch(WorkflowStepBranch step, String upstreamOutput) {
+    private WorkflowStepBranch.Branch selectBranch(WorkflowStepBranch step, String upstreamOutput) {
 
         var trimmed = upstreamOutput.strip().toLowerCase();
 
-        for (var path : step.paths())
-            if (trimmed.equals(path.pathName().toLowerCase()))
-                return path;
+        for (var branch : step.branches())
+            if (trimmed.equals(branch.name().toLowerCase()))
+                return branch;
 
-        for (var path : step.paths())
-            if (trimmed.contains(path.pathName().toLowerCase()))
-                return path;
+        for (var branch : step.branches())
+            if (trimmed.contains(branch.name().toLowerCase()))
+                return branch;
 
         try {
 
@@ -98,19 +98,19 @@ class StepBranchRunner {
 
                     var first = parsed.getFirst().strip().toLowerCase();
 
-                    for (var path : step.paths())
-                        if (first.equals(path.pathName().toLowerCase()))
-                            return path;
+                    for (var branch : step.branches())
+                        if (first.equals(branch.name().toLowerCase()))
+                            return branch;
                 }
             }
         }
         catch (Exception _) {}
 
-        if (step.defaultPath() != null) {
+        if (step.defaultBranch() != null) {
 
-            for (var path : step.paths())
-                if (path.pathName().equals(step.defaultPath()))
-                    return path;
+            for (var branch : step.branches())
+                if (branch.name().equals(step.defaultBranch()))
+                    return branch;
         }
 
         return null;

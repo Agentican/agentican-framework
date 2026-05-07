@@ -128,7 +128,7 @@ class AgenticanProcessor {
                 WorkflowStepAgent.class,
                 WorkflowStepLoop.class,
                 WorkflowStepBranch.class,
-                WorkflowStepBranch.Path.class,
+                WorkflowStepBranch.Branch.class,
                 WorkflowParam.class,
                 WorkflowRunStatus.class,
                 LlmRequest.class,

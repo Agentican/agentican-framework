@@ -11,6 +11,7 @@ import ai.agentican.framework.orchestration.model.WorkflowParam;
 import ai.agentican.framework.util.Json;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -143,60 +144,49 @@ public record WorkflowConfig(
 
         public final class BranchEntry {
 
-            private String branchName;
+            private String branchStepName;
             private String from;
-            private String defaultPath;
+            private String defaultBranch;
             private List<String> dependencies = List.of();
             private boolean hitl;
 
-            private final List<BranchPathConfig> pathConfigs = new ArrayList<>();
+            private final List<BranchConfig> branches = new ArrayList<>();
 
             BranchEntry() {}
 
-            public BranchEntry name(String name)                { this.branchName = name; return this; }
+            public BranchEntry name(String name)                { this.branchStepName = name; return this; }
             public BranchEntry from(String stepName)            { this.from = stepName; return this; }
-            public BranchEntry defaultPath(String pathName)     { this.defaultPath = pathName; return this; }
+            public BranchEntry defaultBranch(String branchName) { this.defaultBranch = branchName; return this; }
             public BranchEntry dependencies(String... deps)     { this.dependencies = List.of(deps); return this; }
             public BranchEntry dependencies(List<String> deps)  { this.dependencies = deps; return this; }
             public BranchEntry hitl(boolean hitl)               { this.hitl = hitl; return this; }
             public BranchEntry hitl()                           { this.hitl = true; return this; }
 
-            public PathEntry path() { return new PathEntry(); }
+            public Branch branch() { return new Branch(); }
 
             public WorkflowConfigBuilder end() {
 
-                steps.add(new PlanStepConfig(branchName, "branch", null, null, dependencies, hitl, null, null,
-                        null, from, pathConfigs, defaultPath, null, null, null));
+                steps.add(new PlanStepConfig(branchStepName, "branch", null, null, dependencies, hitl, null, null,
+                        null, from, branches, defaultBranch, null, null, null));
 
                 return WorkflowConfigBuilder.this;
             }
 
-            public final class PathEntry {
+            public final class Branch {
 
-                private String pathName;
-                private String agent;
-                private String instructions;
-                private List<String> tools = List.of();
-                private List<String> skills = List.of();
+                private String branchName;
 
                 private final List<PlanStepConfig> bodySteps = new ArrayList<>();
 
-                PathEntry() {}
+                Branch() {}
 
-                public PathEntry name(String name)              { this.pathName = name; return this; }
-                public PathEntry agent(String agent)            { this.agent = agent; return this; }
-                public PathEntry instructions(String instr)     { this.instructions = instr; return this; }
-                public PathEntry tools(String... tools)         { this.tools = List.of(tools); return this; }
-                public PathEntry tools(List<String> tools)      { this.tools = tools; return this; }
-                public PathEntry skills(String... skills)       { this.skills = List.of(skills); return this; }
-                public PathEntry skills(List<String> skills)    { this.skills = skills; return this; }
+                public Branch name(String name) { this.branchName = name; return this; }
 
-                public StepEntry<PathEntry> step() { return new StepEntry<>(this, bodySteps); }
+                public StepEntry<Branch> step() { return new StepEntry<>(this, bodySteps); }
 
                 public BranchEntry end() {
 
-                    pathConfigs.add(new BranchPathConfig(pathName, agent, instructions, tools, skills,
-                            bodySteps.isEmpty() ? null : bodySteps));
+                    branches.add(new BranchConfig(branchName, bodySteps));
 
                     return BranchEntry.this;
                 }
@@ -335,8 +325,8 @@ public record WorkflowConfig(
             List<String> tools,
             String over,
             String from,
-            List<BranchPathConfig> pathConfigs,
-            String defaultPath,
+            List<BranchConfig> branches,
+            @JsonProperty("default") String defaultBranch,
             List<PlanStepConfig> steps,
             String codeSlug,
             Object codeInput) {
@@ -390,11 +380,11 @@ public record WorkflowConfig(
 
                 case "branch" -> {
 
-                    var paths = this.pathConfigs.stream()
-                            .map(bpc -> new WorkflowStepBranch.Path(bpc.pathName(), bpc.toPlanStep(codeStepRegistry)))
+                    var resolvedBranches = this.branches.stream()
+                            .map(b -> new WorkflowStepBranch.Branch(b.name(), b.toPlanSteps(codeStepRegistry)))
                             .toList();
 
-                    yield new WorkflowStepBranch(name, from, paths, defaultPath, dependencies, hitl);
+                    yield new WorkflowStepBranch(name, from, resolvedBranches, defaultBranch, dependencies, hitl);
                 }
 
                 case "code" -> buildCodeStep(codeStepRegistry);
@@ -425,41 +415,29 @@ public record WorkflowConfig(
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record BranchPathConfig(
-            String pathName,
-            String agent,
-            String instructions,
-            List<String> tools,
-            List<String> skills,
+    public record BranchConfig(
+            String name,
             List<PlanStepConfig> steps) {
 
-        public BranchPathConfig {
+        public BranchConfig {
 
-            if (pathName == null || pathName.isBlank())
-                throw new IllegalArgumentException("Path name is required");
+            if (name == null || name.isBlank())
+                throw new IllegalArgumentException("Branch name is required");
 
-            if (tools == null)
-                tools = List.of();
+            if (steps == null || steps.isEmpty())
+                throw new IllegalArgumentException("Steps are required for branch '" + name + "'");
 
-            if (skills == null)
-                skills = List.of();
+            steps = List.copyOf(steps);
         }
 
-        List<WorkflowStep> toPlanStep() {
+        List<WorkflowStep> toPlanSteps() {
 
-            return toPlanStep(null);
+            return toPlanSteps(null);
         }
 
-        List<WorkflowStep> toPlanStep(CodeStepRegistry codeStepRegistry) {
+        List<WorkflowStep> toPlanSteps(CodeStepRegistry codeStepRegistry) {
 
-            if (steps != null && !steps.isEmpty())
-                return steps.stream().map(s -> s.toWorkflowStep(codeStepRegistry)).toList();
-
-            var stepName = pathName + "-body";
-
-            var agentStep = new WorkflowStepAgent(stepName, agent, instructions, List.of(), false, skills, tools);
-
-            return List.of(agentStep);
+            return steps.stream().map(s -> s.toWorkflowStep(codeStepRegistry)).toList();
         }
     }
 }

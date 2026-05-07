@@ -428,22 +428,22 @@ public class WorkflowRunner {
                                              String taskId,
                                              AtomicBoolean cancelled) {
 
-        var chosenPath = stepLog.branchChosenPath();
+        var chosenBranch = stepLog.branchChosenPath();
 
-        if (chosenPath == null)
+        if (chosenBranch == null)
             return new WorkflowStepResult(branchStep.name(), WorkflowRunStatus.FAILED,
-                    "Branch step has no recorded chosen path — cannot resume deterministically", List.of());
+                    "Branch step has no recorded chosen branch — cannot resume deterministically", List.of());
 
-        var path = branchStep.paths().stream()
-                .filter(p -> chosenPath.equals(p.pathName()))
+        var branch = branchStep.branches().stream()
+                .filter(b -> chosenBranch.equals(b.name()))
                 .findFirst().orElse(null);
 
-        if (path == null)
+        if (branch == null)
             return new WorkflowStepResult(branchStep.name(), WorkflowRunStatus.FAILED,
-                    "Chosen path '" + chosenPath + "' not found in branch step", List.of());
+                    "Chosen branch '" + chosenBranch + "' not found in branch step", List.of());
 
-        LOG.info("Resuming branch step '{}': chosen path '{}' ({} body steps)",
-                branchStep.name(), chosenPath, path.body().size());
+        LOG.info("Resuming branch step '{}': chosen branch '{}' ({} body steps)",
+                branchStep.name(), chosenBranch, branch.steps().size());
 
         var existingChild = workflowRunStore.list().stream()
                 .filter(t -> taskId.equals(t.parentTaskId()))
@@ -479,8 +479,8 @@ public class WorkflowRunner {
                     List.of());
         }
 
-        var subPlan = WorkflowDefinition.builder(Ids.generate(), branchStep.name() + "-" + chosenPath)
-                .description("").steps(path.body()).build();
+        var subPlan = WorkflowDefinition.builder(Ids.generate(), branchStep.name() + "-" + chosenBranch)
+                .description("").steps(branch.steps()).build();
         var subResult = run(subPlan, newTaskId(), taskId, stepLog.id(), 0,
                 taskParams, cancelled, parentOutputs);
 

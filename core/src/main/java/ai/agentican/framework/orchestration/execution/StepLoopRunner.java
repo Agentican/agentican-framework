@@ -142,10 +142,10 @@ class StepLoopRunner {
 
             case WorkflowStepBranch s -> new WorkflowStepBranch(
                     s.name(), s.from(),
-                    s.paths().stream().map(p -> new WorkflowStepBranch.Path(
-                            p.pathName(),
-                            resolveLoopBody(p.body(), item, params))).toList(),
-                    s.defaultPath(), s.dependencies(), s.hitl());
+                    s.branches().stream().map(b -> new WorkflowStepBranch.Branch(
+                            b.name(),
+                            resolveLoopBody(b.steps(), item, params))).toList(),
+                    s.defaultBranch(), s.dependencies(), s.hitl());
 
             case WorkflowStepCode<?> s -> s;
 

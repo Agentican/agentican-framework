@@ -47,47 +47,53 @@ workflows:
       - name: intervene
         type: branch
         from: analyze
-        defaultPath: low
-        pathConfigs:
-          - pathName: low
-            agent: Customer Success Manager
-            skills: [Churn signals]
-            instructions: |
-              Draft a lightweight engagement plan for this low-risk account.
-              Work entirely from the account summary and risk analysis below —
-              do not ask for more information. Every plan item names an owner
-              and a date.
+        default: low
+        branches:
+          - name: low
+            steps:
+              - name: low-plan
+                agent: Customer Success Manager
+                skills: [Churn signals]
+                instructions: |
+                  Draft a lightweight engagement plan for this low-risk account.
+                  Work entirely from the account summary and risk analysis below —
+                  do not ask for more information. Every plan item names an owner
+                  and a date.
 
-              Account summary:
-              {{param.account}}
+                  Account summary:
+                  {{param.account}}
 
-              Risk analysis:
-              {{step.analyze.output}}
-          - pathName: medium
-            agent: Customer Success Manager
-            skills: [Churn signals]
-            instructions: |
-              Draft an EBR-focused plan for this medium-risk account. Work
-              entirely from the account summary and risk analysis below — do
-              not ask for more information. Every plan item names an owner
-              and a date.
+                  Risk analysis:
+                  {{step.analyze.output}}
+          - name: medium
+            steps:
+              - name: medium-plan
+                agent: Customer Success Manager
+                skills: [Churn signals]
+                instructions: |
+                  Draft an EBR-focused plan for this medium-risk account. Work
+                  entirely from the account summary and risk analysis below — do
+                  not ask for more information. Every plan item names an owner
+                  and a date.
 
-              Account summary:
-              {{param.account}}
+                  Account summary:
+                  {{param.account}}
 
-              Risk analysis:
-              {{step.analyze.output}}
-          - pathName: high
-            agent: Customer Success Manager
-            skills: [Churn signals]
-            instructions: |
-              Draft a save plan with a named exec sponsor and deadlines for this
-              high-risk account. Work entirely from the account summary and risk
-              analysis below — do not ask for more information. Every plan item
-              names an owner and a date.
+                  Risk analysis:
+                  {{step.analyze.output}}
+          - name: high
+            steps:
+              - name: high-plan
+                agent: Customer Success Manager
+                skills: [Churn signals]
+                instructions: |
+                  Draft a save plan with a named exec sponsor and deadlines for this
+                  high-risk account. Work entirely from the account summary and risk
+                  analysis below — do not ask for more information. Every plan item
+                  names an owner and a date.
 
-              Account summary:
-              {{param.account}}
+                  Account summary:
+                  {{param.account}}
 
-              Risk analysis:
-              {{step.analyze.output}}
+                  Risk analysis:
+                  {{step.analyze.output}}

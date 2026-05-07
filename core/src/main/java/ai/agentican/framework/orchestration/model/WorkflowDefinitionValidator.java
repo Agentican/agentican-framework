@@ -42,7 +42,7 @@ public final class WorkflowDefinitionValidator {
             acc.add(step.name());
             switch (step) {
                 case WorkflowStepLoop l   -> collectStepNames(l.body(), acc);
-                case WorkflowStepBranch b -> b.paths().forEach(p -> collectStepNames(p.body(), acc));
+                case WorkflowStepBranch b -> b.branches().forEach(br -> collectStepNames(br.steps(), acc));
                 case WorkflowStepAgent a  -> {}
                 case WorkflowStepCode<?> c -> {}
             }
@@ -84,7 +84,7 @@ public final class WorkflowDefinitionValidator {
                     if (b.from() != null && !stepNames.contains(b.from()))
                         issues.add("Branch step '" + b.name() + "' branches from unknown step '" + b.from() + "' "
                                 + "(if this is a definition param, ignore)");
-                    b.paths().forEach(p -> validateSteps(p.body(), stepNames, agents, skills, issues));
+                    b.branches().forEach(br -> validateSteps(br.steps(), stepNames, agents, skills, issues));
                 }
                 case WorkflowStepCode<?> c -> {}
             }

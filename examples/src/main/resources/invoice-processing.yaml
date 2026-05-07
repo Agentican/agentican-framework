@@ -66,15 +66,17 @@ workflows:
       - name: route
         type: branch
         from: validate
-        defaultPath: auto
-        pathConfigs:
-          - pathName: auto
-            agent: Treasury Analyst
-            skills: [AP policy]
-            instructions: |
-              Process payment for this approved invoice:
-              {{step.extract.output}}
-          - pathName: needs-approval
+        default: auto
+        branches:
+          - name: auto
+            steps:
+              - name: auto-pay
+                agent: Treasury Analyst
+                skills: [AP policy]
+                instructions: |
+                  Process payment for this approved invoice:
+                  {{step.extract.output}}
+          - name: needs-approval
             steps:
               - name: review
                 agent: Finance Controller
@@ -89,12 +91,14 @@ workflows:
                 instructions: |
                   Process approved payment:
                   {{step.extract.output}}
-          - pathName: reject
-            agent: Accounts Payable Specialist
-            skills: [AP policy]
-            instructions: |
-              Draft a rejection notice to the vendor:
-              {{step.validate.output}}
+          - name: reject
+            steps:
+              - name: rejection-notice
+                agent: Accounts Payable Specialist
+                skills: [AP policy]
+                instructions: |
+                  Draft a rejection notice to the vendor:
+                  {{step.validate.output}}
       - name: notify
         agent: Treasury Analyst
         skills: [AP policy]
