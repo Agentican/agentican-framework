@@ -51,8 +51,8 @@ public final class CatalogReferences {
                     if (stepsReferenceAgent(l.body(), ref)) return true;
                 }
                 case WorkflowStepBranch b -> {
-                    for (var path : b.paths())
-                        if (stepsReferenceAgent(path.body(), ref)) return true;
+                    for (var path : b.branches())
+                        if (stepsReferenceAgent(path.steps(), ref)) return true;
                 }
                 case WorkflowStepCode<?> c -> {}
             }
@@ -73,8 +73,8 @@ public final class CatalogReferences {
                     if (stepsReferenceSkill(l.body(), ref)) return true;
                 }
                 case WorkflowStepBranch b -> {
-                    for (var path : b.paths())
-                        if (stepsReferenceSkill(path.body(), ref)) return true;
+                    for (var path : b.branches())
+                        if (stepsReferenceSkill(path.steps(), ref)) return true;
                 }
                 case WorkflowStepCode<?> c -> {}
             }
