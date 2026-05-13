@@ -2,6 +2,7 @@ package ai.agentican.temporal.activity;
 
 import ai.agentican.temporal.dto.AgentInvocationRequest;
 import ai.agentican.temporal.dto.AgentInvocationResult;
+import ai.agentican.temporal.dto.AgentResumeRequest;
 
 import io.temporal.activity.ActivityInterface;
 import io.temporal.activity.ActivityMethod;
@@ -14,4 +15,7 @@ public interface AgentStepActivity {
 
     @ActivityMethod
     AgentInvocationResult invokeAgent(AgentInvocationRequest request);
+
+    @ActivityMethod
+    AgentInvocationResult resumeAgent(AgentResumeRequest request);
 }
