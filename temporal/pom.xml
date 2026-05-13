@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.agentican</groupId>
+        <artifactId>agentican-framework-parent</artifactId>
+        <version>0.1.0-alpha.5-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>agentican-temporal</artifactId>
+    <name>Agentican Temporal</name>
+    <description>Temporal.io activity wrappers around Agentican's agent and code step boundaries. Use these to call agentican from your own Temporal workflows without taking a dependency on agentican's in-process executor.</description>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <temporal.version>1.27.0</temporal.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>ai.agentican</groupId>
+            <artifactId>agentican-framework-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.temporal</groupId>
+            <artifactId>temporal-sdk</artifactId>
+            <version>${temporal.version}</version>
+        </dependency>
+    </dependencies>
+</project>

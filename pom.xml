@@ -51,6 +51,7 @@
         <module>quarkus-integration-tests</module>
         <module>server</module>
         <module>examples</module>
+        <module>temporal</module>
     </modules>
 
     <properties>
