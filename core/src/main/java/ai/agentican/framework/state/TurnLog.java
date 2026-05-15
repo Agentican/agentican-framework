@@ -6,6 +6,9 @@ import ai.agentican.framework.orchestration.execution.resume.TurnResumeState;
 import ai.agentican.framework.tools.ToolResult;
 import ai.agentican.framework.util.Ids;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -70,6 +73,25 @@ public class TurnLog {
         this.startedAt = startedAt != null ? startedAt : Instant.now();
         this.completedAt = completedAt;
         this.state = state != null ? state : (completedAt != null ? State.COMPLETED : State.STARTED);
+    }
+
+    @JsonCreator
+    public TurnLog(@JsonProperty("id") String id,
+                   @JsonProperty("index") int index,
+                   @JsonProperty("messageId") String messageId,
+                   @JsonProperty("request") LlmRequest request,
+                   @JsonProperty("responseId") String responseId,
+                   @JsonProperty("response") LlmResponse response,
+                   @JsonProperty("toolResults") List<ToolResult> toolResults,
+                   @JsonProperty("startedAt") Instant startedAt,
+                   @JsonProperty("completedAt") Instant completedAt,
+                   @JsonProperty("state") State state,
+                   @JsonProperty("resumeState") TurnResumeState resumeState) {
+
+        this(id, index, messageId, request, responseId, response, toolResults,
+                startedAt, completedAt, state);
+
+        if (resumeState != null) setResumeState(resumeState);
     }
 
     public void setRequest(LlmRequest request) {

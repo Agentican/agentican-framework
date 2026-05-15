@@ -4,10 +4,6 @@ import ai.agentican.framework.orchestration.model.*;
 import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.framework.util.Ids;
 
-import ai.agentican.framework.util.Json;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +38,7 @@ class StepBranchRunner {
                     List.of());
         }
 
-        var selectedBranch = selectBranch(step, upstreamOutput);
+        var selectedBranch = OrchestrationHelpers.selectBranch(step, upstreamOutput);
 
         if (selectedBranch == null) {
 
@@ -71,48 +67,4 @@ class StepBranchRunner {
                 allAgentResults);
     }
 
-    private WorkflowStepBranch.Branch selectBranch(WorkflowStepBranch step, String upstreamOutput) {
-
-        var trimmed = upstreamOutput.strip().toLowerCase();
-
-        for (var branch : step.branches())
-            if (trimmed.equals(branch.name().toLowerCase()))
-                return branch;
-
-        for (var branch : step.branches())
-            if (trimmed.contains(branch.name().toLowerCase()))
-                return branch;
-
-        try {
-
-            int start = upstreamOutput.indexOf('[');
-            int end = upstreamOutput.lastIndexOf(']');
-
-            if (start >= 0 && end > start) {
-
-                var jsonPart = upstreamOutput.substring(start, end + 1);
-
-                List<String> parsed = Json.mapper().readValue(jsonPart, new TypeReference<>() {});
-
-                if (!parsed.isEmpty()) {
-
-                    var first = parsed.getFirst().strip().toLowerCase();
-
-                    for (var branch : step.branches())
-                        if (first.equals(branch.name().toLowerCase()))
-                            return branch;
-                }
-            }
-        }
-        catch (Exception _) {}
-
-        if (step.defaultBranch() != null) {
-
-            for (var branch : step.branches())
-                if (branch.name().equals(step.defaultBranch()))
-                    return branch;
-        }
-
-        return null;
-    }
 }

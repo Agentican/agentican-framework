@@ -17,6 +17,8 @@
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <temporal.version>1.27.0</temporal.version>
+        <!-- Parent pom's surefire uses @{argLine}; resolve to empty unless something injects a value. -->
+        <argLine></argLine>
     </properties>
 
     <dependencies>
@@ -29,5 +31,37 @@
             <artifactId>temporal-sdk</artifactId>
             <version>${temporal.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.temporal</groupId>
+            <artifactId>temporal-testing</artifactId>
+            <version>${temporal.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- TestWorkflowEnvironment uses gRPC in-process transport; not pulled in transitively. -->
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-inprocess</artifactId>
+            <version>1.78.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.11.4</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- Parent pom uses @{argLine} which only resolves when something (e.g. JaCoCo)
+                         sets the argLine property. Override here so surefire forks cleanly. -->
+                    <argLine></argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

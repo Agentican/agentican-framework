@@ -1,0 +1,87 @@
+agents:
+  - id: researcher
+    name: researcher
+    role: |
+      Expert at finding accurate, sourced information about companies and
+      markets. Quotes sources. Distinguishes opinion from fact.
+
+  - id: writer
+    name: writer
+    role: |
+      Synthesizes research into structured, concise briefs. Avoids hedging
+      language. Cites concrete evidence.
+
+skills:
+  - id: web-search
+    name: web-search
+    instructions: |
+      When a question requires external information, call the search tool
+      first. Quote sources in your answer.
+
+workflows:
+  - id: market-brief
+    name: market-brief
+    description: Research vendors in a market and produce a structured brief
+    outputStep: deliver
+    params:
+      - name: topic
+        description: Market to research
+        required: true
+
+      - name: vendor_count
+        description: Number of vendors
+        defaultValue: "5"
+    steps:
+      - name: identify
+        agent: researcher
+        skills: [web-search]
+        instructions: |
+          Identify the top {{param.vendor_count}} vendors in {{param.topic}}.
+          Return a JSON array of vendor names — names only, no commentary.
+
+      - name: deep-dive
+        type: loop
+        over: identify
+        steps:
+          - name: analyze
+            agent: researcher
+            skills: [web-search]
+            instructions: |
+              Deep-dive vendor {{item}}: positioning, key strengths, recent news.
+              Quote sources.
+
+      - name: classify
+        agent: writer
+        dependencies: [deep-dive]
+        instructions: |
+          Read the per-vendor deep-dives below. If any vendor has launched
+          a competitive feature in the last 30 days, return the single word
+          'urgent'. Otherwise return 'standard'.
+
+          Deep-dives: {{step.deep-dive.output}}
+
+      - name: deliver
+        type: branch
+        from: classify
+        default: standard
+        branches:
+          - name: urgent
+            steps:
+              - name: urgent-brief
+                agent: writer
+                instructions: |
+                  Synthesize a vendor brief flagged URGENT for executive review.
+                  Lead with the recent competitive moves.
+
+                  Topic: {{param.topic}}
+                  Deep-dives: {{step.deep-dive.output}}
+
+          - name: standard
+            steps:
+              - name: standard-brief
+                agent: writer
+                instructions: |
+                  Synthesize a vendor brief.
+
+                  Topic: {{param.topic}}
+                  Deep-dives: {{step.deep-dive.output}}

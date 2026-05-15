@@ -79,19 +79,28 @@ public class ReActAgentRunner implements AgentRunner {
                            Duration timeoutOverride, List<String> skills, Map<String, Toolkit> toolkits,
                            StructuredOutput outputSchema) {
 
+        var cancelled = new AtomicBoolean(false);
+
+        return run(agent, task, taskId, stepId, stepName, timeoutOverride, skills, toolkits, outputSchema,
+                new InProcessAgentLoopHost(llm, workflowRunStore, null, null, cancelled));
+    }
+
+    @Override
+    public AgentResult run(Agent agent, String task, String taskId, String stepId, String stepName,
+                           Duration timeoutOverride, List<String> skills, Map<String, Toolkit> toolkits,
+                           StructuredOutput outputSchema, AgentLoopHost host) {
+
         LOG.info(Logs.AGENT_RUNNING_STEP, agent.name(), 0, distinctToolkitCount(toolkits));
         LOG.debug(Logs.AGENT_RUNNING_STEP_FULL, task);
 
-        ensureTaskLog(taskId, stepId, stepName);
+        ensureTaskLog(host, taskId, stepId, stepName);
 
-        var runId = Ids.generate();
+        var runId = host.newId();
 
-        workflowRunStore.runStarted(taskId, stepId, runId, agent.name());
+        host.runStarted(taskId, stepId, runId, agent.name());
 
-        var startTime = Instant.now();
+        var startTime = host.now();
         var deadline = effectiveDeadline(startTime, timeoutOverride);
-
-        var cancelled = new AtomicBoolean(false);
 
         var systemPrompt = SYSTEM_PROMPT_TEMPLATE.formatted(
                 agent.role() != null && !agent.role().isBlank() ? agent.role() : "(no specific role)");
@@ -106,26 +115,30 @@ public class ReActAgentRunner implements AgentRunner {
 
             LOG.info(Logs.AGENT_RUNNING_LOOP, turnIndex);
 
-            if (cancelled.get())
-                return result(AgentStatus.CANCELLED, taskId, stepId, runId);
+            if (host.isCancelled())
+                return result(host, AgentStatus.CANCELLED, taskId, stepId, runId);
 
-            if (deadline != null && Instant.now().isAfter(deadline))
-                return result(AgentStatus.TIMED_OUT, taskId, stepId, runId);
+            if (deadline != null && host.now().isAfter(deadline))
+                return result(host, AgentStatus.TIMED_OUT, taskId, stepId, runId);
 
-            var turnId = Ids.generate();
+            var turnId = host.newId();
 
-            workflowRunStore.turnStarted(taskId, runId, turnId);
+            host.turnStarted(taskId, runId, turnId);
 
             var request = new LlmRequest(systemPrompt, task, "", toolDefs, turnIndex, llmName, llmProvider,
                     llmModel, outputSchema, List.copyOf(history));
 
             LOG.info(Logs.AGENT_SEND_LLM, turnIndex);
 
-            workflowRunStore.messageSent(taskId, turnId, request);
+            host.messageSent(taskId, turnId, request);
 
-            var response = llm.sendStreaming(request, token -> workflowRunListener.onToken(taskId, turnId, token));
+            var response = host.callLlm(request);
 
-            workflowRunStore.responseReceived(taskId, turnId, response);
+            // Host SPI doesn't carry token-level streaming yet; fire the listener once with the full text.
+            if (response.text() != null && !response.text().isEmpty())
+                workflowRunListener.onToken(taskId, turnId, response.text());
+
+            host.responseReceived(taskId, turnId, response);
 
             LOG.info(Logs.AGENT_RECD_LLM, turnIndex, response.stopReason());
 
@@ -133,22 +146,22 @@ public class ReActAgentRunner implements AgentRunner {
 
             if (response.stopReason() != StopReason.TOOL_USE || response.toolCalls().isEmpty()) {
 
-                workflowRunStore.turnCompleted(taskId, turnId);
-                workflowRunStore.runCompleted(taskId, runId);
+                host.turnCompleted(taskId, turnId);
+                host.runCompleted(taskId, runId);
 
-                return result(AgentStatus.COMPLETED, taskId, stepId, runId);
+                return result(host, AgentStatus.COMPLETED, taskId, stepId, runId);
             }
 
-            var toolResults = executeToolCalls(response.toolCalls(), toolkits, cancelled, turnIndex, taskId, turnId);
+            var toolResults = executeToolCalls(response.toolCalls(), toolkits, host, turnIndex, taskId, turnId);
 
             history.add(toToolResultMessage(toolResults));
 
-            workflowRunStore.turnCompleted(taskId, turnId);
+            host.turnCompleted(taskId, turnId);
         }
 
-        workflowRunStore.runCompleted(taskId, runId);
+        host.runCompleted(taskId, runId);
 
-        return result(AgentStatus.MAX_TURNS, taskId, stepId, runId);
+        return result(host, AgentStatus.MAX_TURNS, taskId, stepId, runId);
     }
 
     private static Message toAssistantMessage(ai.agentican.framework.llm.LlmResponse response) {
@@ -175,26 +188,26 @@ public class ReActAgentRunner implements AgentRunner {
     }
 
     private List<ToolResult> executeToolCalls(List<ToolCall> toolCalls, Map<String, Toolkit> toolkits,
-                                              AtomicBoolean cancelled, int turnIndex, String taskId, String turnId) {
+                                              AgentLoopHost host, int turnIndex, String taskId, String turnId) {
 
-        return Parallel.map(toolCalls, toolCall -> executeOne(toolCall, toolkits, cancelled, turnIndex,
+        return Parallel.map(toolCalls, toolCall -> executeOne(toolCall, toolkits, host, turnIndex,
                 taskId, turnId));
     }
 
     private ToolResult executeOne(ToolCall toolCall, Map<String, Toolkit> toolkits,
-                                   AtomicBoolean cancelled, int turnIndex,
+                                   AgentLoopHost host, int turnIndex,
                                    String taskId, String turnId) {
 
-        workflowRunStore.toolCallStarted(taskId, turnId, toolCall);
+        host.toolCallStarted(taskId, turnId, toolCall);
 
         var toolCallId = toolCall.id();
         var toolName = toolCall.name();
 
-        if (cancelled.get()) {
+        if (host.isCancelled()) {
 
             var result = new ToolResult(toolCallId, toolName, toolError("Execution cancelled"));
 
-            workflowRunStore.toolCallCompleted(taskId, turnId, result);
+            host.toolCallCompleted(taskId, turnId, result);
 
             return result;
         }
@@ -205,7 +218,7 @@ public class ReActAgentRunner implements AgentRunner {
 
             var result = new ToolResult(toolCallId, toolName, toolError("No executor found for tool: " + toolName));
 
-            workflowRunStore.toolCallCompleted(taskId, turnId, result);
+            host.toolCallCompleted(taskId, turnId, result);
 
             return result;
         }
@@ -214,10 +227,10 @@ public class ReActAgentRunner implements AgentRunner {
 
         try {
 
-            var output = toolkit.execute(toolName, toolCall.args());
+            var output = host.executeTool(toolName, toolCall.args(), toolkit);
             var result = new ToolResult(toolCallId, toolName, output);
 
-            workflowRunStore.toolCallCompleted(taskId, turnId, result);
+            host.toolCallCompleted(taskId, turnId, result);
 
             return result;
         }
@@ -227,7 +240,7 @@ public class ReActAgentRunner implements AgentRunner {
 
             var result = new ToolResult(toolCallId, toolName, toolError(e.getMessage()), e);
 
-            workflowRunStore.toolCallCompleted(taskId, turnId, result);
+            host.toolCallCompleted(taskId, turnId, result);
 
             return result;
         }
@@ -266,20 +279,20 @@ public class ReActAgentRunner implements AgentRunner {
         return d != null ? start.plus(d) : null;
     }
 
-    private void ensureTaskLog(String taskId, String stepId, String stepName) {
+    private void ensureTaskLog(AgentLoopHost host, String taskId, String stepId, String stepName) {
 
-        var taskLog = workflowRunStore.load(taskId);
+        var taskLog = host.loadRunLog(taskId);
 
         if (taskLog == null) {
 
-            workflowRunStore.taskStarted(taskId, stepName, null, Map.of());
-            workflowRunStore.stepStarted(taskId, stepId, stepName);
+            host.taskStarted(taskId, stepName, null, Map.of());
+            host.stepStarted(taskId, stepId, stepName);
         }
     }
 
-    private AgentResult result(AgentStatus status, String taskId, String stepId, String runId) {
+    private AgentResult result(AgentLoopHost host, AgentStatus status, String taskId, String stepId, String runId) {
 
-        var taskLog = workflowRunStore.load(taskId);
+        var taskLog = host.loadRunLog(taskId);
         var stepLog = taskLog != null ? taskLog.findStepById(stepId) : null;
         var runLog = stepLog != null ? stepLog.lastRun() : null;
 

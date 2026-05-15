@@ -5,6 +5,9 @@ import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -36,6 +39,32 @@ public class StepLog {
         this.id = id;
         this.stepName = stepName;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
+    }
+
+    @JsonCreator
+    public StepLog(@JsonProperty("id") String id,
+                   @JsonProperty("stepName") String stepName,
+                   @JsonProperty("createdAt") Instant createdAt,
+                   @JsonProperty("completedAt") Instant completedAt,
+                   @JsonProperty("output") String output,
+                   @JsonProperty("status") WorkflowRunStatus status,
+                   @JsonProperty("checkpoint") HitlCheckpoint checkpoint,
+                   @JsonProperty("aggregateTokenUsage") TokenUsage aggregateTokenUsage,
+                   @JsonProperty("branchChosenPath") String branchChosenPath,
+                   @JsonProperty("hitlResponse") HitlResponse hitlResponse,
+                   @JsonProperty("runs") List<RunLog> runs) {
+
+        this(id, stepName, createdAt);
+
+        if (output != null)              setOutput(output);
+        if (status != null)              setStatus(status);
+        if (checkpoint != null)          setCheckpoint(checkpoint);
+        if (completedAt != null)         setCompletedAt(completedAt);
+        if (aggregateTokenUsage != null) setAggregateTokenUsage(aggregateTokenUsage);
+        if (branchChosenPath != null)    setBranchChosenPath(branchChosenPath);
+        if (hitlResponse != null)        setHitlResponse(hitlResponse);
+
+        if (runs != null) for (var r : runs) addRun(r);
     }
 
     public String id() { return id; }

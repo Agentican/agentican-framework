@@ -36,6 +36,7 @@ class ExampleYamlTest {
             "feature-spec.yaml",
             "dpa-review.yaml",
             "vendor-selection.yaml",
+            "market-brief.yaml",
             "research-synthesis.yaml",
             "fraud-triage.yaml",
             "article-pipeline.yaml",
@@ -110,7 +111,8 @@ class ExampleYamlTest {
     @ValueSource(strings = {
             "alert-review.yaml",
             "quick-task.yaml",
-            "vendor-selection.yaml"
+            "vendor-selection.yaml",
+            "market-brief.yaml"
     })
     void exampleYamlBootsViaBothAxes(String resourceName) throws Exception {
 

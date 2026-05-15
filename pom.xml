@@ -81,6 +81,11 @@
                 <artifactId>agentican-framework-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>ai.agentican</groupId>
+                <artifactId>agentican-temporal</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

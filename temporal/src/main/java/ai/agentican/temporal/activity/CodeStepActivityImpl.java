@@ -2,46 +2,51 @@ package ai.agentican.temporal.activity;
 
 import ai.agentican.framework.orchestration.code.CodeStep;
 import ai.agentican.framework.orchestration.code.CodeStepContext;
+import ai.agentican.framework.orchestration.code.CodeStepRegistry;
+import ai.agentican.framework.orchestration.execution.OrchestrationHelpers;
 import ai.agentican.temporal.dto.CodeInvocationRequest;
 import ai.agentican.temporal.dto.CodeInvocationResult;
 
 public class CodeStepActivityImpl implements CodeStepActivity {
 
-    private final CodeStepResolver codeResolver;
+    private final CodeStepRegistry registry;
     private final CodeStepContextProvider contextProvider;
 
-    @FunctionalInterface
-    public interface CodeStepContextProvider {
+    public CodeStepActivityImpl(CodeStepRegistry registry, CodeStepContextProvider contextProvider) {
 
-        CodeStepContext context(CodeInvocationRequest request);
-    }
-
-    public CodeStepActivityImpl(CodeStepResolver codeResolver, CodeStepContextProvider contextProvider) {
-
-        if (codeResolver == null)    throw new IllegalArgumentException("codeResolver is required");
+        if (registry == null) throw new IllegalArgumentException("CodeStepRegistry is required");
         if (contextProvider == null) throw new IllegalArgumentException("contextProvider is required");
 
-        this.codeResolver = codeResolver;
+        this.registry = registry;
         this.contextProvider = contextProvider;
     }
 
     @Override
     public CodeInvocationResult invokeCode(CodeInvocationRequest req) {
 
-        var step = codeResolver.resolve(req.codeSlug());
+        var entry = registry.get(req.codeSlug());
 
-        if (step == null)
+        if (entry == null)
             throw new IllegalArgumentException("Unknown code step slug: " + req.codeSlug());
 
-        var ctx = contextProvider.context(req);
-        var output = step.execute(req.input(), ctx);
+        var spec = entry.spec();
 
-        return new CodeInvocationResult(output);
+        var typedInput = OrchestrationHelpers.resolveInput(req.input(), spec.inputType(),
+                req.params(), req.stepOutputs());
+
+        var ctx = contextProvider.context(req);
+
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        var output = ((CodeStep) entry.executor()).execute(typedInput, ctx);
+
+        var stored = OrchestrationHelpers.serializeOutput(output, spec.outputType());
+
+        return new CodeInvocationResult(stored);
     }
 
     @FunctionalInterface
-    public interface CodeStepResolver {
+    public interface CodeStepContextProvider {
 
-        CodeStep<Object, Object> resolve(String slug);
+        CodeStepContext context(CodeInvocationRequest request);
     }
 }

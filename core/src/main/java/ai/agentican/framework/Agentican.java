@@ -67,11 +67,23 @@ public class Agentican implements AutoCloseable {
 
     private final WorkflowPlannerAgent workflowPlanner;
     private final WorkflowEngine workflowEngine;
+    private final Map<String, LlmClient> llms;
 
-    private Agentican(WorkflowPlannerAgent workflowPlanner, WorkflowEngine workflowEngine) {
+    private Agentican(WorkflowPlannerAgent workflowPlanner, WorkflowEngine workflowEngine,
+                      Map<String, LlmClient> llms) {
 
         this.workflowPlanner = workflowPlanner;
         this.workflowEngine = workflowEngine;
+        this.llms = llms;
+    }
+
+    public LlmClient llm(String name) {
+
+        var client = llms.get(name);
+
+        if (client == null) throw new IllegalArgumentException("No LLM configured for name: " + name);
+
+        return client;
     }
 
     public WorkflowPlan plan(String description) {
@@ -353,7 +365,7 @@ public class Agentican implements AutoCloseable {
             var engine = new WorkflowEngine(agenticanRegistry, finalTss, tl, taskRunner, executor,
                     workflowRunDecorator, hm, knowledgeIngestor, ownsExecutor);
 
-            return new Agentican(taskPlanner, engine);
+            return new Agentican(taskPlanner, engine, llmClients);
         }
 
         public Configuration configuration() { return configuration; }

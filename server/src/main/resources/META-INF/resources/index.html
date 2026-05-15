@@ -175,81 +175,112 @@
               <h1>Plans</h1>
               <p class="subtitle">Registered plan definitions available for execution.</p>
             </div>
-            <button class="btn-primary" onclick="openPlanModal()">+ New plan</button>
+            <button class="btn-primary" onclick="openPlanEditor()">+ New plan</button>
           </div>
         </div>
         <div id="plans-list" class="card-grid"></div>
       </div>
 
-      <!-- Plan edit modal -->
-      <div id="plan-modal" class="modal-overlay" hidden>
-        <div class="modal modal-wide">
-          <div class="modal-header">
-            <h2 id="plan-modal-title">New plan</h2>
-            <div class="mode-toggle">
-              <button type="button" class="mode-btn active" data-mode="form" onclick="switchPlanMode('form')">Form</button>
-              <button type="button" class="mode-btn" data-mode="json" onclick="switchPlanMode('json')">JSON</button>
+      <!-- Plan editor panel -->
+      <div id="panel-plan-editor" class="panel">
+        <div class="panel-header">
+          <div class="panel-header-row">
+            <div class="plan-editor-titlebar">
+              <button class="card-btn" onclick="closePlanEditor()" title="Back to plans">← Back</button>
+              <div>
+                <h1 id="plan-editor-title">New plan</h1>
+                <p class="subtitle">Define a workflow as a graph of agent steps.</p>
+              </div>
             </div>
-            <button class="modal-close" onclick="closePlanModal()">×</button>
+            <div class="plan-editor-actions">
+              <div class="mode-toggle">
+                <button type="button" class="mode-btn" data-mode="form" onclick="switchPlanMode('form')">Form</button>
+                <button type="button" class="mode-btn active" data-mode="canvas" onclick="switchPlanMode('canvas')">Canvas</button>
+                <button type="button" class="mode-btn" data-mode="json" onclick="switchPlanMode('json')">JSON</button>
+              </div>
+              <button type="button" class="btn-secondary" onclick="closePlanEditor()">Cancel</button>
+              <button type="submit" form="plan-form" class="btn-primary" id="plan-submit">Save</button>
+            </div>
           </div>
-          <form id="plan-form" onsubmit="submitPlanForm(event)">
-
-            <!-- Form view (structured editor) -->
-            <div id="plan-form-view">
-              <div class="form-row-inline">
-                <div class="form-row" style="flex:1">
-                  <label>Name</label>
-                  <input id="plan-form-name" type="text">
-                </div>
-                <div class="form-row" style="flex:1">
-                  <label>External ID</label>
-                  <input id="plan-form-externalId" type="text">
-                </div>
-              </div>
-              <div class="form-row">
-                <label>Description</label>
-                <textarea id="plan-form-description" rows="2"></textarea>
-              </div>
-              <div class="form-row">
-                <label>Output step</label>
-                <input id="plan-form-outputStep" type="text" placeholder="step name whose output is the plan's output">
-              </div>
-
-              <div class="form-row">
-                <div class="form-row-header">
-                  <label>Parameters</label>
-                  <button type="button" class="card-btn" onclick="addParamRow()">+ Add parameter</button>
-                </div>
-                <div id="plan-form-params" class="editor-rows"></div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-row-header">
-                  <label>Steps</label>
-                  <button type="button" class="card-btn" onclick="addStepRow()">+ Add step</button>
-                </div>
-                <div id="plan-form-steps" class="editor-rows"></div>
-              </div>
-
-              <div class="modal-error" id="plan-form-warning" hidden></div>
-            </div>
-
-            <!-- JSON view (raw) -->
-            <div id="plan-json-view" hidden>
-              <div class="form-row">
-                <label for="plan-json">Plan (JSON)</label>
-                <textarea id="plan-json" name="plan" rows="22"></textarea>
-                <p class="form-help">Shape mirrors <code>GET /agentican/plans/{ref}</code>. <code>externalId</code> is required.</p>
-              </div>
-            </div>
-
-            <div class="modal-error" id="plan-error" hidden></div>
-            <div class="modal-actions">
-              <button type="button" class="btn-secondary" onclick="closePlanModal()">Cancel</button>
-              <button type="submit" class="btn-primary" id="plan-submit">Save</button>
-            </div>
-          </form>
         </div>
+
+        <form id="plan-form" onsubmit="submitPlanForm(event)">
+
+          <!-- Form view (structured editor) -->
+          <div id="plan-form-view" hidden>
+            <div class="form-row-inline">
+              <div class="form-row" style="flex:1">
+                <input id="plan-form-name" type="text" placeholder="Name">
+              </div>
+              <div class="form-row" style="flex:1">
+                <input id="plan-form-id" type="text" placeholder="ID">
+              </div>
+            </div>
+            <div class="form-row">
+              <textarea id="plan-form-description" rows="2" placeholder="Description"></textarea>
+            </div>
+            <div class="form-row">
+              <input id="plan-form-outputStep" type="text" placeholder="Output step">
+            </div>
+
+            <div class="form-row">
+              <div class="form-row-header">
+                <button type="button" class="card-btn" onclick="addParamRow()">+ Add parameter</button>
+              </div>
+              <div id="plan-form-params" class="editor-rows"></div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-row-header">
+                <button type="button" class="card-btn" onclick="addStepRow()">+ Add step</button>
+              </div>
+              <div id="plan-form-steps" class="editor-rows"></div>
+            </div>
+
+            <div class="modal-error" id="plan-form-warning" hidden></div>
+          </div>
+
+          <!-- Canvas view (drag-and-drop) — default visible -->
+          <div id="plan-canvas-view">
+            <div class="canvas-meta-row">
+              <div class="form-row" style="flex:2">
+                <input id="plan-canvas-name" type="text" placeholder="Name" oninput="canvasUpdatePlanMeta()">
+              </div>
+              <div class="form-row" style="flex:1">
+                <input id="plan-canvas-id" type="text" placeholder="ID" oninput="canvasUpdatePlanMeta()">
+              </div>
+              <div class="form-row" style="flex:1">
+                <input id="plan-canvas-outputStep" type="text" placeholder="Output step" oninput="canvasUpdatePlanMeta()">
+              </div>
+            </div>
+            <div class="canvas-toolbar">
+              <button type="button" class="card-btn" onclick="canvasAddAgentStep()">+ Agent step</button>
+              <button type="button" class="card-btn" onclick="canvasAutoLayout()">Auto-layout</button>
+              <span class="canvas-hint">Drag from a node's right handle to another's left handle to add a dependency. Click a node to edit.</span>
+            </div>
+            <div class="canvas-workspace" id="plan-canvas-workspace">
+              <svg class="canvas-edges" id="plan-canvas-edges">
+                <defs>
+                  <marker id="canvas-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+                  </marker>
+                </defs>
+              </svg>
+              <div class="canvas-nodes" id="plan-canvas-nodes"></div>
+              <aside class="canvas-inspector" id="plan-canvas-inspector" hidden></aside>
+            </div>
+            <div class="modal-error" id="plan-canvas-warning" hidden></div>
+          </div>
+
+          <!-- JSON view (raw) -->
+          <div id="plan-json-view" hidden>
+            <div class="form-row">
+              <textarea id="plan-json" name="plan" rows="22" placeholder="Plan (JSON)"></textarea>
+            </div>
+          </div>
+
+          <div class="modal-error" id="plan-error" hidden></div>
+        </form>
       </div>
 
       <!-- Agents panel -->
@@ -288,26 +319,33 @@
             <button class="modal-close" onclick="closeCatalogModal()">×</button>
           </div>
           <form id="catalog-form" onsubmit="submitCatalogForm(event)">
-            <div class="form-row">
-              <label for="catalog-externalId">External ID</label>
-              <input id="catalog-externalId" name="externalId" type="text" required>
-              <p class="form-help">Stable business key. Cannot be changed after creation.</p>
-            </div>
-            <div class="form-row">
-              <label for="catalog-name">Name</label>
-              <input id="catalog-name" name="name" type="text" required>
-            </div>
-            <div class="form-row" id="catalog-role-row">
-              <label for="catalog-role">Role</label>
-              <textarea id="catalog-role" name="role" rows="3" required></textarea>
-            </div>
-            <div class="form-row" id="catalog-instructions-row" hidden>
-              <label for="catalog-instructions">Instructions</label>
-              <textarea id="catalog-instructions" name="instructions" rows="6"></textarea>
-            </div>
-            <div class="form-row" id="catalog-llm-row">
-              <label for="catalog-llm">LLM (optional)</label>
-              <input id="catalog-llm" name="llm" type="text" placeholder="default">
+            <div class="catalog-form-grid">
+              <div class="catalog-form-col">
+                <div class="form-row">
+                  <input id="catalog-id" name="id" type="text" placeholder="ID" required>
+                </div>
+                <div class="form-row">
+                  <input id="catalog-name" name="name" type="text" placeholder="Name" required>
+                </div>
+                <div class="form-row" id="catalog-llm-row">
+                  <div class="canvas-picker-wrapper">
+                    <input type="text" class="canvas-picker-input" id="catalog-llm-input"
+                           placeholder="LLM (optional)" autocomplete="off"
+                           onfocus="catalogLlmPickerOpen(true)"
+                           oninput="catalogLlmPickerOpen(false)"
+                           onblur="catalogLlmPickerClose()">
+                    <div class="canvas-picker-list" id="catalog-llm-list"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="catalog-form-col">
+                <div class="form-row" id="catalog-role-row">
+                  <textarea id="catalog-role" name="role" rows="8" placeholder="Role" required></textarea>
+                </div>
+                <div class="form-row" id="catalog-instructions-row" hidden>
+                  <textarea id="catalog-instructions" name="instructions" rows="8" placeholder="Instructions"></textarea>
+                </div>
+              </div>
             </div>
             <div class="modal-error" id="catalog-error" hidden></div>
             <div class="modal-actions">
@@ -378,9 +416,7 @@
           </div>
           <form id="import-form" onsubmit="submitImport(event)">
             <div class="form-row">
-              <label for="import-body">Catalog (YAML or JSON)</label>
-              <textarea id="import-body" rows="18" required placeholder="agents:&#10;  - externalId: ...&#10;    name: ...&#10;skills:&#10;  - ...&#10;plans:&#10;  - ..."></textarea>
-              <p class="form-help">Upserts by externalId. Entries declared in <code>application.properties</code> are skipped.</p>
+              <textarea id="import-body" rows="18" required placeholder="Catalog (YAML or JSON) — upserts by id. agents:&#10;  - id: ...&#10;    name: ..."></textarea>
             </div>
             <div class="form-row">
               <label><input type="checkbox" id="import-dry-run" checked> Dry run (preview only, don't apply)</label>

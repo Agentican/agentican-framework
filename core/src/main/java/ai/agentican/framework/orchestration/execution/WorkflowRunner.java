@@ -54,7 +54,7 @@ public class WorkflowRunner {
     private final Duration taskTimeout;
     private final StepAgentRunner stepAgentRunner;
 
-    private final ConcurrentHashMap<WorkflowDefinition, ImmutableDeps> depsCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<WorkflowDefinition, OrchestrationHelpers.Dependencies> depsCache = new ConcurrentHashMap<>();
     private final StepLoopRunner stepLoopRunner;
     private final StepBranchRunner stepBranchRunner;
     private final StepCodeRunner stepCodeRunner;
@@ -1070,11 +1070,6 @@ public class WorkflowRunner {
         }
     }
 
-    private record ImmutableDeps(
-            Map<String, Set<String>> forwardDeps,
-            Map<String, Set<String>> dependents,
-            Map<String, WorkflowStep> stepsByName) {}
-
     private record DependencyGraph(
             Map<String, Set<String>> forwardDeps,
             Map<String, Set<String>> dependents,
@@ -1083,62 +1078,12 @@ public class WorkflowRunner {
 
     private DependencyGraph buildDependencyStructures(WorkflowDefinition plan) {
 
-        var immutable = depsCache.computeIfAbsent(plan, WorkflowRunner::computeImmutableDeps);
+        var immutable = depsCache.computeIfAbsent(plan, OrchestrationHelpers::computeDependencies);
 
         var remainingDeps = new HashMap<String, Integer>();
-        immutable.forwardDeps.forEach((name, deps) -> remainingDeps.put(name, deps.size()));
+        immutable.forward().forEach((name, deps) -> remainingDeps.put(name, deps.size()));
 
-        return new DependencyGraph(immutable.forwardDeps, immutable.dependents, remainingDeps, immutable.stepsByName);
-    }
-
-    private static ImmutableDeps computeImmutableDeps(WorkflowDefinition plan) {
-
-        var forwardDeps = new HashMap<String, Set<String>>();
-        var dependents = new HashMap<String, Set<String>>();
-        var stepsByName = new HashMap<String, WorkflowStep>();
-
-        var paramNames = plan.params().stream()
-                .map(ai.agentican.framework.orchestration.model.WorkflowParam::name)
-                .collect(java.util.stream.Collectors.toSet());
-
-        for (var taskStep : plan.steps()) {
-
-            var name = taskStep.name();
-
-            stepsByName.put(name, taskStep);
-
-            var deps = new LinkedHashSet<>(taskStep.dependencies());
-
-            if (taskStep instanceof WorkflowStepAgent agentTaskStep) {
-
-                var matcher = Placeholders.STEP_OUTPUT_PATTERN.matcher(agentTaskStep.instructions());
-
-                while (matcher.find())
-                    deps.add(matcher.group(1));
-            }
-
-            if (taskStep instanceof WorkflowStepLoop loopTaskStep
-                    && !paramNames.contains(loopTaskStep.over()))
-                deps.add(loopTaskStep.over());
-
-            if (taskStep instanceof WorkflowStepBranch branchTaskStep
-                    && !paramNames.contains(branchTaskStep.from()))
-                deps.add(branchTaskStep.from());
-
-            forwardDeps.put(name, Set.copyOf(deps));
-
-            for (var dep : deps) {
-                dependents.computeIfAbsent(dep, k -> new LinkedHashSet<>()).add(name);
-            }
-        }
-
-        var immutableDependents = new HashMap<String, Set<String>>();
-        dependents.forEach((k, v) -> immutableDependents.put(k, Set.copyOf(v)));
-
-        return new ImmutableDeps(
-                Map.copyOf(forwardDeps),
-                Map.copyOf(immutableDependents),
-                Map.copyOf(stepsByName));
+        return new DependencyGraph(immutable.forward(), immutable.dependents(), remainingDeps, immutable.stepsByName());
     }
 
     private boolean evaluateConditions(WorkflowStep step, Map<String, String> stepOutputs, Map<String, String> taskParams) {

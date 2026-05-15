@@ -3,6 +3,9 @@ package ai.agentican.framework.state;
 import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.util.Ids;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -28,6 +31,17 @@ public class RunLog {
         this.index = index;
         this.agentName = null;
         this.turns = new CopyOnWriteArrayList<>(turns != null ? turns : List.of());
+    }
+
+    @JsonCreator
+    public RunLog(@JsonProperty("id") String id,
+                  @JsonProperty("index") int index,
+                  @JsonProperty("agentName") String agentName,
+                  @JsonProperty("turns") List<TurnLog> turns) {
+
+        this(id, index, agentName);
+
+        if (turns != null) for (var t : turns) addTurn(t);
     }
 
     public void addTurn(TurnLog turn) { turns.add(turn); }

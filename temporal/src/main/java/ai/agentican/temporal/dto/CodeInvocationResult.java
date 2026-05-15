@@ -1,5 +1,3 @@
 package ai.agentican.temporal.dto;
 
-public record CodeInvocationResult(Object output) {
-
-}
+public record CodeInvocationResult(String output) { }

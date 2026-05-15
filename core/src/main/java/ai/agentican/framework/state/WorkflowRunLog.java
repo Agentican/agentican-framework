@@ -4,6 +4,9 @@ import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +53,30 @@ public class WorkflowRunLog {
         this.parentTaskId = parentTaskId;
         this.parentStepId = parentStepId;
         this.iterationIndex = iterationIndex;
+    }
+
+    @JsonCreator
+    public WorkflowRunLog(@JsonProperty("taskId") String taskId,
+                          @JsonProperty("taskName") String taskName,
+                          @JsonProperty("plan") WorkflowDefinition plan,
+                          @JsonProperty("params") Map<String, String> params,
+                          @JsonProperty("parentTaskId") String parentTaskId,
+                          @JsonProperty("parentStepId") String parentStepId,
+                          @JsonProperty("iterationIndex") int iterationIndex,
+                          @JsonProperty("createdAt") Instant createdAt,
+                          @JsonProperty("status") WorkflowRunStatus status,
+                          @JsonProperty("completedAt") Instant completedAt,
+                          @JsonProperty("planSnapshotCorrupt") boolean planSnapshotCorrupt,
+                          @JsonProperty("steps") Map<String, StepLog> steps) {
+
+        this(taskId, taskName, plan, params != null ? params : Map.of(),
+                parentTaskId, parentStepId, iterationIndex, createdAt);
+
+        if (status != null)      setStatus(status);
+        if (completedAt != null) setCompletedAt(completedAt);
+        setPlanSnapshotCorrupt(planSnapshotCorrupt);
+
+        if (steps != null) for (var e : steps.entrySet()) addStep(e.getKey(), e.getValue());
     }
 
     public String taskId() { return taskId; }

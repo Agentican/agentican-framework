@@ -85,7 +85,16 @@ public class SmacAgentRunner implements AgentRunner {
 
         var taskCancelled = new AtomicBoolean(false);
 
-        return execute(agent, task, taskId, stepId, stepName, taskCancelled, timeout, skills, toolkits, outputSchema);
+        return run(agent, task, taskId, stepId, stepName, timeout, skills, toolkits, outputSchema,
+                new InProcessAgentLoopHost(llm, workflowRunStore, hitlManager, knowledgeStore, taskCancelled));
+    }
+
+    @Override
+    public AgentResult run(Agent agent, String task, String taskId, String stepId, String stepName, Duration timeout,
+                           List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema,
+                           AgentLoopHost host) {
+
+        return execute(agent, task, taskId, stepId, stepName, host, timeout, skills, toolkits, outputSchema);
     }
 
     @Override
@@ -95,12 +104,22 @@ public class SmacAgentRunner implements AgentRunner {
 
         var taskCancelled = new AtomicBoolean(false);
 
-        return resumeExecution(agent, task, taskId, stepId, stepName, taskCancelled, timeout, skills, toolkits,
+        return resume(agent, task, taskId, stepId, stepName, timeout, skills, toolkits, outputSchema, savedRun,
+                hitlToolResults,
+                new InProcessAgentLoopHost(llm, workflowRunStore, hitlManager, knowledgeStore, taskCancelled));
+    }
+
+    @Override
+    public AgentResult resume(Agent agent, String task, String taskId, String stepId, String stepName, Duration timeout,
+                              List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema,
+                              RunLog savedRun, List<ToolResult> hitlToolResults, AgentLoopHost host) {
+
+        return resumeExecution(agent, task, taskId, stepId, stepName, host, timeout, skills, toolkits,
                 savedRun, hitlToolResults, outputSchema);
     }
 
     private AgentResult execute(Agent agent, String task, String taskId, String stepId, String stepName,
-                                AtomicBoolean cancelled, Duration timeout, List<String> skills,
+                                AgentLoopHost host, Duration timeout, List<String> skills,
                                 Map<String, Toolkit> toolkits, StructuredOutput outputSchema) {
 
         LOG.info(Logs.AGENT_RUNNING_STEP, agent.name(), skills.size(), toolkits.size());
@@ -108,17 +127,17 @@ public class SmacAgentRunner implements AgentRunner {
 
         var ctx = buildContext(agent, skills, toolkits, outputSchema);
 
-        ensureTaskLog(taskId, stepId, stepName);
+        ensureTaskLog(host, taskId, stepId, stepName);
 
-        var runId = Ids.generate();
+        var runId = host.newId();
         var agentName = agent.name();
 
-        workflowRunStore.runStarted(taskId, stepId, runId, agentName);
+        host.runStarted(taskId, stepId, runId, agentName);
 
-        var agentResult = loop(task, Instant.now(), List.of(), ctx, cancelled, taskId, stepId, stepName, runId, 0,
+        var agentResult = loop(task, host.now(), List.of(), ctx, host, taskId, stepId, stepName, runId, 0,
                 timeout, outputSchema);
 
-        workflowRunStore.runCompleted(taskId, runId);
+        host.runCompleted(taskId, runId);
 
         return agentResult;
     }
@@ -128,13 +147,15 @@ public class SmacAgentRunner implements AgentRunner {
                                         List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema,
                                         RunLog savedRun, AtomicBoolean cancelled, ResumePlan resumePlan) {
 
+        var host = new InProcessAgentLoopHost(llm, workflowRunStore, hitlManager, knowledgeStore, cancelled);
+
         LOG.info("Resuming agent step after crash: agent={}, savedTurns={}, turnState={}",
                 agent.name(), savedRun != null ? savedRun.turns().size() : 0,
                 resumePlan != null ? resumePlan.turnState() : "<no definition>");
 
         var ctx = buildContext(agent, skills, toolkits, outputSchema);
 
-        ensureTaskLog(taskId, stepId, stepName);
+        ensureTaskLog(host, taskId, stepId, stepName);
 
         if (savedRun != null) rehydrateExplicitStores(ctx.localScratchpad(), savedRun);
 
@@ -150,7 +171,7 @@ public class SmacAgentRunner implements AgentRunner {
                 LOG.info("Step '{}' was logically complete (last turn stopReason={}); short-circuiting resume",
                         stepName, lastTurn.response().stopReason());
 
-                workflowRunStore.runCompleted(taskId, savedRun.id());
+                host.runCompleted(taskId, savedRun.id());
 
                 return AgentResult.builder().status(AgentStatus.COMPLETED).run(savedRun).build();
             }
@@ -164,7 +185,7 @@ public class SmacAgentRunner implements AgentRunner {
 
                     LOG.info("Abandoning in-flight turn {} in state {}; starting fresh turn", lastTurnId, state);
 
-                    workflowRunStore.turnAbandoned(taskId, lastTurnId);
+                    host.turnAbandoned(taskId, lastTurnId);
                 }
 
                 case RESPONSE_RECEIVED, TOOLS_PARTIAL, TOOLS_COMPLETE -> {
@@ -175,30 +196,30 @@ public class SmacAgentRunner implements AgentRunner {
                         LOG.info("Replaying response and executing {} pending tool call(s) for turn {}",
                                 pending.size(), lastTurnId);
 
-                        executeToolCalls(pending, ctx.toolkits(), cancelled, lastTurn.index(), taskId, lastTurnId);
+                        executeToolCalls(pending, ctx.toolkits(), host, lastTurn.index(), taskId, lastTurnId);
                     }
 
-                    workflowRunStore.turnCompleted(taskId, lastTurnId);
+                    host.turnCompleted(taskId, lastTurnId);
                 }
             }
         }
 
-        if (savedRun != null) workflowRunStore.runCompleted(taskId, savedRun.id());
+        if (savedRun != null) host.runCompleted(taskId, savedRun.id());
 
-        var runId = Ids.generate();
+        var runId = host.newId();
 
-        workflowRunStore.runStarted(taskId, stepId, runId, agent.name());
+        host.runStarted(taskId, stepId, runId, agent.name());
 
-        var agentResult = loop(task, Instant.now(), List.of(), ctx, cancelled, taskId, stepId, stepName, runId, 0,
+        var agentResult = loop(task, host.now(), List.of(), ctx, host, taskId, stepId, stepName, runId, 0,
                 null, outputSchema);
 
-        workflowRunStore.runCompleted(taskId, runId);
+        host.runCompleted(taskId, runId);
 
         return agentResult;
     }
 
     private AgentResult resumeExecution(Agent agent, String task, String taskId, String stepId, String stepName,
-                                        AtomicBoolean cancelled, Duration timeout, List<String> skills,
+                                        AgentLoopHost host, Duration timeout, List<String> skills,
                                         Map<String, Toolkit> toolkits, RunLog savedRun,
                                         List<ToolResult> approvalToolResults, StructuredOutput outputSchema) {
 
@@ -206,7 +227,7 @@ public class SmacAgentRunner implements AgentRunner {
 
         var ctx = buildContext(agent, skills, toolkits, outputSchema);
 
-        ensureTaskLog(taskId, stepId, stepName);
+        ensureTaskLog(host, taskId, stepId, stepName);
 
         rehydrateExplicitStores(ctx.localScratchpad(), savedRun);
 
@@ -226,7 +247,7 @@ public class SmacAgentRunner implements AgentRunner {
             toolResults.addAll(approvalToolResults);
 
             for (var approvalToolResult : approvalToolResults)
-                workflowRunStore.toolCallCompleted(taskId, lastTurnId, approvalToolResult);
+                host.toolCallCompleted(taskId, lastTurnId, approvalToolResult);
         }
         else {
 
@@ -238,16 +259,16 @@ public class SmacAgentRunner implements AgentRunner {
 
                     LOG.info("Executing approved HITL tool: {}", pendingToolCall.name());
 
-                    workflowRunStore.toolCallStarted(taskId, lastTurnId, pendingToolCall);
+                    host.toolCallStarted(taskId, lastTurnId, pendingToolCall);
 
                     try {
 
-                        var toolOutput = toolkit.execute(pendingToolCall.name(), pendingToolCall.args());
+                        var toolOutput = host.executeTool(pendingToolCall.name(), pendingToolCall.args(), toolkit);
                         var toolResult = new ToolResult(pendingToolCall.id(), pendingToolCall.name(), toolOutput);
 
                         toolResults.add(toolResult);
 
-                        workflowRunStore.toolCallCompleted(taskId, lastTurnId, toolResult);
+                        host.toolCallCompleted(taskId, lastTurnId, toolResult);
                     }
                     catch (Exception e) {
 
@@ -257,28 +278,28 @@ public class SmacAgentRunner implements AgentRunner {
 
                         toolResults.add(toolResult);
 
-                        workflowRunStore.toolCallCompleted(taskId, lastTurnId, toolResult);
+                        host.toolCallCompleted(taskId, lastTurnId, toolResult);
                     }
                 }
             }
         }
 
-        workflowRunStore.turnCompleted(taskId, lastTurnId);
+        host.turnCompleted(taskId, lastTurnId);
 
-        var runId = Ids.generate();
+        var runId = host.newId();
 
-        workflowRunStore.runStarted(taskId, stepId, runId, agent.name());
+        host.runStarted(taskId, stepId, runId, agent.name());
 
-        var agentResult = loop(task, Instant.now(), toolResults, ctx, cancelled, taskId, stepId, stepName, runId,
+        var agentResult = loop(task, host.now(), toolResults, ctx, host, taskId, stepId, stepName, runId,
                 savedRun.turns().size(), timeout, outputSchema);
 
-        workflowRunStore.runCompleted(taskId, runId);
+        host.runCompleted(taskId, runId);
 
         return agentResult;
     }
 
     private AgentResult loop(String task, Instant startTime, List<ToolResult> toolResults, SmacAgentContext ctx,
-                             AtomicBoolean cancelled, String taskId, String stepId, String stepName, String runId,
+                             AgentLoopHost host, String taskId, String stepId, String stepName, String runId,
                              int turnIndex, Duration timeoutOverride, StructuredOutput outputSchema) {
 
         var effectiveTimeout = timeoutOverride != null ? timeoutOverride : timeout;
@@ -289,21 +310,21 @@ public class SmacAgentRunner implements AgentRunner {
             LOG.info(Logs.AGENT_RUNNING_LOOP, turnIndex);
 
             if (turnIndex >= maxTurns)
-                return AgentResult.builder().status(AgentStatus.MAX_TURNS).run(getOrCreateRunLog(taskId, stepId)).build();
+                return AgentResult.builder().status(AgentStatus.MAX_TURNS).run(getOrCreateRunLog(host, taskId, stepId)).build();
 
-            if (cancelled.get())
-                return AgentResult.builder().status(AgentStatus.CANCELLED).run(getOrCreateRunLog(taskId, stepId)).build();
+            if (host.isCancelled())
+                return AgentResult.builder().status(AgentStatus.CANCELLED).run(getOrCreateRunLog(host, taskId, stepId)).build();
 
-            if (deadline != null && Instant.now().isAfter(deadline))
-                return AgentResult.builder().status(AgentStatus.TIMED_OUT).run(getOrCreateRunLog(taskId, stepId)).build();
+            if (deadline != null && host.now().isAfter(deadline))
+                return AgentResult.builder().status(AgentStatus.TIMED_OUT).run(getOrCreateRunLog(host, taskId, stepId)).build();
 
-            var turnId = Ids.generate();
+            var turnId = host.newId();
 
-            workflowRunStore.turnStarted(taskId, runId, turnId);
+            host.turnStarted(taskId, runId, turnId);
 
             var recalledKnowledge = List.copyOf(ctx.recalledKnowledge().values());
 
-            var progress = buildProgress(taskId, stepId);
+            var progress = buildProgress(host, taskId, stepId);
 
             var userTask = TEMPLATES.renderTaskBlock(task);
             var userMessage = TEMPLATES.renderUserMessage(turnIndex,
@@ -315,19 +336,24 @@ public class SmacAgentRunner implements AgentRunner {
 
             LOG.info(Logs.AGENT_SEND_LLM, turnIndex);
 
-            workflowRunStore.messageSent(taskId, turnId, llmRequest);
+            host.messageSent(taskId, turnId, llmRequest);
 
-            var llmResponse = llm.sendStreaming(llmRequest, token -> workflowRunListener.onToken(taskId, turnId, token));
+            var llmResponse = host.callLlm(llmRequest);
 
-            workflowRunStore.responseReceived(taskId, turnId, llmResponse);
+            // Host SPI doesn't carry token-level streaming yet; fire the listener once
+            // with the full text so non-streaming consumers still see a notification.
+            if (llmResponse.text() != null && !llmResponse.text().isEmpty())
+                workflowRunListener.onToken(taskId, turnId, llmResponse.text());
+
+            host.responseReceived(taskId, turnId, llmResponse);
 
             LOG.info(Logs.AGENT_RECD_LLM, turnIndex, llmResponse.stopReason());
 
             if (llmResponse.stopReason() != StopReason.TOOL_USE || llmResponse.toolCalls().isEmpty()) {
 
-                workflowRunStore.turnCompleted(taskId, turnId);
+                host.turnCompleted(taskId, turnId);
 
-                return AgentResult.builder().status(AgentStatus.COMPLETED).run(getOrCreateRunLog(taskId, stepId)).build();
+                return AgentResult.builder().status(AgentStatus.COMPLETED).run(getOrCreateRunLog(host, taskId, stepId)).build();
             }
 
             var approvalToolCalls = new ArrayList<ToolCall>();
@@ -356,25 +382,23 @@ public class SmacAgentRunner implements AgentRunner {
             var currentToolResults = normalToolCalls.isEmpty()
                     ? new ArrayList<ToolResult>()
                     : new ArrayList<>(executeToolCalls(normalToolCalls,
-                    ctx.toolkits(), cancelled, turnIndex, taskId, turnId));
+                    ctx.toolkits(), host, turnIndex, taskId, turnId));
 
-            if (knowledgeStore != null) {
+            // Knowledge recall — if any tool call was a recall, hydrate the entries into context.
+            for (var toolCall : normalToolCalls) {
 
-                for (var toolCall : normalToolCalls) {
+                if (KnowledgeToolkit.TOOL_NAME.equals(toolCall.name())) {
 
-                    if (KnowledgeToolkit.TOOL_NAME.equals(toolCall.name())) {
+                    var entryIds = toolCall.args().get("entry_ids");
 
-                        var entryIds = toolCall.args().get("entry_ids");
+                    if (entryIds instanceof List<?> list) {
 
-                        if (entryIds instanceof List<?> list) {
+                        for (var entryId : list) {
 
-                            for (var entryId : list) {
+                            var entry = host.knowledgeEntry(entryId.toString());
 
-                                var entry = knowledgeStore.get(entryId.toString());
-
-                                if (entry != null)
-                                    ctx.recalledKnowledge().put(entry.id(), entry);
-                            }
+                            if (entry != null)
+                                ctx.recalledKnowledge().put(entry.id(), entry);
                         }
                     }
                 }
@@ -390,9 +414,9 @@ public class SmacAgentRunner implements AgentRunner {
                 LOG.info("Turn {}: tool '{}' asking question, suspending after executing {} normal tool(s)",
                         turnIndex, questionCall.name(), currentToolResults.size());
 
-                var checkpoint = hitlManager.createQuestionCheckpoint(question, context, stepName);
+                var checkpoint = host.createQuestionCheckpoint(question, context, stepName);
 
-                return AgentResult.builder().status(AgentStatus.SUSPENDED).run(getOrCreateRunLog(taskId, stepId)).checkpoint(checkpoint).build();
+                return AgentResult.builder().status(AgentStatus.SUSPENDED).run(getOrCreateRunLog(host, taskId, stepId)).checkpoint(checkpoint).build();
             }
 
             if (!approvalToolCalls.isEmpty()) {
@@ -402,12 +426,12 @@ public class SmacAgentRunner implements AgentRunner {
                 LOG.info("Turn {}: tool '{}' requires approval, suspending after executing {} normal tool(s)",
                         turnIndex, pendingToolCall.name(), currentToolResults.size());
 
-                var checkpoint = hitlManager.createToolApprovalCheckpoint(pendingToolCall, stepName);
+                var checkpoint = host.createToolApprovalCheckpoint(pendingToolCall, stepName);
 
-                return AgentResult.builder().status(AgentStatus.SUSPENDED).run(getOrCreateRunLog(taskId, stepId)).checkpoint(checkpoint).build();
+                return AgentResult.builder().status(AgentStatus.SUSPENDED).run(getOrCreateRunLog(host, taskId, stepId)).checkpoint(checkpoint).build();
             }
 
-            workflowRunStore.turnCompleted(taskId, turnId);
+            host.turnCompleted(taskId, turnId);
 
             toolResults = currentToolResults;
 
@@ -415,38 +439,38 @@ public class SmacAgentRunner implements AgentRunner {
         }
     }
 
-    private void ensureTaskLog(String taskId, String stepId, String stepName) {
+    private void ensureTaskLog(AgentLoopHost host, String taskId, String stepId, String stepName) {
 
-        var taskLog = workflowRunStore.load(taskId);
+        var taskLog = host.loadRunLog(taskId);
 
         if (taskLog == null) {
 
-            workflowRunStore.taskStarted(taskId, stepName, null, Map.of());
-            workflowRunStore.stepStarted(taskId, stepId, stepName);
+            host.taskStarted(taskId, stepName, null, Map.of());
+            host.stepStarted(taskId, stepId, stepName);
         }
     }
 
-    private RunLog getOrCreateRunLog(String taskId, String stepId) {
+    private RunLog getOrCreateRunLog(AgentLoopHost host, String taskId, String stepId) {
 
-        var taskLog = workflowRunStore.load(taskId);
+        var taskLog = host.loadRunLog(taskId);
 
         if (taskLog == null)
-            return new RunLog(Ids.generate(), 0, (String) null);
+            return new RunLog(host.newId(), 0, (String) null);
 
         var stepLog = taskLog.findStepById(stepId);
         var runLog = stepLog != null ? stepLog.lastRun() : null;
 
-        return runLog != null ? runLog : new RunLog(Ids.generate(), 0, (String) null);
+        return runLog != null ? runLog : new RunLog(host.newId(), 0, (String) null);
     }
 
     private List<ToolResult> executeToolCalls(List<ToolCall> toolCalls, Map<String, Toolkit> taskToolkits,
-                                              AtomicBoolean cancelled, int iteration, String taskId, String turnId) {
+                                              AgentLoopHost host, int iteration, String taskId, String turnId) {
 
         return Parallel.map(toolCalls, toolCall -> {
 
             try {
 
-                return executeToolCall(toolCall, taskToolkits, cancelled, iteration, taskId, turnId);
+                return executeToolCall(toolCall, taskToolkits, host, iteration, taskId, turnId);
             }
             catch (Exception ex) {
 
@@ -458,7 +482,7 @@ public class SmacAgentRunner implements AgentRunner {
                 var toolResult = new ToolResult(toolCallId, toolName,
                         toolErrorAsJson(ex.getClass().getSimpleName() + ": " + ex.getMessage()), ex);
 
-                workflowRunStore.toolCallCompleted(taskId, turnId, toolResult);
+                host.toolCallCompleted(taskId, turnId, toolResult);
 
                 return toolResult;
             }
@@ -466,19 +490,19 @@ public class SmacAgentRunner implements AgentRunner {
     }
 
     private ToolResult executeToolCall(ToolCall toolCall, Map<String, Toolkit> taskToolkits,
-                                       AtomicBoolean taskCancelled, int iteration, String taskId, String turnId) {
+                                       AgentLoopHost host, int iteration, String taskId, String turnId) {
 
-        workflowRunStore.toolCallStarted(taskId, turnId, toolCall);
+        host.toolCallStarted(taskId, turnId, toolCall);
 
         var toolCallId = toolCall.id();
         var toolCallArgs = toolCall.args();
         var toolName = toolCall.name();
 
-        if (taskCancelled.get()) {
+        if (host.isCancelled()) {
 
             var toolResult = new ToolResult(toolCallId, toolName, toolErrorAsJson("Execution cancelled"));
 
-            workflowRunStore.toolCallCompleted(taskId, turnId, toolResult);
+            host.toolCallCompleted(taskId, turnId, toolResult);
 
             return toolResult;
         }
@@ -490,7 +514,7 @@ public class SmacAgentRunner implements AgentRunner {
             var toolResult = new ToolResult(toolCallId, toolName,
                     toolErrorAsJson("No executor found for tool: " + toolName));
 
-            workflowRunStore.toolCallCompleted(taskId, turnId, toolResult);
+            host.toolCallCompleted(taskId, turnId, toolResult);
 
             return toolResult;
         }
@@ -499,10 +523,10 @@ public class SmacAgentRunner implements AgentRunner {
 
         try {
 
-            var toolOutput = toolkit.execute(toolName, toolCallArgs);
+            var toolOutput = host.executeTool(toolName, toolCallArgs, toolkit);
             var toolResult = new ToolResult(toolCallId, toolName, toolOutput);
 
-            workflowRunStore.toolCallCompleted(taskId, turnId, toolResult);
+            host.toolCallCompleted(taskId, turnId, toolResult);
 
             return toolResult;
         }
@@ -512,7 +536,7 @@ public class SmacAgentRunner implements AgentRunner {
 
             var toolResult = new ToolResult(toolCallId, toolName, toolErrorAsJson(e.getMessage()), e);
 
-            workflowRunStore.toolCallCompleted(taskId, turnId, toolResult);
+            host.toolCallCompleted(taskId, turnId, toolResult);
 
             return toolResult;
         }
@@ -592,9 +616,9 @@ public class SmacAgentRunner implements AgentRunner {
                 .build();
     }
 
-    private List<AgentToolUse> buildProgress(String taskId, String stepId) {
+    private List<AgentToolUse> buildProgress(AgentLoopHost host, String taskId, String stepId) {
 
-        var taskLog = workflowRunStore.load(taskId);
+        var taskLog = host.loadRunLog(taskId);
 
         if (taskLog == null) return List.of();
 

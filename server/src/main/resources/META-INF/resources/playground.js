@@ -18,9 +18,17 @@ function shortHexId() {
 
 // === Navigation (hash-based so refresh + back/forward preserve the panel) ===
 
-const VALID_PANELS = new Set(['tasks','plans','agents','skills','tools','knowledge','metrics','config','audit']);
+const VALID_PANELS = new Set(['tasks','plans','plan-editor','agents','skills','tools','knowledge','metrics','config','audit']);
 
-function activatePanel(panel) {
+function parseHash() {
+  const raw = location.hash.slice(1);
+  const slash = raw.indexOf('/');
+  const panel = (slash < 0 ? raw : raw.slice(0, slash)) || 'tasks';
+  const ref   = slash < 0 ? null : decodeURIComponent(raw.slice(slash + 1));
+  return { panel, ref };
+}
+
+function activatePanel(panel, ref) {
   if (!VALID_PANELS.has(panel)) panel = 'tasks';
   document.querySelectorAll('.nav-item').forEach(n => {
     n.classList.toggle('active', n.dataset.panel === panel);
@@ -31,6 +39,7 @@ function activatePanel(panel) {
   switch (panel) {
     case 'tasks': loadTasks(); break;
     case 'plans': loadPlans(); break;
+    case 'plan-editor': _loadPlanEditor(ref); break;
     case 'agents': loadAgents(); break;
     case 'skills': loadSkills(); break;
     case 'tools': loadTools(); break;
@@ -45,7 +54,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', e => {
     e.preventDefault();
     const panel = item.dataset.panel;
-    if ((location.hash.slice(1) || 'tasks') === panel) {
+    if (parseHash().panel === panel) {
       activatePanel(panel);
     } else {
       location.hash = panel;
@@ -54,7 +63,8 @@ document.querySelectorAll('.nav-item').forEach(item => {
 });
 
 window.addEventListener('hashchange', () => {
-  activatePanel(location.hash.slice(1) || 'tasks');
+  const { panel, ref } = parseHash();
+  activatePanel(panel, ref);
 });
 
 // === Theme ===
@@ -1127,12 +1137,12 @@ async function loadPlans() {
 
       // Inject action buttons into the plan summary.
       const summary = el.querySelector('.plan-summary');
-      const refKey = p.plan.externalId || p.planId;
-      if (summary && p.plan.externalId) {
+      const refKey = p.plan.id || p.planId;
+      if (summary && p.plan.id) {
         const actions = document.createElement('span');
         actions.className = 'card-actions';
         actions.innerHTML = `
-          <button class="card-btn" onclick="event.stopPropagation(); openPlanModal('${escapeAttr(refKey)}')">Edit</button>
+          <button class="card-btn" onclick="event.stopPropagation(); openPlanEditor('${escapeAttr(refKey)}')">Edit</button>
           <button class="card-btn card-btn-danger" onclick="event.stopPropagation(); deletePlan('${escapeAttr(refKey)}', '${escapeAttr(p.plan.name || refKey)}')">Delete</button>`;
         summary.appendChild(actions);
       }
@@ -1152,14 +1162,15 @@ async function loadPlans() {
 // === Plan CRUD modal ===
 
 let _planEditRef = null;
-let _planMode = 'form';               // 'form' | 'json'
-let _planAgentChoices = [];           // populated from /agents on modal open
-let _planSkillChoices = [];           // populated from /skills on modal open
+let _planMode = 'canvas';             // 'form' | 'canvas' | 'json'
+let _planAgentChoices = [];           // populated from /agents on editor open
+let _planSkillChoices = [];           // populated from /skills on editor open
+let _planToolChoices  = [];           // [{ name, label, toolkit }] from /tools on editor open
 
 const BLANK_PLAN = () => ({
   name: '',
   description: '',
-  externalId: '',
+  id: '',
   outputStep: '',
   params: [],
   steps: [{
@@ -1174,40 +1185,48 @@ const BLANK_PLAN = () => ({
   }]
 });
 
-function openPlanModal(ref) {
+function openPlanEditor(ref) {
+  location.hash = ref ? 'plan-editor/' + encodeURIComponent(ref) : 'plan-editor';
+}
+
+function _loadPlanEditor(ref) {
   _planEditRef = ref || null;
 
-  document.getElementById('plan-modal-title').textContent = ref ? 'Edit plan' : 'New plan';
+  document.getElementById('plan-editor-title').textContent = ref ? 'Edit plan' : 'New plan';
   document.getElementById('plan-error').hidden = true;
   document.getElementById('plan-error').textContent = '';
 
-  // Refresh agent/skill options for the form view.
+  // Refresh agent/skill/tool options for the form view & canvas inspector.
   Promise.all([
     fetch(API + '/agents').then(r => r.ok ? r.json() : []).catch(() => []),
-    fetch(API + '/skills').then(r => r.ok ? r.json() : []).catch(() => [])
-  ]).then(([agents, skills]) => {
-    _planAgentChoices = agents.map(a => a.externalId || a.name).filter(Boolean);
-    _planSkillChoices = skills.map(s => s.externalId || s.name).filter(Boolean);
+    fetch(API + '/skills').then(r => r.ok ? r.json() : []).catch(() => []),
+    fetch(API + '/tools' ).then(r => r.ok ? r.json() : []).catch(() => [])
+  ]).then(([agents, skills, toolkits]) => {
+    _planAgentChoices = agents.map(a => a.id || a.name).filter(Boolean);
+    _planSkillChoices = skills.map(s => s.id || s.name).filter(Boolean);
+    _planToolChoices  = (toolkits || []).flatMap(tk => (tk.tools || []).map(t => ({
+      name:    t.name,
+      label:   t.displayName || t.name,
+      toolkit: tk.displayName || tk.slug || 'Tools'
+    })));
 
     if (ref) {
       fetch(API + '/plans/' + encodeURIComponent(ref))
         .then(r => r.json())
-        .then(view => populatePlanModal(view.plan))
+        .then(view => populatePlanEditor(view.plan))
         .catch(() => toast('Failed to load plan', 'error'));
     } else {
-      populatePlanModal(BLANK_PLAN());
+      populatePlanEditor(BLANK_PLAN());
     }
   });
-
-  document.getElementById('plan-modal').hidden = false;
 }
 
-function populatePlanModal(plan) {
+function populatePlanEditor(plan) {
 
   const editable = {
     name:        plan.name        || '',
     description: plan.description || '',
-    externalId:  plan.externalId  || '',
+    id:          plan.id          || '',
     outputStep:  plan.outputStep  || '',
     params:      plan.params      || [],
     steps:       plan.steps       || []
@@ -1217,17 +1236,18 @@ function populatePlanModal(plan) {
 
   renderPlanForm(editable);
 
-  // Only `code` steps are form-incompatible now — agent/loop/branch all work.
   const hasCode = planHasCodeStep(editable.steps);
   const warnEl = document.getElementById('plan-form-warning');
   if (hasCode) {
     warnEl.textContent = 'This plan contains code steps which the form editor doesn\'t handle yet. Switch to JSON mode to edit them.';
     warnEl.hidden = false;
-    setPlanMode('json');
   } else {
     warnEl.hidden = true;
-    setPlanMode('form');
   }
+
+  // Default to canvas — it handles code/loop/branch as read-only blocks.
+  canvasLoadPlan(editable);
+  setPlanMode('canvas');
 }
 
 function planHasCodeStep(steps) {
@@ -1242,7 +1262,7 @@ function planHasCodeStep(steps) {
 function renderPlanForm(plan) {
 
   document.getElementById('plan-form-name').value        = plan.name || '';
-  document.getElementById('plan-form-externalId').value  = plan.externalId || '';
+  document.getElementById('plan-form-id').value          = plan.id || '';
   document.getElementById('plan-form-description').value = plan.description || '';
   document.getElementById('plan-form-outputStep').value  = plan.outputStep || '';
 
@@ -1262,8 +1282,8 @@ function paramRow(param) {
   row.className = 'editor-row';
   row.innerHTML = `
     <div class="form-row-inline">
-      <div class="form-row" style="flex:1"><label>Name</label><input data-field="name" value="${escapeAttr(p.name || '')}"></div>
-      <div class="form-row" style="flex:2"><label>Description</label><input data-field="description" value="${escapeAttr(p.description || '')}"></div>
+      <div class="form-row" style="flex:1"><input data-field="name" placeholder="Name" value="${escapeAttr(p.name || '')}"></div>
+      <div class="form-row" style="flex:2"><input data-field="description" placeholder="Description" value="${escapeAttr(p.description || '')}"></div>
       <label class="toggle-inline"><input type="checkbox" data-field="required" ${p.required ? 'checked' : ''}> Required</label>
       <button type="button" class="card-btn card-btn-danger editor-row-remove" onclick="this.closest('.editor-row').remove()">×</button>
     </div>`;
@@ -1329,26 +1349,21 @@ function agentStepBody(s) {
   return `
     <div class="form-row-inline">
       <div class="form-row" style="flex:1">
-        <label>Agent</label>
         <select data-field="agentId">${agentOpts}</select>
       </div>
       <div class="form-row" style="flex:1">
-        <label>Skills (comma-separated)</label>
-        <input data-field="skills" value="${escapeAttr((s.skills || []).join(', '))}" placeholder="${_planSkillChoices.slice(0, 3).join(', ')}">
+        <input data-field="skills" placeholder="Skills (comma-separated)" value="${escapeAttr((s.skills || []).join(', '))}">
       </div>
     </div>
     <div class="form-row">
-      <label>Instructions</label>
-      <textarea data-field="instructions" rows="3">${escapeHtml(s.instructions || '')}</textarea>
+      <textarea data-field="instructions" rows="3" placeholder="Instructions">${escapeHtml(s.instructions || '')}</textarea>
     </div>
     <div class="form-row-inline">
       <div class="form-row" style="flex:2">
-        <label>Dependencies</label>
-        <input data-field="dependencies" value="${escapeAttr((s.dependencies || []).join(', '))}" placeholder="comma-separated step names">
+        <input data-field="dependencies" placeholder="Dependencies (comma-separated step names)" value="${escapeAttr((s.dependencies || []).join(', '))}">
       </div>
       <div class="form-row" style="flex:1">
-        <label>Tools</label>
-        <input data-field="tools" value="${escapeAttr((s.tools || []).join(', '))}" placeholder="comma-separated">
+        <input data-field="tools" placeholder="Tools (comma-separated)" value="${escapeAttr((s.tools || []).join(', '))}">
       </div>
       <label class="toggle-inline"><input type="checkbox" data-field="hitl" ${s.hitl ? 'checked' : ''}> HITL</label>
     </div>`;
@@ -1358,12 +1373,10 @@ function loopStepBody(s) {
   return `
     <div class="form-row-inline">
       <div class="form-row" style="flex:1">
-        <label>Over</label>
-        <input data-field="over" value="${escapeAttr(s.over || '')}" placeholder="step name or param name">
+        <input data-field="over" placeholder="Over (step name or param name)" value="${escapeAttr(s.over || '')}">
       </div>
       <div class="form-row" style="flex:1">
-        <label>Dependencies</label>
-        <input data-field="dependencies" value="${escapeAttr((s.dependencies || []).join(', '))}" placeholder="comma-separated">
+        <input data-field="dependencies" placeholder="Dependencies (comma-separated)" value="${escapeAttr((s.dependencies || []).join(', '))}">
       </div>
       <label class="toggle-inline"><input type="checkbox" data-field="hitl" ${s.hitl ? 'checked' : ''}> HITL</label>
     </div>
@@ -1378,16 +1391,13 @@ function branchStepBody(s) {
   return `
     <div class="form-row-inline">
       <div class="form-row" style="flex:1">
-        <label>From</label>
-        <input data-field="from" value="${escapeAttr(s.from || '')}" placeholder="step name or param name">
+        <input data-field="from" placeholder="From (step name or param name)" value="${escapeAttr(s.from || '')}">
       </div>
       <div class="form-row" style="flex:1">
-        <label>Default path</label>
-        <input data-field="defaultPath" value="${escapeAttr(s.defaultPath || '')}" placeholder="low">
+        <input data-field="defaultPath" placeholder="Default path" value="${escapeAttr(s.defaultPath || '')}">
       </div>
       <div class="form-row" style="flex:1">
-        <label>Dependencies</label>
-        <input data-field="dependencies" value="${escapeAttr((s.dependencies || []).join(', '))}" placeholder="comma-separated">
+        <input data-field="dependencies" placeholder="Dependencies (comma-separated)" value="${escapeAttr((s.dependencies || []).join(', '))}">
       </div>
       <label class="toggle-inline"><input type="checkbox" data-field="hitl" ${s.hitl ? 'checked' : ''}> HITL</label>
     </div>
@@ -1558,7 +1568,7 @@ function gatherFormToPlan() {
   return {
     name:        document.getElementById('plan-form-name').value.trim(),
     description: document.getElementById('plan-form-description').value.trim(),
-    externalId:  document.getElementById('plan-form-externalId').value.trim(),
+    id:          document.getElementById('plan-form-id').value.trim(),
     outputStep:  document.getElementById('plan-form-outputStep').value.trim() || null,
     params,
     steps
@@ -1568,39 +1578,47 @@ function gatherFormToPlan() {
 function setPlanMode(mode) {
   _planMode = mode;
   document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-  document.getElementById('plan-form-view').hidden = mode !== 'form';
-  document.getElementById('plan-json-view').hidden = mode !== 'json';
+  document.getElementById('plan-form-view').hidden   = mode !== 'form';
+  document.getElementById('plan-canvas-view').hidden = mode !== 'canvas';
+  document.getElementById('plan-json-view').hidden   = mode !== 'json';
+  if (mode === 'canvas') canvasRender();
 }
 
 function switchPlanMode(mode) {
   if (mode === _planMode) return;
 
-  if (_planMode === 'form' && mode === 'json') {
-    document.getElementById('plan-json').value = JSON.stringify(gatherFormToPlan(), null, 2);
-  } else if (_planMode === 'json' && mode === 'form') {
-    try {
-      const parsed = JSON.parse(document.getElementById('plan-json').value);
-      renderPlanForm(parsed);
-      const hasComplex = (parsed.steps || []).some(s => s.type && s.type !== 'agent');
-      const warnEl = document.getElementById('plan-form-warning');
-      if (hasComplex) {
-        warnEl.textContent = 'This plan contains loop/branch/code steps. The form editor handles only agent steps; the others will be dropped if you save from form mode.';
-        warnEl.hidden = false;
-      } else {
-        warnEl.hidden = true;
-      }
-    } catch (e) {
-      toast('Invalid JSON — fix it first to switch to form mode', 'error');
-      return;
+  // Gather current plan from the source view we're leaving.
+  let plan = null;
+  if (_planMode === 'form')        plan = gatherFormToPlan();
+  else if (_planMode === 'canvas') plan = gatherCanvasToPlan();
+  else if (_planMode === 'json') {
+    try { plan = JSON.parse(document.getElementById('plan-json').value); }
+    catch (e) { toast('Invalid JSON — fix it first to switch modes', 'error'); return; }
+  }
+
+  // Populate the target view.
+  if (mode === 'json') {
+    document.getElementById('plan-json').value = JSON.stringify(plan, null, 2);
+  } else if (mode === 'form') {
+    renderPlanForm(plan);
+    const hasComplex = (plan.steps || []).some(s => s.type && s.type !== 'agent');
+    const warnEl = document.getElementById('plan-form-warning');
+    if (hasComplex) {
+      warnEl.textContent = 'This plan contains loop/branch/code steps. The form editor handles only agent steps; the others will be dropped if you save from form mode.';
+      warnEl.hidden = false;
+    } else {
+      warnEl.hidden = true;
     }
+  } else if (mode === 'canvas') {
+    canvasLoadPlan(plan);
   }
   setPlanMode(mode);
 }
 
-function closePlanModal() {
-  document.getElementById('plan-modal').hidden = true;
+function closePlanEditor() {
   _planEditRef = null;
-  _planMode = 'form';
+  _planMode = 'canvas';
+  location.hash = 'plans';
 }
 
 async function submitPlanForm(event) {
@@ -1612,6 +1630,8 @@ async function submitPlanForm(event) {
   let plan;
   if (_planMode === 'form') {
     plan = gatherFormToPlan();
+  } else if (_planMode === 'canvas') {
+    plan = gatherCanvasToPlan();
   } else {
     try {
       plan = JSON.parse(document.getElementById('plan-json').value);
@@ -1634,8 +1654,7 @@ async function submitPlanForm(event) {
     });
 
     if (res.ok) {
-      closePlanModal();
-      loadPlans();
+      closePlanEditor();
       toast(isEdit ? 'Updated' : 'Created', 'success');
       return;
     }
@@ -1651,6 +1670,642 @@ async function submitPlanForm(event) {
     errEl.textContent = 'Network error: ' + e.message;
     errEl.hidden = false;
   }
+}
+
+// === Canvas (drag-and-drop) plan editor ===
+// v1 scope: agent steps only; loop/branch nodes pass through read-only.
+// Positions are local-only (localStorage by plan id); not part of the plan schema.
+
+const CANVAS_NODE_W = 200;
+const CANVAS_NODE_H = 88;
+const CANVAS_LAYER_GAP_X = 40;
+const CANVAS_LAYER_GAP_Y = 20;
+const CANVAS_PAD = 16;
+const CANVAS_HANDLE_INSET = 7; // distance from node edge to outer edge of handle circle
+
+let _canvasState = {
+  plan: null,
+  positions: new Map(),
+  selected: null,
+  connecting: null,   // { fromStep, x, y }
+  dragging: null      // { stepName, offsetX, offsetY }
+};
+
+function canvasStorageKey() {
+  const id = (_canvasState.plan && _canvasState.plan.id) || '_new';
+  return 'agentican.canvas.' + id;
+}
+
+function canvasSavePositions() {
+  try {
+    const obj = {};
+    _canvasState.positions.forEach((v, k) => { obj[k] = v; });
+    localStorage.setItem(canvasStorageKey(), JSON.stringify(obj));
+  } catch (e) { /* localStorage unavailable; ignore */ }
+}
+
+function canvasLoadPositions() {
+  try {
+    const raw = localStorage.getItem(canvasStorageKey());
+    if (!raw) return new Map();
+    const obj = JSON.parse(raw);
+    return new Map(Object.entries(obj));
+  } catch (e) { return new Map(); }
+}
+
+function canvasLoadPlan(plan) {
+  _canvasState.plan = JSON.parse(JSON.stringify(plan || BLANK_PLAN()));
+  _canvasState.positions = canvasLoadPositions();
+  _canvasState.selected = null;
+  _canvasState.connecting = null;
+  _canvasState.dragging = null;
+  canvasAutoLayoutMissing();
+
+  // Sync the canvas-view header inputs from the plan.
+  const n  = document.getElementById('plan-canvas-name');
+  const e  = document.getElementById('plan-canvas-id');
+  const o  = document.getElementById('plan-canvas-outputStep');
+  if (n) n.value = _canvasState.plan.name       || '';
+  if (e) e.value = _canvasState.plan.id         || '';
+  if (o) o.value = _canvasState.plan.outputStep || '';
+
+  const hasNonAgent = (_canvasState.plan.steps || []).some(s => s.type && s.type !== 'agent');
+  const warnEl = document.getElementById('plan-canvas-warning');
+  if (hasNonAgent) {
+    warnEl.textContent = 'Canvas mode edits only agent steps. Loop / branch / code steps are shown as read-only blocks and preserved on save.';
+    warnEl.hidden = false;
+  } else {
+    warnEl.hidden = true;
+  }
+}
+
+function canvasUpdatePlanMeta() {
+  if (!_canvasState.plan) return;
+  const n = document.getElementById('plan-canvas-name');
+  const e = document.getElementById('plan-canvas-id');
+  const o = document.getElementById('plan-canvas-outputStep');
+  if (n) _canvasState.plan.name       = n.value.trim();
+  if (e) _canvasState.plan.id         = e.value.trim();
+  if (o) _canvasState.plan.outputStep = o.value.trim();
+}
+
+function gatherCanvasToPlan() {
+  canvasUpdatePlanMeta();
+  return _canvasState.plan ? JSON.parse(JSON.stringify(_canvasState.plan)) : BLANK_PLAN();
+}
+
+function canvasAutoLayoutMissing() {
+  // Run topological layering on the top-level steps; assign positions only to steps
+  // that don't already have one (preserves user-dragged positions across reloads).
+  const steps = (_canvasState.plan.steps || []);
+  if (steps.length === 0) return;
+  const layers = computePlanLayers(steps);
+  layers.forEach((layer, li) => {
+    layer.forEach((step, ri) => {
+      if (_canvasState.positions.has(step.name)) return;
+      _canvasState.positions.set(step.name, {
+        x: CANVAS_PAD + li * (CANVAS_NODE_W + CANVAS_LAYER_GAP_X),
+        y: CANVAS_PAD + ri * (CANVAS_NODE_H + CANVAS_LAYER_GAP_Y)
+      });
+    });
+  });
+}
+
+function canvasAutoLayout() {
+  // Force a fresh layout for every step.
+  _canvasState.positions.clear();
+  canvasAutoLayoutMissing();
+  canvasSavePositions();
+  canvasRender();
+}
+
+function canvasAddAgentStep() {
+  const steps = _canvasState.plan.steps = _canvasState.plan.steps || [];
+  let n = steps.length + 1;
+  let name = 'step-' + n;
+  while (steps.some(s => s.name === name)) { n++; name = 'step-' + n; }
+  steps.push({
+    type: 'agent', name,
+    agentId: '', instructions: '',
+    skills: [], tools: [], dependencies: [], hitl: false
+  });
+  // Drop new step centered in the visible workspace.
+  const ws = document.getElementById('plan-canvas-workspace');
+  const wsRect = ws.getBoundingClientRect();
+  _canvasState.positions.set(name, {
+    x: Math.max(CANVAS_PAD, (ws.scrollLeft || 0) + wsRect.width / 2 - CANVAS_NODE_W / 2),
+    y: Math.max(CANVAS_PAD, (ws.scrollTop  || 0) + wsRect.height / 2 - CANVAS_NODE_H / 2)
+  });
+  canvasSavePositions();
+  _canvasState.selected = name;
+  canvasRender();
+}
+
+function canvasDeleteStep(name) {
+  const steps = _canvasState.plan.steps || [];
+  const idx = steps.findIndex(s => s.name === name);
+  if (idx < 0) return;
+  steps.splice(idx, 1);
+  // Strip references to the deleted step from other steps' dependencies / over / from.
+  steps.forEach(s => {
+    if (Array.isArray(s.dependencies)) s.dependencies = s.dependencies.filter(d => d !== name);
+    if (s.over === name) s.over = '';
+    if (s.from === name) s.from = '';
+  });
+  if (_canvasState.plan.outputStep === name) _canvasState.plan.outputStep = '';
+  _canvasState.positions.delete(name);
+  if (_canvasState.selected === name) _canvasState.selected = null;
+  canvasSavePositions();
+  canvasRender();
+}
+
+function canvasRenameStep(oldName, newName) {
+  newName = (newName || '').trim();
+  if (!newName || newName === oldName) return false;
+  const steps = _canvasState.plan.steps || [];
+  if (steps.some(s => s.name === newName)) { toast('A step named "' + newName + '" already exists', 'error'); return false; }
+  const step = steps.find(s => s.name === oldName);
+  if (!step) return false;
+  step.name = newName;
+  steps.forEach(s => {
+    if (Array.isArray(s.dependencies))
+      s.dependencies = s.dependencies.map(d => d === oldName ? newName : d);
+    if (s.over === oldName) s.over = newName;
+    if (s.from === oldName) s.from = newName;
+  });
+  if (_canvasState.plan.outputStep === oldName) _canvasState.plan.outputStep = newName;
+  const pos = _canvasState.positions.get(oldName);
+  if (pos) { _canvasState.positions.delete(oldName); _canvasState.positions.set(newName, pos); }
+  if (_canvasState.selected === oldName) _canvasState.selected = newName;
+  canvasSavePositions();
+  return true;
+}
+
+function canvasAddDependency(fromName, toName) {
+  if (!fromName || !toName || fromName === toName) return;
+  const target = (_canvasState.plan.steps || []).find(s => s.name === toName);
+  if (!target) return;
+  // Reject if it'd create a cycle.
+  if (canvasCreatesCycle(fromName, toName)) {
+    toast('That edge would create a cycle', 'error');
+    return;
+  }
+  target.dependencies = target.dependencies || [];
+  if (!target.dependencies.includes(fromName)) target.dependencies.push(fromName);
+}
+
+function canvasCreatesCycle(fromName, toName) {
+  // If fromName is reachable from toName via existing edges, adding fromName→toName closes a cycle.
+  const steps = _canvasState.plan.steps || [];
+  const byName = new Map(steps.map(s => [s.name, s]));
+  const visited = new Set();
+  const stack = [toName];
+  while (stack.length) {
+    const cur = stack.pop();
+    if (cur === fromName) return true;
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+    if (!byName.has(cur)) continue;
+    steps.forEach(other => {
+      const deps = other.dependencies || [];
+      if (deps.includes(cur)) stack.push(other.name);
+      if (other.type === 'loop' && other.over === cur) stack.push(other.name);
+      if (other.type === 'branch' && other.from === cur) stack.push(other.name);
+    });
+  }
+  return false;
+}
+
+function canvasEdges() {
+  // Yield { from, to, kind } for every edge implied by the plan.
+  const edges = [];
+  (_canvasState.plan.steps || []).forEach(s => {
+    (s.dependencies || []).forEach(d => edges.push({ from: d, to: s.name, kind: 'dep' }));
+    if (s.type === 'loop' && s.over)   edges.push({ from: s.over, to: s.name, kind: 'over' });
+    if (s.type === 'branch' && s.from) edges.push({ from: s.from, to: s.name, kind: 'from' });
+  });
+  return edges;
+}
+
+function canvasRender() {
+  const nodesEl  = document.getElementById('plan-canvas-nodes');
+  const edgesEl  = document.getElementById('plan-canvas-edges');
+  if (!nodesEl || !edgesEl) return;
+
+  const steps = _canvasState.plan && _canvasState.plan.steps ? _canvasState.plan.steps : [];
+
+  // Pre-compute which handles are connected so we can highlight them.
+  const edges = canvasEdges();
+  const sourceNodes = new Set(edges.map(e => e.from));
+  const targetNodes = new Set(edges.map(e => e.to));
+
+  // Nodes
+  nodesEl.innerHTML = steps.map(s => {
+    const pos = _canvasState.positions.get(s.name) || { x: CANVAS_PAD, y: CANVAS_PAD };
+    const isAgent = !s.type || s.type === 'agent';
+    const isSelected = _canvasState.selected === s.name;
+    const agentLabel = isAgent && s.agentId
+      ? (_agentNameById.get(s.agentId) || s.agentId)
+      : '';
+    const typeBadge = !isAgent
+      ? `<span class="canvas-node-type-badge">${escapeHtml(s.type)}</span>` : '';
+    const hitl = s.hitl ? '<span class="canvas-node-flag" title="Requires approval">&#9873;</span>' : '';
+    const subtitle = isAgent
+      ? (agentLabel ? `<span class="canvas-node-agent">${escapeHtml(agentLabel)}</span>` : '<span class="canvas-node-agent muted">(no agent)</span>')
+      : `<span class="canvas-node-agent muted">read-only</span>`;
+    const inCls  = targetNodes.has(s.name) ? ' canvas-handle-connected' : '';
+    const outCls = sourceNodes.has(s.name) ? ' canvas-handle-connected' : '';
+    return `
+      <div class="canvas-node${isAgent ? '' : ' canvas-node-readonly'}${isSelected ? ' selected' : ''}"
+           data-step="${escapeAttr(s.name)}"
+           style="left:${pos.x}px; top:${pos.y}px; width:${CANVAS_NODE_W}px; height:${CANVAS_NODE_H}px">
+        <div class="canvas-node-handle canvas-handle-in${inCls}"   data-step="${escapeAttr(s.name)}" data-handle="in"></div>
+        <div class="canvas-node-handle canvas-handle-out${outCls}" data-step="${escapeAttr(s.name)}" data-handle="out"></div>
+        <div class="canvas-node-header">
+          <span class="canvas-node-name">${escapeHtml(s.name)}</span>
+          ${typeBadge}${hitl}
+        </div>
+        <div class="canvas-node-body">${subtitle}</div>
+      </div>`;
+  }).join('');
+
+  // SVG size + viewport
+  const bounds = canvasBounds();
+  edgesEl.setAttribute('width',  bounds.w);
+  edgesEl.setAttribute('height', bounds.h);
+  edgesEl.style.width  = bounds.w + 'px';
+  edgesEl.style.height = bounds.h + 'px';
+
+  // Edges (preserve defs/marker by clearing only paths)
+  edgesEl.querySelectorAll('path.canvas-edge, path.canvas-edge-temp').forEach(p => p.remove());
+  edges.forEach(e => {
+    const a = _canvasState.positions.get(e.from);
+    const b = _canvasState.positions.get(e.to);
+    if (!a || !b) return;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', canvasEdgePath(
+      a.x + CANVAS_NODE_W + CANVAS_HANDLE_INSET, a.y + CANVAS_NODE_H / 2,
+      b.x - CANVAS_HANDLE_INSET,                 b.y + CANVAS_NODE_H / 2
+    ));
+    path.setAttribute('class', 'canvas-edge canvas-edge-' + e.kind);
+    path.setAttribute('marker-end', 'url(#canvas-arrow)');
+    path.dataset.from = e.from;
+    path.dataset.to   = e.to;
+    path.dataset.kind = e.kind;
+    edgesEl.appendChild(path);
+  });
+
+  // Temp connect path
+  if (_canvasState.connecting) {
+    const a = _canvasState.positions.get(_canvasState.connecting.fromStep);
+    if (a) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', canvasEdgePath(
+        a.x + CANVAS_NODE_W + CANVAS_HANDLE_INSET, a.y + CANVAS_NODE_H / 2,
+        _canvasState.connecting.x, _canvasState.connecting.y
+      ));
+      path.setAttribute('class', 'canvas-edge-temp');
+      edgesEl.appendChild(path);
+    }
+  }
+
+  canvasRenderInspector();
+}
+
+function canvasBounds() {
+  // Size the SVG to actual node extent, not to the workspace. Defaulting to
+  // workspace clientWidth × clientHeight made the SVG match the visible area
+  // exactly and any sub-pixel/scrollbar-gutter wobble tipped it into "overflowing"
+  // — both scrollbars would appear with just a single step on screen.
+  let maxX = 0, maxY = 0;
+  _canvasState.positions.forEach(p => {
+    if (p.x + CANVAS_NODE_W > maxX) maxX = p.x + CANVAS_NODE_W;
+    if (p.y + CANVAS_NODE_H > maxY) maxY = p.y + CANVAS_NODE_H;
+  });
+  return { w: Math.max(maxX, 1), h: Math.max(maxY, 1) };
+}
+
+function canvasEdgePath(x1, y1, x2, y2) {
+  const dx = Math.max(40, Math.abs(x2 - x1) / 2);
+  return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+}
+
+function canvasRenderInspector() {
+  const el = document.getElementById('plan-canvas-inspector');
+  const name = _canvasState.selected;
+  const step = name ? (_canvasState.plan.steps || []).find(s => s.name === name) : null;
+  if (!step) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+
+  if (step.type && step.type !== 'agent') {
+    el.innerHTML = `
+      <div class="canvas-inspector-header">
+        <h3>${escapeHtml(step.name)}</h3>
+        <button class="modal-close" onclick="canvasSelectStep(null)">×</button>
+      </div>
+      <p class="form-help">${escapeHtml(step.type)} steps aren't editable in canvas mode yet. Switch to the JSON editor.</p>
+    `;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="canvas-inspector-header">
+      <h3>Step</h3>
+      <button class="modal-close" onclick="canvasSelectStep(null)">×</button>
+    </div>
+    <div class="form-row">
+      <input id="canvas-insp-name" type="text" placeholder="Step name" value="${escapeAttr(step.name)}" onchange="canvasInspectorRename(this.value)">
+    </div>
+    <div class="form-row">
+      <div class="canvas-picker-wrapper">
+        <input type="text" class="canvas-picker-input" id="canvas-insp-agent-input"
+               placeholder="Agent" autocomplete="off"
+               value="${escapeAttr(step.agentId || '')}"
+               onfocus="canvasPickerOpen('agent', true)"
+               oninput="canvasPickerOpen('agent', false)"
+               onblur="canvasPickerClose('agent')">
+        <div class="canvas-picker-list" id="canvas-insp-agent-list"></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <textarea id="canvas-insp-instructions" rows="5" placeholder="Instructions" oninput="canvasInspectorField('instructions', this.value)">${escapeHtml(step.instructions || '')}</textarea>
+    </div>
+    <div class="form-row">
+      <div class="canvas-chips" id="canvas-insp-skills-chips">${canvasInspectorSkillChips(step)}</div>
+      <div class="canvas-picker-wrapper">
+        <input type="text" class="canvas-picker-input" id="canvas-insp-skills-input"
+               placeholder="Add skill" autocomplete="off"
+               onfocus="canvasPickerOpen('skills', true)"
+               oninput="canvasPickerOpen('skills', false)"
+               onblur="canvasPickerClose('skills')">
+        <div class="canvas-picker-list" id="canvas-insp-skills-list"></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="canvas-chips" id="canvas-insp-tools-chips">${canvasInspectorToolChips(step)}</div>
+      <div class="canvas-picker-wrapper">
+        <input type="text" class="canvas-picker-input" id="canvas-insp-tools-input"
+               placeholder="Add tool" autocomplete="off"
+               onfocus="canvasPickerOpen('tools', true)"
+               oninput="canvasPickerOpen('tools', false)"
+               onblur="canvasPickerClose('tools')">
+        <div class="canvas-picker-list" id="canvas-insp-tools-list"></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="toggle-inline"><input type="checkbox" ${step.hitl ? 'checked' : ''} onchange="canvasInspectorField('hitl', this.checked)"> HITL approval</label>
+    </div>
+    <div class="form-row canvas-inspector-actions">
+      <button type="button" class="card-btn card-btn-danger" onclick="canvasDeleteSelected()">Delete step</button>
+    </div>
+  `;
+}
+
+function canvasSelectStep(name) {
+  _canvasState.selected = name || null;
+  canvasRender();
+}
+
+function canvasInspectorField(field, value, transform) {
+  const step = (_canvasState.plan.steps || []).find(s => s.name === _canvasState.selected);
+  if (!step) return;
+  if (transform === 'csv') step[field] = _csvToList(value);
+  else                     step[field] = value;
+  // No full re-render for simple text edits — but nodes show agent/hitl/name → re-render lightly.
+  if (field === 'agentId' || field === 'hitl') canvasRender();
+}
+
+function canvasInspectorRename(newName) {
+  const old = _canvasState.selected;
+  if (canvasRenameStep(old, newName)) canvasRender();
+  else if (old) {
+    // Revert input on collision.
+    const input = document.getElementById('canvas-insp-name');
+    if (input) input.value = old;
+  }
+}
+
+function canvasDeleteSelected() {
+  const name = _canvasState.selected;
+  if (!name) return;
+  if (!confirm('Delete step “' + name + '”?')) return;
+  canvasDeleteStep(name);
+}
+
+// --- Inspector pickers: skills + tools ---
+
+function canvasInspectorSkillChips(step) {
+  return (step.skills || []).map(s =>
+    `<span class="canvas-chip">${escapeHtml(s)}<button type="button" onclick="canvasInspectorRemoveSkill('${escapeAttr(s)}')">×</button></span>`
+  ).join('');
+}
+
+function canvasInspectorToolChips(step) {
+  return (step.tools || []).map(t => {
+    const choice = _planToolChoices.find(c => c.name === t);
+    const display = choice ? choice.label : t;
+    return `<span class="canvas-chip">${escapeHtml(display)}<button type="button" onclick="canvasInspectorRemoveTool('${escapeAttr(t)}')">×</button></span>`;
+  }).join('');
+}
+
+// Open / re-filter the picker dropdown. `which` is 'agent', 'skills', or 'tools'.
+function canvasPickerOpen(which, showAll) {
+  const input = document.getElementById('canvas-insp-' + which + '-input');
+  const list  = document.getElementById('canvas-insp-' + which + '-list');
+  if (!input || !list) return;
+  const step = (_canvasState.plan.steps || []).find(s => s.name === _canvasState.selected);
+  if (!step) return;
+
+  const q = input.value.trim().toLowerCase();
+  const match = (text) => showAll || !q || (text || '').toLowerCase().includes(q);
+
+  let html;
+  if (which === 'agent') {
+    const items = _planAgentChoices.filter(a => match(a));
+    html = items.length === 0
+      ? '<div class="canvas-picker-option canvas-picker-empty">No agents</div>'
+      : '<div class="canvas-picker-option" data-value="">(no agent)</div>'
+        + items.map(a => `<div class="canvas-picker-option" data-value="${escapeAttr(a)}">${escapeHtml(a)}</div>`).join('');
+  } else if (which === 'skills') {
+    const picked = new Set(step.skills || []);
+    const items = _planSkillChoices.filter(s => !picked.has(s) && match(s));
+    html = items.length === 0
+      ? '<div class="canvas-picker-option canvas-picker-empty">No skills</div>'
+      : items.map(s => `<div class="canvas-picker-option" data-value="${escapeAttr(s)}">${escapeHtml(s)}</div>`).join('');
+  } else {
+    const picked = new Set(step.tools || []);
+    const items = _planToolChoices.filter(c => !picked.has(c.name) && (match(c.label) || match(c.toolkit)));
+    if (items.length === 0) {
+      html = '<div class="canvas-picker-option canvas-picker-empty">No tools</div>';
+    } else {
+      const byKit = new Map();
+      items.forEach(c => {
+        const g = c.toolkit || 'Tools';
+        if (!byKit.has(g)) byKit.set(g, []);
+        byKit.get(g).push(c);
+      });
+      html = [...byKit.entries()].map(([g, tools]) =>
+        `<div class="canvas-picker-group">${escapeHtml(g)}</div>` +
+        tools.map(c => `<div class="canvas-picker-option" data-value="${escapeAttr(c.name)}">${escapeHtml(c.label)}</div>`).join('')
+      ).join('');
+    }
+  }
+  list.innerHTML = html;
+  list.classList.add('canvas-picker-open');
+
+  // Use mousedown (not click) and preventDefault so the input keeps focus —
+  // otherwise blur fires before click and onblur closes the list first.
+  list.querySelectorAll('.canvas-picker-option[data-value]').forEach(el => {
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      canvasPickerSelect(which, el.dataset.value);
+    });
+  });
+}
+
+function canvasPickerClose(which) {
+  // Defer so click→select on an option still fires before close.
+  setTimeout(() => {
+    const list = document.getElementById('canvas-insp-' + which + '-list');
+    if (list) list.classList.remove('canvas-picker-open');
+    // Single-select agent picker: restore the input text to the stored value so
+    // a stray typed query doesn't linger after the user clicks away.
+    if (which === 'agent') {
+      const step = (_canvasState.plan.steps || []).find(s => s.name === _canvasState.selected);
+      const input = document.getElementById('canvas-insp-agent-input');
+      if (step && input) input.value = step.agentId || '';
+    }
+  }, 150);
+}
+
+function canvasPickerSelect(which, value) {
+  const step = (_canvasState.plan.steps || []).find(s => s.name === _canvasState.selected);
+  if (!step) return;
+
+  if (which === 'agent') {
+    step.agentId = value || '';
+    const input = document.getElementById('canvas-insp-agent-input');
+    const list  = document.getElementById('canvas-insp-agent-list');
+    if (input) { input.value = step.agentId; input.blur(); }
+    if (list) list.classList.remove('canvas-picker-open');
+    canvasRender(); // node card shows the agent label
+    return;
+  }
+
+  if (!value) return; // chip-additive pickers ignore the empty/clear sentinel
+  const field = which === 'skills' ? 'skills' : 'tools';
+  step[field] = step[field] || [];
+  if (!step[field].includes(value)) step[field].push(value);
+
+  // Refresh chips + re-filter dropdown without losing input focus.
+  const chipsEl = document.getElementById('canvas-insp-' + which + '-chips');
+  const input   = document.getElementById('canvas-insp-' + which + '-input');
+  if (chipsEl) chipsEl.innerHTML = which === 'skills'
+    ? canvasInspectorSkillChips(step) : canvasInspectorToolChips(step);
+  if (input) { input.value = ''; input.focus(); }
+  canvasPickerOpen(which, true);
+}
+
+function canvasInspectorRemoveSkill(value) {
+  const step = (_canvasState.plan.steps || []).find(s => s.name === _canvasState.selected);
+  if (!step || !Array.isArray(step.skills)) return;
+  step.skills = step.skills.filter(s => s !== value);
+  const chipsEl = document.getElementById('canvas-insp-skills-chips');
+  if (chipsEl) chipsEl.innerHTML = canvasInspectorSkillChips(step);
+  const list = document.getElementById('canvas-insp-skills-list');
+  if (list && list.classList.contains('canvas-picker-open')) canvasPickerOpen('skills', false);
+}
+
+function canvasInspectorRemoveTool(value) {
+  const step = (_canvasState.plan.steps || []).find(s => s.name === _canvasState.selected);
+  if (!step || !Array.isArray(step.tools)) return;
+  step.tools = step.tools.filter(t => t !== value);
+  const chipsEl = document.getElementById('canvas-insp-tools-chips');
+  if (chipsEl) chipsEl.innerHTML = canvasInspectorToolChips(step);
+  const list = document.getElementById('canvas-insp-tools-list');
+  if (list && list.classList.contains('canvas-picker-open')) canvasPickerOpen('tools', false);
+}
+
+// --- Mouse handling: node drag + handle-to-handle connect ---
+
+(function initCanvasMouse() {
+  const wsId = 'plan-canvas-workspace';
+  document.addEventListener('mousedown', e => {
+    const ws = document.getElementById(wsId);
+    if (!ws || !ws.contains(e.target)) return;
+
+    // Inspector lives inside the workspace; clicks in it are form interactions, not canvas events.
+    if (e.target.closest('.canvas-inspector')) return;
+
+    const handle = e.target.closest('.canvas-node-handle');
+    if (handle && handle.dataset.handle === 'out') {
+      // Begin connect.
+      e.preventDefault();
+      const pt = canvasMouseInWorkspace(e);
+      _canvasState.connecting = { fromStep: handle.dataset.step, x: pt.x, y: pt.y };
+      canvasRender();
+      return;
+    }
+    if (handle) return; // mousedown on input handle: ignore
+
+    const node = e.target.closest('.canvas-node');
+    if (node) {
+      e.preventDefault();
+      const stepName = node.dataset.step;
+      // Read-only node: select only.
+      const step = (_canvasState.plan.steps || []).find(s => s.name === stepName);
+      _canvasState.selected = stepName;
+      if (step && step.type && step.type !== 'agent') { canvasRender(); return; }
+
+      const pos = _canvasState.positions.get(stepName) || { x: 0, y: 0 };
+      const pt = canvasMouseInWorkspace(e);
+      _canvasState.dragging = { stepName, offsetX: pt.x - pos.x, offsetY: pt.y - pos.y };
+      canvasRender();
+      return;
+    }
+
+    // Click empty space → deselect.
+    if (_canvasState.selected) { _canvasState.selected = null; canvasRender(); }
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (_canvasState.dragging) {
+      const pt = canvasMouseInWorkspace(e);
+      _canvasState.positions.set(_canvasState.dragging.stepName, {
+        x: Math.max(0, pt.x - _canvasState.dragging.offsetX),
+        y: Math.max(0, pt.y - _canvasState.dragging.offsetY)
+      });
+      canvasRender();
+      return;
+    }
+    if (_canvasState.connecting) {
+      const pt = canvasMouseInWorkspace(e);
+      _canvasState.connecting.x = pt.x;
+      _canvasState.connecting.y = pt.y;
+      canvasRender();
+    }
+  });
+
+  document.addEventListener('mouseup', e => {
+    if (_canvasState.dragging) {
+      _canvasState.dragging = null;
+      canvasSavePositions();
+    }
+    if (_canvasState.connecting) {
+      const target = e.target.closest('.canvas-node-handle');
+      if (target && target.dataset.handle === 'in') {
+        canvasAddDependency(_canvasState.connecting.fromStep, target.dataset.step);
+      }
+      _canvasState.connecting = null;
+      canvasRender();
+    }
+  });
+})();
+
+function canvasMouseInWorkspace(e) {
+  const ws = document.getElementById('plan-canvas-workspace');
+  const r = ws.getBoundingClientRect();
+  return { x: e.clientX - r.left + ws.scrollLeft, y: e.clientY - r.top + ws.scrollTop };
 }
 
 async function deletePlan(ref, name) {
@@ -1714,8 +2369,7 @@ async function loadAgents() {
 }
 
 function renderAgentCard(a) {
-  const extId = a.externalId || '';
-  const refKey = extId || a.id;
+  const refKey = a.id;
   const actions = a.declaredInConfig
     ? `<span class="config-badge" title="Declared in application.properties — read-only">config</span>`
     : `<button class="card-btn" onclick="event.stopPropagation(); openAgentModal('${escapeAttr(refKey)}')">Edit</button>
@@ -1728,7 +2382,6 @@ function renderAgentCard(a) {
         <span class="card-actions">${actions}</span>
       </div>
       <div class="agent-desc">
-        ${extId ? `<div class="agent-field"><span class="agent-field-label">External ID</span><div class="agent-field-value" style="font-family:var(--mono);font-size:12px">${escapeHtml(extId)}</div></div>` : ''}
         ${a.id ? `<div class="agent-field"><span class="agent-field-label">ID</span><div class="agent-field-value" style="font-family:var(--mono);font-size:12px">${escapeHtml(a.id)}</div></div>` : ''}
         ${a.role ? `<div class="agent-field"><span class="agent-field-label">Role</span><div class="agent-field-value">${escapeHtml(a.role)}</div></div>` : ''}
         ${a.llm ? `<div class="agent-field"><span class="agent-field-label">LLM</span><div class="agent-field-value">${escapeHtml(a.llm)}</div></div>` : ''}
@@ -1754,8 +2407,7 @@ async function loadSkills() {
 }
 
 function renderSkillCard(s) {
-  const extId = s.externalId || '';
-  const refKey = extId || s.id;
+  const refKey = s.id;
   const actions = s.declaredInConfig
     ? `<span class="config-badge" title="Declared in application.properties — read-only">config</span>`
     : `<button class="card-btn" onclick="event.stopPropagation(); openSkillModal('${escapeAttr(refKey)}')">Edit</button>
@@ -1768,7 +2420,6 @@ function renderSkillCard(s) {
         <span class="card-actions">${actions}</span>
       </div>
       <div class="agent-desc">
-        ${extId ? `<div class="agent-field"><span class="agent-field-label">External ID</span><div class="agent-field-value" style="font-family:var(--mono);font-size:12px">${escapeHtml(extId)}</div></div>` : ''}
         ${s.id ? `<div class="agent-field"><span class="agent-field-label">ID</span><div class="agent-field-value" style="font-family:var(--mono);font-size:12px">${escapeHtml(s.id)}</div></div>` : ''}
         <div class="agent-field">
           <span class="agent-field-label">Instructions</span>
@@ -1782,6 +2433,18 @@ function renderSkillCard(s) {
 
 let _modalMode = null;  // 'agent' | 'skill'
 let _modalEditRef = null;  // non-null when editing
+let _catalogLlmChoices = []; // populated from /config on agent modal open
+
+async function loadCatalogLlmChoices() {
+  try {
+    const res = await fetch(API + '/config');
+    const props = await res.json();
+    _catalogLlmChoices = props
+      .filter(p => /^agentican\.llm\[\d+\]\.name$/.test(p.name))
+      .map(p => (p.value || '').trim())
+      .filter(Boolean);
+  } catch (e) { _catalogLlmChoices = []; }
+}
 
 function openAgentModal(ref) {
   _modalMode = 'agent';
@@ -1796,20 +2459,21 @@ function openAgentModal(ref) {
   document.getElementById('catalog-instructions').required = false;
 
   _resetModalFields();
+  loadCatalogLlmChoices();
 
   if (ref) {
     fetch(API + '/agents/' + encodeURIComponent(ref))
       .then(r => r.json())
       .then(a => {
-        document.getElementById('catalog-externalId').value = a.externalId || a.id;
-        document.getElementById('catalog-externalId').disabled = true;
+        document.getElementById('catalog-id').value = a.id || '';
+        document.getElementById('catalog-id').disabled = true;
         document.getElementById('catalog-name').value = a.name || '';
         document.getElementById('catalog-role').value = a.role || '';
-        document.getElementById('catalog-llm').value = a.llm || '';
+        document.getElementById('catalog-llm-input').value = a.llm || '';
       })
       .catch(() => toast('Failed to load agent', 'error'));
   } else {
-    document.getElementById('catalog-externalId').disabled = false;
+    document.getElementById('catalog-id').disabled = false;
   }
 
   document.getElementById('catalog-modal').hidden = false;
@@ -1833,14 +2497,14 @@ function openSkillModal(ref) {
     fetch(API + '/skills/' + encodeURIComponent(ref))
       .then(r => r.json())
       .then(s => {
-        document.getElementById('catalog-externalId').value = s.externalId || s.id;
-        document.getElementById('catalog-externalId').disabled = true;
+        document.getElementById('catalog-id').value = s.id || '';
+        document.getElementById('catalog-id').disabled = true;
         document.getElementById('catalog-name').value = s.name || '';
         document.getElementById('catalog-instructions').value = s.instructions || '';
       })
       .catch(() => toast('Failed to load skill', 'error'));
   } else {
-    document.getElementById('catalog-externalId').disabled = false;
+    document.getElementById('catalog-id').disabled = false;
   }
 
   document.getElementById('catalog-modal').hidden = false;
@@ -1864,8 +2528,8 @@ async function submitCatalogForm(event) {
   const errEl = document.getElementById('catalog-error');
   errEl.hidden = true;
 
-  const extId = document.getElementById('catalog-externalId').value.trim();
-  const name  = document.getElementById('catalog-name').value.trim();
+  const id   = document.getElementById('catalog-id').value.trim();
+  const name = document.getElementById('catalog-name').value.trim();
 
   const isEdit = !!_modalEditRef;
   const resource = _modalMode === 'agent' ? 'agents' : 'skills';
@@ -1873,15 +2537,15 @@ async function submitCatalogForm(event) {
   let body;
   if (_modalMode === 'agent') {
     const role = document.getElementById('catalog-role').value.trim();
-    const llm  = document.getElementById('catalog-llm').value.trim();
+    const llm  = document.getElementById('catalog-llm-input').value.trim();
     body = isEdit
       ? { name, role, llm: llm || null }
-      : { externalId: extId, name, role, llm: llm || null };
+      : { id, name, role, llm: llm || null };
   } else {
     const instructions = document.getElementById('catalog-instructions').value.trim();
     body = isEdit
       ? { name, instructions }
-      : { externalId: extId, name, instructions };
+      : { id, name, instructions };
   }
 
   const url = API + '/' + resource + (isEdit ? '/' + encodeURIComponent(_modalEditRef) : '');
@@ -1910,6 +2574,45 @@ async function submitCatalogForm(event) {
     errEl.textContent = 'Network error: ' + e.message;
     errEl.hidden = false;
   }
+}
+
+// --- Catalog LLM picker (same search style as canvas agent/skill pickers) ---
+
+function catalogLlmPickerOpen(showAll) {
+  const input = document.getElementById('catalog-llm-input');
+  const list  = document.getElementById('catalog-llm-list');
+  if (!input || !list) return;
+
+  const q = input.value.trim().toLowerCase();
+  const match = (t) => showAll || !q || (t || '').toLowerCase().includes(q);
+  const items = _catalogLlmChoices.filter(match);
+
+  const html = items.length === 0
+    ? '<div class="canvas-picker-option canvas-picker-empty">No LLMs</div>'
+    : items.map(l => `<div class="canvas-picker-option" data-value="${escapeAttr(l)}">${escapeHtml(l)}</div>`).join('');
+
+  list.innerHTML = html;
+  list.classList.add('canvas-picker-open');
+  list.querySelectorAll('.canvas-picker-option[data-value]').forEach(el => {
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      catalogLlmPickerSelect(el.dataset.value);
+    });
+  });
+}
+
+function catalogLlmPickerClose() {
+  setTimeout(() => {
+    const list = document.getElementById('catalog-llm-list');
+    if (list) list.classList.remove('canvas-picker-open');
+  }, 150);
+}
+
+function catalogLlmPickerSelect(value) {
+  const input = document.getElementById('catalog-llm-input');
+  const list  = document.getElementById('catalog-llm-list');
+  if (input) { input.value = value || ''; input.blur(); }
+  if (list) list.classList.remove('canvas-picker-open');
 }
 
 async function deleteAgent(ref, name) {
@@ -2185,7 +2888,7 @@ function renderTurnModal(turn, focusTab, ctx) {
 }
 
 // === Init ===
-activatePanel(location.hash.slice(1) || 'tasks');
+{ const { panel, ref } = parseHash(); activatePanel(panel, ref); }
 // Prefetch so plan step badges can show display names (not ids) regardless of nav order.
 fetch(API + '/agents').then(r => r.ok ? r.json() : []).then(agents => {
   _agentNameById = new Map(agents.map(a => [a.id, a.name]));

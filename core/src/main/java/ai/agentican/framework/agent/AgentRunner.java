@@ -16,11 +16,25 @@ public interface AgentRunner {
     AgentResult run(Agent agent, String task, String taskId, String stepId, String stepName, Duration timeout,
                     List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema);
 
+    default AgentResult run(Agent agent, String task, String taskId, String stepId, String stepName, Duration timeout,
+                            List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema,
+                            AgentLoopHost host) {
+
+        throw new UnsupportedOperationException("This agent runner does not yet support the AgentLoopHost SPI");
+    }
+
     default AgentResult resume(Agent agent, String task, String taskId, String stepId, String stepName, Duration timeout,
                                List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema,
                                RunLog savedRun, List<ToolResult> hitlToolResults) {
 
         throw new UnsupportedOperationException("This agent runner does not support HITL resume");
+    }
+
+    default AgentResult resume(Agent agent, String task, String taskId, String stepId, String stepName, Duration timeout,
+                               List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema,
+                               RunLog savedRun, List<ToolResult> hitlToolResults, AgentLoopHost host) {
+
+        throw new UnsupportedOperationException("This agent runner does not yet support the AgentLoopHost SPI");
     }
 
     default AgentResult resumeAfterCrash(Agent agent, String task, String taskId, String stepId, String stepName,
