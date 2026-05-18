@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.rest.ws;
 
-import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
+import ai.agentican.framework.hitl.HitlResponseDispatcher;
 import ai.agentican.quarkus.rest.TaskEventBus;
 import ai.agentican.quarkus.rest.TaskService;
 import ai.agentican.quarkus.rest.sse.SseEventTypes;
@@ -26,7 +26,7 @@ public class AgenticanWebSocket {
     TaskEventBus eventBus;
 
     @Inject
-    HitlManager hitlManager;
+    HitlResponseDispatcher dispatcher;
 
     @Inject
     ObjectMapper objectMapper;
@@ -94,14 +94,22 @@ public class AgenticanWebSocket {
         if (message.approved() == null)
             return WsResponse.error("approved is required for respond");
 
-        if (!hitlManager.pendingCheckpoints().containsKey(message.checkpointId()))
+        if (!isPending(message.checkpointId()))
             return WsResponse.error("No pending checkpoint: " + message.checkpointId());
 
-        hitlManager.respond(message.checkpointId(),
+        dispatcher.respond(message.checkpointId(),
                 new HitlResponse(message.approved(), message.feedback()));
         eventBus.clearCheckpoint(message.checkpointId());
 
         return WsResponse.ok("checkpoint resolved");
+    }
+
+    private boolean isPending(String checkpointId) {
+
+        // Runtime-agnostic lookup — covers in-process and Temporal-owned checkpoints alike.
+        return eventBus.allPending().values().stream()
+                .flatMap(java.util.List::stream)
+                .anyMatch(c -> checkpointId.equals(c.id()));
     }
 
     private WsResponse handleCancel(WsMessage message) {

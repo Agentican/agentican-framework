@@ -27,7 +27,7 @@ try (var agentican = Agentican.builder()
     
     var task = agentican.run("Research the top 5 CDC tools and compare them");
     
-    System.out.println(task.result().output());
+    System.out.println(task.await());
 }
 ```
 
@@ -85,7 +85,7 @@ Everything is under `ai.agentican.framework.*`.
 
 - **Virtual threads** — task execution defaults to `Executors.newVirtualThreadPerTaskExecutor()`. Parks during HITL without tying up platform threads.
 - **Resumable** — `agentican.recovery().resumeInterrupted()` / `.reapOrphans()` pick up tasks left in flight after a restart at turn-boundary granularity (pair with a persistent `WorkflowRunStore`). The Quarkus runtime exposes `AgenticanRecovery` as a CDI bean and runs it on `StartupEvent`.
-- **Observable** — plug in `WorkflowRunListener`s and `WorkflowRunDecorator`s via the builder; the Quarkus metrics / OTel modules are built on exactly these hooks.
+- **Observable** — subscribe `AgenticanEventListener`s and `WorkflowRunDecorator`s via the builder; the framework's own state persistence runs as a listener on the same bus, and the Quarkus metrics / OTel modules are built on exactly these hooks.
 
 ## When to reach for a peer module instead
 

@@ -1,27 +1,61 @@
 package ai.agentican.quarkus.event;
 
 import ai.agentican.framework.Agentican;
-import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
-import ai.agentican.framework.agent.AgentStatus;
-import ai.agentican.framework.llm.StopReason;
-import ai.agentican.framework.state.StepLog;
-import ai.agentican.framework.store.WorkflowRunStore;
-import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
+import ai.agentican.framework.event.AgenticanEvent;
+import ai.agentican.framework.event.AgenticanEventListener;
+import ai.agentican.framework.event.HitlNotified;
+import ai.agentican.framework.event.MessageSent;
+import ai.agentican.framework.event.PlanStarted;
+import ai.agentican.framework.event.PlanCompleted;
+import ai.agentican.framework.event.ResponseReceived;
+import ai.agentican.framework.event.RunCompleted;
+import ai.agentican.framework.event.RunStarted;
+import ai.agentican.framework.event.StepCompleted;
+import ai.agentican.framework.event.StepStarted;
+import ai.agentican.framework.event.TaskCompleted;
+import ai.agentican.framework.event.TaskReaped;
+import ai.agentican.framework.event.TaskResumed;
+import ai.agentican.framework.event.TaskStarted;
+import ai.agentican.framework.event.ToolCallCompleted;
+import ai.agentican.framework.event.ToolCallStarted;
+import ai.agentican.framework.event.TurnCompleted;
+import ai.agentican.framework.event.TurnStarted;
 import ai.agentican.framework.util.Ids;
-import ai.agentican.framework.hitl.HitlCheckpoint;
+
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
-@ApplicationScoped
-public class CdiEventBridge implements WorkflowRunListener {
+import java.util.concurrent.ConcurrentHashMap;
 
-    @Inject WorkflowRunStore workflowRunStore;
+/**
+ * Translates {@link AgenticanEvent}s on the framework bus into CDI {@link Event}s
+ * fired through the Quarkus runtime. Lets application beans listen via
+ * {@code @Observes TaskStartedEvent} etc. without depending directly on the
+ * framework's event types.
+ *
+ * <p>Reads no state from {@code WorkflowRunStore} inside event handlers
+ * (event-payload-sufficiency principle). Small in-memory maps track
+ * cross-event correlations (task name, step name, per-run agent name) so
+ * the legacy CDI payload shapes stay backward-compatible.
+ */
+@ApplicationScoped
+public class CdiEventBridge implements AgenticanEventListener {
 
     @Inject Instance<Agentican> agentican;
 
-    private final java.util.concurrent.ConcurrentHashMap<String, String> toolCallIds = new java.util.concurrent.ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> toolCallIds = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> taskNames = new ConcurrentHashMap<>();      // taskId -> taskName
+    private final ConcurrentHashMap<String, ParentRef> parentRefs = new ConcurrentHashMap<>();  // taskId -> parent linkage
+    private final ConcurrentHashMap<String, String> stepNames = new ConcurrentHashMap<>();      // stepId -> stepName
+    private final ConcurrentHashMap<String, RunCtx> runCtx = new ConcurrentHashMap<>();         // runId  -> agent + stepId
+    private final ConcurrentHashMap<String, String> turnToRun = new ConcurrentHashMap<>();      // turnId -> runId
+    private final ConcurrentHashMap<String, Integer> turnIndices = new ConcurrentHashMap<>();   // turnId -> turn index
+    private final ConcurrentHashMap<String, String> toolToTurn = new ConcurrentHashMap<>();     // toolCallId -> turnId
+
+    private record ParentRef(String parentTaskId, String parentStepId, int iterationIndex) { }
+    private record RunCtx(String agentName, String stepId) { }
 
     @Inject Event<WfRunStartedEvent> planStartedEvents;
     @Inject Event<WfRunCompletedEvent> planCompletedEvents;
@@ -44,18 +78,205 @@ public class CdiEventBridge implements WorkflowRunListener {
     @Inject Event<TaskReapedEvent> taskReapedEvents;
 
     @Override
-    public void onPlanStarted(String taskId) {
+    public void on(AgenticanEvent event) {
 
-        var taskLog = workflowRunStore.load(taskId);
-        var taskDescription = taskLog != null ? taskLog.taskName() : null;
-        planStartedEvents.fire(new WfRunStartedEvent(taskId, taskDescription));
+        switch (event) {
+
+            case PlanStarted   e -> planStartedEvents.fire(new WfRunStartedEvent(e.taskId(), taskNames.get(e.taskId())));
+            case PlanCompleted e -> planCompletedEvents.fire(new WfRunCompletedEvent(e.taskId(), resolvePlanName(e.planId()), e.planId()));
+
+            case TaskStarted   e -> onTaskStarted(e);
+            case TaskCompleted e -> onTaskCompleted(e);
+
+            case StepStarted   e -> onStepStarted(e);
+            case StepCompleted e -> onStepCompleted(e);
+
+            case RunStarted   e -> onRunStarted(e);
+            case RunCompleted e -> onRunCompleted(e);
+
+            case TurnStarted   e -> onTurnStarted(e);
+            case TurnCompleted e -> onTurnCompleted(e);
+
+            case MessageSent      e -> onMessageSent(e);
+            case ResponseReceived e -> onResponseReceived(e);
+
+            case ToolCallStarted   e -> onToolCallStarted(e);
+            case ToolCallCompleted e -> onToolCallCompleted(e);
+
+            case HitlNotified e -> onHitlNotified(e);
+
+            case TaskResumed e -> taskResumedEvents.fire(new TaskResumedEvent(e.taskId()));
+            case TaskReaped  e -> taskReapedEvents.fire(new TaskReapedEvent(e.taskId(), e.reason()));
+
+            default -> { /* events with no CDI mapping (HitlResponded, BranchPathChosen, etc.) */ }
+        }
     }
 
-    @Override
-    public void onPlanCompleted(String taskId, String planId) {
+    private void onTaskStarted(TaskStarted event) {
 
-        var taskName = resolvePlanName(planId);
-        planCompletedEvents.fire(new WfRunCompletedEvent(taskId, taskName, planId));
+        taskNames.put(event.taskId(), event.taskName());
+
+        taskStartedEvents.fire(new TaskStartedEvent(event.taskId(), event.taskName(), event.parentTaskId(), null));
+
+        if (event.parentTaskId() != null && event.parentStepId() != null) {
+
+            parentRefs.put(event.taskId(),
+                    new ParentRef(event.parentTaskId(), event.parentStepId(), event.iterationIndex()));
+
+            iterationStartedEvents.fire(new IterationStartedEvent(
+                    event.taskId(),
+                    event.parentStepId(),
+                    event.parentTaskId(),
+                    event.taskName(),
+                    event.iterationIndex()));
+        }
+    }
+
+    private void onTaskCompleted(TaskCompleted event) {
+
+        var taskName = taskNames.remove(event.taskId());
+
+        taskCompletedEvents.fire(new TaskCompletedEvent(event.taskId(), taskName, event.status(), null));
+
+        var parent = parentRefs.remove(event.taskId());
+
+        if (parent != null) {
+
+            iterationCompletedEvents.fire(new IterationCompletedEvent(
+                    event.taskId(),
+                    parent.parentStepId(),
+                    parent.parentTaskId(),
+                    event.status()));
+        }
+    }
+
+    private void onStepStarted(StepStarted event) {
+
+        stepNames.put(event.stepId(), event.stepName());
+
+        stepStartedEvents.fire(new StepStartedEvent(event.stepId(), event.taskId(), event.stepName()));
+    }
+
+    private void onStepCompleted(StepCompleted event) {
+
+        stepCompletedEvents.fire(new StepCompletedEvent(
+                event.stepId(), event.taskId(), event.stepName(), event.status()));
+
+        stepNames.remove(event.stepId());
+    }
+
+    private void onRunStarted(RunStarted event) {
+
+        runCtx.put(event.runId(), new RunCtx(event.agentName(), event.stepId()));
+
+        // runIndex is not a framework-level concept — agent steps may have multiple
+        // runs across resume cycles, but the framework doesn't number them. CDI
+        // observers that want ordering should rely on event arrival order on the bus.
+        runStartedEvents.fire(new RunStartedEvent(
+                event.runId(), event.stepId(), event.agentName(), 0, event.taskId()));
+    }
+
+    private void onRunCompleted(RunCompleted event) {
+
+        var ctx = runCtx.remove(event.runId());
+
+        runCompletedEvents.fire(new RunCompletedEvent(
+                event.runId(),
+                event.stepId() != null ? event.stepId() : (ctx != null ? ctx.stepId() : null),
+                ctx != null ? ctx.agentName() : null,
+                0,                          // see onRunStarted — runIndex isn't framework-tracked
+                event.taskId()));
+    }
+
+    private void onTurnStarted(TurnStarted event) {
+
+        turnToRun.put(event.turnId(), event.runId());
+        turnIndices.put(event.turnId(), event.index());
+
+        var ctx = runCtx.get(event.runId());
+        var agentName = ctx != null ? ctx.agentName() : null;
+
+        turnStartedEvents.fire(new TurnStartedEvent(
+                event.turnId(), event.runId(), agentName, event.index(), event.taskId()));
+    }
+
+    private void onTurnCompleted(TurnCompleted event) {
+
+        var runId = turnToRun.remove(event.turnId());
+        turnIndices.remove(event.turnId());
+        var ctx = runId != null ? runCtx.get(runId) : null;
+        var agentName = ctx != null ? ctx.agentName() : null;
+
+        turnCompletedEvents.fire(new TurnCompletedEvent(
+                event.turnId(), runId, agentName, event.index(), event.taskId()));
+    }
+
+    private void onMessageSent(MessageSent event) {
+
+        var runId = turnToRun.get(event.turnId());
+        var ctx = runId != null ? runCtx.get(runId) : null;
+        var agentName = ctx != null ? ctx.agentName() : null;
+        var turnIndex = turnIndices.getOrDefault(event.turnId(), 0);
+
+        // messageId is not generated by the framework — turnId uniquely identifies the
+        // message within its turn since at most one MessageSent fires per turn.
+        messageSentEvents.fire(new MessageSentEvent(
+                null,
+                event.turnId(), agentName, turnIndex, event.taskId()));
+    }
+
+    private void onResponseReceived(ResponseReceived event) {
+
+        var runId = turnToRun.get(event.turnId());
+        var ctx = runId != null ? runCtx.get(runId) : null;
+        var agentName = ctx != null ? ctx.agentName() : null;
+        var turnIndex = turnIndices.getOrDefault(event.turnId(), 0);
+
+        var response = event.response();
+
+        var toolCallCount = response != null && response.toolCalls() != null ? response.toolCalls().size() : 0;
+        var inputTokens   = response != null ? response.inputTokens()  : 0;
+        var outputTokens  = response != null ? response.outputTokens() : 0;
+        var stopReason    = response != null ? response.stopReason()   : null;
+
+        // responseId is not generated by the framework — turnId uniquely identifies
+        // the response within its turn (one LLM round-trip per turn).
+        responseReceivedEvents.fire(new ResponseReceivedEvent(
+                null,
+                event.turnId(), agentName, turnIndex, stopReason,
+                inputTokens, outputTokens, toolCallCount, event.taskId()));
+    }
+
+    private void onToolCallStarted(ToolCallStarted event) {
+
+        var hexId = Ids.generate();
+        toolCallIds.put(event.toolCall().id(), hexId);
+        toolToTurn.put(event.toolCall().id(), event.turnId());
+
+        toolCallStartedEvents.fire(new ToolCallStartedEvent(
+                hexId, event.turnId(), event.toolCall().name(), event.taskId()));
+    }
+
+    private void onToolCallCompleted(ToolCallCompleted event) {
+
+        var result = event.toolResult();
+
+        var hexId = toolCallIds.remove(result.toolCallId());
+        if (hexId == null) hexId = Ids.generate();
+
+        var turnId = toolToTurn.remove(result.toolCallId());
+        if (turnId == null) turnId = event.turnId();
+
+        toolCallCompletedEvents.fire(new ToolCallCompletedEvent(
+                hexId, turnId, result.toolName(), result.isError(), event.taskId()));
+    }
+
+    private void onHitlNotified(HitlNotified event) {
+
+        var stepName = stepNames.get(event.stepId());
+
+        hitlCheckpointEvents.fire(new HitlCheckpointEvent(
+                event.taskId(), event.stepId(), stepName, event.checkpoint()));
     }
 
     private String resolvePlanName(String planId) {
@@ -63,327 +284,5 @@ public class CdiEventBridge implements WorkflowRunListener {
         if (!agentican.isResolvable()) return null;
         var plan = agentican.get().registry().workflows().byId(planId);
         return plan != null ? plan.name() : null;
-    }
-
-    @Override
-    public void onTaskStarted(String taskId) {
-
-        var taskLog = workflowRunStore.load(taskId);
-        var taskName = taskLog != null ? taskLog.taskName() : null;
-
-        taskStartedEvents.fire(new TaskStartedEvent(taskId, taskName, null));
-
-        if (taskLog != null && taskLog.parentTaskId() != null && taskLog.parentStepId() != null) {
-
-            iterationStartedEvents.fire(new IterationStartedEvent(
-                    taskId,
-                    taskLog.parentStepId(),
-                    taskLog.parentTaskId(),
-                    taskName,
-                    taskLog.iterationIndex()));
-        }
-    }
-
-    @Override
-    public void onTaskCompleted(String taskId, WorkflowRunStatus status) {
-
-        var taskLog = workflowRunStore.load(taskId);
-        var taskName = taskLog != null ? taskLog.taskName() : null;
-
-        taskCompletedEvents.fire(new TaskCompletedEvent(taskId, taskName, status, null));
-
-        if (taskLog != null && taskLog.parentTaskId() != null && taskLog.parentStepId() != null) {
-
-            iterationCompletedEvents.fire(new IterationCompletedEvent(
-                    taskId,
-                    taskLog.parentStepId(),
-                    taskLog.parentTaskId(),
-                    status));
-        }
-    }
-
-    @Override
-    public void onStepStarted(String taskId, String stepId) {
-
-        var step = resolveStepById(taskId, stepId);
-        var stepName = step != null ? step.stepName() : null;
-        stepStartedEvents.fire(new StepStartedEvent(stepId, taskId, stepName));
-    }
-
-    @Override
-    public void onStepCompleted(String taskId, String stepId) {
-
-        var step = resolveStepById(taskId, stepId);
-        var stepName = step != null ? step.stepName() : null;
-        var status = step != null ? step.status() : null;
-        stepCompletedEvents.fire(new StepCompletedEvent(stepId, taskId, stepName, status));
-    }
-
-    @Override
-    public void onRunStarted(String taskId, String runId) {
-
-        var taskLog = workflowRunStore.load(taskId);
-        var run = taskLog != null ? taskLog.findRunById(runId) : null;
-        var agentName = run != null ? run.agentName() : null;
-        var runIndex = run != null ? run.index() : 0;
-
-        var stepId = resolveStepIdForRun(taskLog, runId);
-        runStartedEvents.fire(new RunStartedEvent(runId, stepId, agentName, runIndex, taskId));
-    }
-
-    @Override
-    public void onRunCompleted(String taskId, String runId, AgentStatus status) {
-
-        var taskLog = workflowRunStore.load(taskId);
-        var run = taskLog != null ? taskLog.findRunById(runId) : null;
-        var agentName = run != null ? run.agentName() : null;
-        var runIndex = run != null ? run.index() : 0;
-
-        var stepId = resolveStepIdForRun(taskLog, runId);
-        runCompletedEvents.fire(new RunCompletedEvent(runId, stepId, agentName, runIndex, taskId));
-    }
-
-    @Override
-    public void onTurnStarted(String taskId, String turnId) {
-
-        var taskLog = workflowRunStore.load(taskId);
-        var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
-        var turn = turnLog != null ? turnLog.index() : 0;
-
-        var agentName = (String) null;
-        var runId = (String) null;
-        if (taskLog != null) {
-            outer:
-            for (var step : taskLog.steps().values()) {
-                for (var run : step.runs()) {
-                    for (var t : run.turns()) {
-                        if (turnId.equals(t.id())) {
-                            agentName = run.agentName();
-                            runId = run.id();
-                            break outer;
-                        }
-                    }
-                }
-            }
-        }
-        turnStartedEvents.fire(new TurnStartedEvent(turnId, runId, agentName, turn, taskId));
-    }
-
-    @Override
-    public void onTurnCompleted(String taskId, String turnId) {
-
-        var taskLog = workflowRunStore.load(taskId);
-        var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
-        var turn = turnLog != null ? turnLog.index() : 0;
-
-        var agentName = (String) null;
-        var runId = (String) null;
-        if (taskLog != null) {
-            outer:
-            for (var step : taskLog.steps().values()) {
-                for (var run : step.runs()) {
-                    for (var t : run.turns()) {
-                        if (turnId.equals(t.id())) {
-                            agentName = run.agentName();
-                            runId = run.id();
-                            break outer;
-                        }
-                    }
-                }
-            }
-        }
-        turnCompletedEvents.fire(new TurnCompletedEvent(turnId, runId, agentName, turn, taskId));
-    }
-
-    @Override
-    public void onMessageSent(String taskId, String turnId) {
-
-        var taskLog = workflowRunStore.load(taskId);
-        var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
-
-        var agentName = (String) null;
-        var turn = turnLog != null ? turnLog.index() : 0;
-        if (taskLog != null) {
-            outer:
-            for (var step : taskLog.steps().values()) {
-                for (var run : step.runs()) {
-                    for (var t : run.turns()) {
-                        if (turnId.equals(t.id())) {
-                            agentName = run.agentName();
-                            break outer;
-                        }
-                    }
-                }
-            }
-        }
-        messageSentEvents.fire(new MessageSentEvent(
-                turnLog != null ? turnLog.messageId() : null,
-                turnId, agentName, turn, taskId));
-    }
-
-    @Override
-    public void onResponseReceived(String taskId, String turnId, StopReason stopReason) {
-
-        var taskLog = workflowRunStore.load(taskId);
-        var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
-        var response = turnLog != null ? turnLog.response() : null;
-
-        var agentName = (String) null;
-        var turn = turnLog != null ? turnLog.index() : 0;
-        if (taskLog != null) {
-            outer:
-            for (var step : taskLog.steps().values()) {
-                for (var run : step.runs()) {
-                    for (var t : run.turns()) {
-                        if (turnId.equals(t.id())) {
-                            agentName = run.agentName();
-                            break outer;
-                        }
-                    }
-                }
-            }
-        }
-        responseReceivedEvents.fire(new ResponseReceivedEvent(
-                turnLog != null ? turnLog.responseId() : null,
-                turnId, agentName, turn, stopReason,
-                response != null ? response.inputTokens() : 0,
-                response != null ? response.outputTokens() : 0,
-                response != null && response.toolCalls() != null ? response.toolCalls().size() : 0,
-                taskId));
-    }
-
-    @Override
-    public void onToolCallStarted(String taskId, String toolCallId) {
-
-        var hexId = Ids.generate();
-        toolCallIds.put(toolCallId, hexId);
-
-        var taskLog = workflowRunStore.load(taskId);
-        var toolName = resolveToolNameByCallId(taskLog, toolCallId);
-        var turnId = resolveTurnIdForToolCall(taskLog, toolCallId);
-
-        toolCallStartedEvents.fire(new ToolCallStartedEvent(hexId, turnId, toolName, taskId));
-    }
-
-    @Override
-    public void onToolCallCompleted(String taskId, String toolCallId) {
-
-        var hexId = toolCallIds.remove(toolCallId);
-        if (hexId == null) hexId = Ids.generate();
-
-        var taskLog = workflowRunStore.load(taskId);
-        var toolResult = resolveToolResultByCallId(taskLog, toolCallId);
-        var toolName = toolResult != null ? toolResult.toolName() : "unknown";
-        var isError = toolResult != null && toolResult.isError();
-        var turnId = resolveTurnIdForToolCall(taskLog, toolCallId);
-
-        toolCallCompletedEvents.fire(new ToolCallCompletedEvent(hexId, turnId, toolName, isError, taskId));
-    }
-
-    @Override
-    public void onHitlNotified(String taskId, String hitlId, HitlCheckpoint.Type type) {
-
-        var taskLog = workflowRunStore.load(taskId);
-        String stepId = null;
-        String stepName = null;
-        ai.agentican.framework.hitl.HitlCheckpoint checkpoint = null;
-        if (taskLog != null) {
-            for (var step : taskLog.steps().values()) {
-                if (step.checkpoint() != null && hitlId.equals(step.checkpoint().id())) {
-                    stepId = step.id();
-                    stepName = step.stepName();
-                    checkpoint = step.checkpoint();
-                    break;
-                }
-            }
-        }
-        hitlCheckpointEvents.fire(new HitlCheckpointEvent(taskId, stepId, stepName, checkpoint));
-    }
-
-    @Override
-    public void onTaskResumed(String taskId) {
-
-        taskResumedEvents.fire(new TaskResumedEvent(taskId));
-    }
-
-    @Override
-    public void onTaskReaped(String taskId,
-                             ai.agentican.framework.orchestration.execution.resume.ReapReason reason) {
-
-        taskReapedEvents.fire(new TaskReapedEvent(taskId, reason));
-    }
-
-    private StepLog resolveStepById(String taskId, String stepId) {
-
-        var taskLog = workflowRunStore.load(taskId);
-        return taskLog != null ? taskLog.findStepById(stepId) : null;
-    }
-
-    private static String resolveStepIdForRun(ai.agentican.framework.state.WorkflowRunLog taskLog, String runId) {
-
-        if (taskLog == null) return null;
-
-        for (var step : taskLog.steps().values()) {
-            for (var run : step.runs()) {
-                if (runId.equals(run.id())) return step.id();
-            }
-        }
-        return null;
-    }
-
-    private static String resolveTurnIdForToolCall(ai.agentican.framework.state.WorkflowRunLog taskLog, String toolCallId) {
-
-        if (taskLog == null) return null;
-
-        for (var step : taskLog.steps().values()) {
-            for (var run : step.runs()) {
-                for (var turn : run.turns()) {
-                    if (turn.response() != null && turn.response().toolCalls() != null) {
-                        for (var tc : turn.response().toolCalls()) {
-                            if (toolCallId.equals(tc.id())) return turn.id();
-                        }
-                    }
-                    for (var tr : turn.toolResults()) {
-                        if (toolCallId.equals(tr.toolCallId())) return turn.id();
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private static String resolveToolNameByCallId(ai.agentican.framework.state.WorkflowRunLog taskLog, String toolCallId) {
-
-        if (taskLog == null) return "unknown";
-
-        for (var step : taskLog.steps().values()) {
-            for (var run : step.runs()) {
-                for (var turn : run.turns()) {
-                    if (turn.response() != null && turn.response().toolCalls() != null) {
-                        for (var tc : turn.response().toolCalls()) {
-                            if (toolCallId.equals(tc.id())) return tc.name();
-                        }
-                    }
-                }
-            }
-        }
-        return "unknown";
-    }
-
-    private static ai.agentican.framework.tools.ToolResult resolveToolResultByCallId(
-            ai.agentican.framework.state.WorkflowRunLog taskLog, String toolCallId) {
-
-        if (taskLog == null) return null;
-
-        for (var step : taskLog.steps().values()) {
-            for (var run : step.runs()) {
-                for (var turn : run.turns()) {
-                    for (var tr : turn.toolResults()) {
-                        if (toolCallId.equals(tr.toolCallId())) return tr;
-                    }
-                }
-            }
-        }
-        return null;
     }
 }

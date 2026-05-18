@@ -1,11 +1,14 @@
 package ai.agentican.framework;
 
+import ai.agentican.framework.event.AgenticanEventBus;
+import ai.agentican.framework.event.PlanCompleted;
+import ai.agentican.framework.event.PlanStarted;
+import ai.agentican.framework.event.TaskCompleted;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.knowledge.KnowledgeIngestor;
 import ai.agentican.framework.orchestration.execution.OutputBinding;
 import ai.agentican.framework.orchestration.execution.WorkflowRun;
 import ai.agentican.framework.orchestration.execution.WorkflowRunDecorator;
-import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
 import ai.agentican.framework.orchestration.execution.WorkflowRunResult;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.orchestration.execution.WorkflowRunner;
@@ -31,7 +34,7 @@ public final class WorkflowEngine implements AutoCloseable {
 
     final AgenticanRegistry registry;
     final WorkflowRunStore workflowRunStore;
-    final WorkflowRunListener workflowRunListener;
+    final AgenticanEventBus eventBus;
     final WorkflowRunner taskRunner;
     final ExecutorService taskExecutor;
     final WorkflowRunDecorator workflowRunDecorator;
@@ -39,13 +42,13 @@ public final class WorkflowEngine implements AutoCloseable {
     final KnowledgeIngestor knowledgeIngestor;
     final boolean ownsExecutor;
 
-    WorkflowEngine(AgenticanRegistry registry, WorkflowRunStore workflowRunStore, WorkflowRunListener workflowRunListener,
+    WorkflowEngine(AgenticanRegistry registry, WorkflowRunStore workflowRunStore, AgenticanEventBus eventBus,
                    WorkflowRunner taskRunner, ExecutorService taskExecutor, WorkflowRunDecorator workflowRunDecorator,
                    HitlManager hitlManager, KnowledgeIngestor knowledgeIngestor, boolean ownsExecutor) {
 
         this.registry = registry;
         this.workflowRunStore = workflowRunStore;
-        this.workflowRunListener = workflowRunListener;
+        this.eventBus = eventBus;
         this.taskRunner = taskRunner;
         this.taskExecutor = taskExecutor;
         this.workflowRunDecorator = workflowRunDecorator;
@@ -54,6 +57,8 @@ public final class WorkflowEngine implements AutoCloseable {
         this.ownsExecutor = ownsExecutor;
     }
 
+    public AgenticanEventBus eventBus() { return eventBus; }
+
     <R> WorkflowRun<R> dispatch(WorkflowDefinition plan, Map<String, String> inputs, OutputBinding outputBinding,
                                 Function<WorkflowRunResult, R> extractor) {
 
@@ -61,8 +66,8 @@ public final class WorkflowEngine implements AutoCloseable {
 
             registry.workflows().registerIfAbsent(plan);
 
-            workflowRunListener.onPlanStarted(taskId);
-            workflowRunListener.onPlanCompleted(taskId, plan.id());
+            eventBus.publish(new PlanStarted(taskId));
+            eventBus.publish(new PlanCompleted(taskId, plan.id()));
 
             return taskRunner.run(plan, taskId, inputs, cancelled, outputBinding);
 
@@ -85,7 +90,7 @@ public final class WorkflowEngine implements AutoCloseable {
 
                 LOG.error("Task {} failed: {}", taskId, e.getMessage(), e);
 
-                workflowRunListener.onTaskCompleted(taskId, WorkflowRunStatus.FAILED);
+                eventBus.publish(new TaskCompleted(taskId, WorkflowRunStatus.FAILED));
 
                 throw e;
             }

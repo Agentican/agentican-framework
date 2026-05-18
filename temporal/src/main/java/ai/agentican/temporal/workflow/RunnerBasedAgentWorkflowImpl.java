@@ -2,13 +2,18 @@ package ai.agentican.temporal.workflow;
 
 import ai.agentican.framework.agent.Agent;
 import ai.agentican.framework.agent.SmacAgentRunner;
+import ai.agentican.framework.event.AgenticanEventBus;
 import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.hitl.HitlType;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.tools.Toolkit;
+import ai.agentican.temporal.activity.AgenticanActivity;
+import ai.agentican.temporal.event.ForwarderListener;
 
+import io.temporal.activity.ActivityOptions;
 import io.temporal.workflow.Workflow;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,20 +28,34 @@ public class RunnerBasedAgentWorkflowImpl implements RunnerBasedAgentWorkflow {
                         + "TemporalAgentLoopHost.callLlm → LlmCallActivity.");
     };
 
+    private static final Duration DEFAULT_ACTIVITY_TIMEOUT = Duration.ofSeconds(30);
+
     private final Map<String, HitlResponse> hitlResponses = new HashMap<>();
 
     @Override
     public String run(RunnerBasedAgentInput input) {
 
+        // Workflow-side bus is sparsely subscribed — exactly one listener forwards every
+        // event to the AgenticanActivity, which on the activity worker side publishes onto
+        // the application's main bus where the in-process listener set (persister,
+        // knowledge ingestor, metrics, OTel, ...) handles them. Same listener wiring,
+        // both runtimes.
+        var agenticanActivity = Workflow.newActivityStub(AgenticanActivity.class,
+                ActivityOptions.newBuilder().setStartToCloseTimeout(DEFAULT_ACTIVITY_TIMEOUT).build());
+
+        var eventBus = new AgenticanEventBus();
+        eventBus.subscribeFirst(new ForwarderListener(agenticanActivity));
+
         var runner = SmacAgentRunner.builder()
                 .llmClient(HOST_ONLY_LLM_CLIENT)
+                .eventBus(eventBus)
                 .maxIterations(input.maxTurns())
                 .timeout(input.timeout())
                 .build();
 
         var agent = Agent.builder().config(input.agentConfig()).runner(runner).build();
 
-        var host = new TemporalAgentLoopHost(this::awaitHitlReply);
+        var host = new TemporalAgentLoopHost(eventBus, agenticanActivity, this::awaitHitlReply);
 
         var toolkits = buildToolkitMap(input);
 

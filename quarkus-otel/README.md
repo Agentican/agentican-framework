@@ -29,7 +29,7 @@ quarkus.otel.exporter.otlp.protocol=grpc
 That's it. The module auto-registers:
 - A `LlmClientDecorator` that wraps every LLM call with an OTel span
 - A `WorkflowRunDecorator` that propagates OTel context to task virtual threads
-- A `WorkflowRunListener` that creates per-step / per-run / per-turn spans
+- An `AgenticanEventListener` that creates per-step / per-run / per-turn spans
 - An HITL checkpoint observer that tracks human wait time as spans
 - An `InMemorySpanExporter` implementing `SpanStore` so exported spans are
   queryable by `taskId` / `traceId`
@@ -51,9 +51,9 @@ task → step → run → turn → llm call / tool call
 ```
 [POST /agentican/tasks]                              <- auto by Quarkus
   |
-  +-- [agentican.step research]                      <- TracedWorkflowRunListener
+  +-- [agentican.step research]                      <- TracedLifecycleListener
   |     |
-  |     +-- [agentican.run 0]                        <- TracedWorkflowRunListener
+  |     +-- [agentican.run 0]                        <- TracedLifecycleListener
   |     |     |
   |     |     +-- [agentican.turn 0]
   |     |     |     +-- [agentican.llm.call]         <- TracedLlmClient
@@ -159,10 +159,11 @@ Same pattern as `agentican-quarkus-metrics`. The `TracingAutoConfiguration` prod
 
 ### Step listener
 
-The framework's `WorkflowRunListener` interface (added in this sprint) is called synchronously
-on the step's virtual thread. `TracedWorkflowRunListener` creates a span on `onStepStarted` and
-ends it on `onStepCompleted`. Because the span is made current via `Span.makeCurrent()`,
-any LLM calls within the step become children of the step span.
+`TracedLifecycleListener` implements `AgenticanEventListener` and is subscribed to the
+framework's `AgenticanEventBus`. Events arrive synchronously on the step's virtual
+thread. The listener opens a span on `StepStarted` and closes it on `StepCompleted`.
+Because the span is made current via `Span.makeCurrent()`, any LLM calls within the
+step become children of the step span.
 
 ## Viewing traces
 

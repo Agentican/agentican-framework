@@ -4,47 +4,47 @@ The framework exposes four extension point interfaces. The Quarkus integration d
 and composes all implementations via `Instance<T>.stream()` — multiple modules can provide
 the same type and they stack correctly.
 
-## WorkflowRunListener
+## AgenticanEventListener
 
-Observes the full execution hierarchy: step → run → turn. Called synchronously on the
-executing thread so implementations can maintain thread-local state (e.g. OTel spans).
+Subscribes to every event on the `AgenticanEventBus` — task, step, run, turn, message,
+response, tool calls, HITL, token streams. One method, pattern-matched on the sealed
+`AgenticanEvent` hierarchy. Called synchronously on the publishing thread, so
+implementations can maintain thread-local state (e.g. OTel spans).
 
 ```java
-public interface WorkflowRunListener {
-    // Task level
-    default void onTaskStarted(String taskId, String taskName) {}
-    default void onTaskCompleted(String taskId, String taskName, WorkflowRunStatus status) {}
-    // Step level
-    default void onStepStarted(String taskId, String stepName) {}
-    default void onStepCompleted(String taskId, String stepName, WorkflowRunStatus status) {}
-    // HITL
-    default void onHitlCheckpoint(String taskId, String stepName, HitlCheckpoint checkpoint) {}
-    // Run level
-    default void onRunStarted(String agentName, String stepName) {}
-    default void onRunCompleted(String agentName, String stepName, AgentResult result) {}
-    // Turn level
-    default void onTurnStarted(String agentName, String stepName, int turn) {}
-    default void onTurnCompleted(String agentName, String stepName, int turn, LlmResponse response) {}
-    // Token streaming
-    default void onToken(String agentName, String stepName, int turn, String token) {}
+public interface AgenticanEventListener {
+    void on(AgenticanEvent event);
 }
 ```
 
-Override only the levels you care about. In Quarkus, produce as a CDI bean:
+Quarkus auto-subscribes every CDI bean of this type — drop in `@ApplicationScoped` and
+the producer wires it onto the bus for you:
 
 ```java
-@Produces @ApplicationScoped
-public WorkflowRunListener myListener() {
-    return new WorkflowRunListener() {
-        @Override
-        public void onTurnCompleted(String agent, String step, int turn, LlmResponse r) {
-            log.info("Agent {} turn {} used {} tokens", agent, turn, r.outputTokens());
+@ApplicationScoped
+public class TurnTokenLogger implements AgenticanEventListener {
+
+    private static final Logger log = LoggerFactory.getLogger(TurnTokenLogger.class);
+
+    @Override
+    public void on(AgenticanEvent event) {
+
+        if (event instanceof ResponseReceived r) {
+            log.info("Turn {} used {} output tokens",
+                    r.turnId(), r.response().outputTokens());
         }
-    };
+    }
 }
 ```
 
-**Used by:** `quarkus-otel` (step + run + turn spans), `quarkus-metrics` (run + turn counters)
+Every event carries the full payload it describes — `ResponseReceived` includes the
+whole `LlmResponse`, `ToolCallStarted` includes the `ToolCall`, `TaskStarted` includes
+the `WorkflowDefinition` plus params. There is no need to read back from
+`WorkflowRunStore` inside the handler (and you shouldn't — see
+[observability.md](../observability.md) for the event-payload sufficiency rule).
+
+**Used by:** `quarkus-otel` (step + run + turn + LLM-call spans), `quarkus-metrics`
+(run + turn + tool counters), `quarkus-rest` (CDI event bridge → SSE timeline).
 
 ## LlmClientDecorator
 
@@ -88,6 +88,40 @@ to capture the current `Context` for restoration on the child run's thread.
 
 **Used by:** `quarkus-otel` (propagates OTel context from HTTP thread to virtual thread)
 
+## HitlResponseDispatcher
+
+Routes a human's HITL response to whichever runtime is awaiting it. The default
+`InProcessHitlResponseDispatcher` (produced as a `@DefaultBean` by `AgenticanBeansProducer`)
+hands responses to the in-process `HitlManager`. When `agentican-temporal` is in play and
+a task's `runtime == TEMPORAL`, the `HitlManager` has no parked thread to wake — the
+agent loop is awaiting a Temporal workflow signal in some worker.
+
+```java
+public interface HitlResponseDispatcher {
+    void respond(String checkpointId, HitlResponse response);
+    void cancel(String checkpointId);
+}
+```
+
+Override with a runtime-aware composite to route correctly:
+
+```java
+@Produces @ApplicationScoped @Alternative
+@Priority(Interceptor.Priority.LIBRARY_AFTER + 10)
+HitlResponseDispatcher temporalAware(HitlManager hm, WorkflowRunStore store,
+                                     WorkflowClient client, AgenticanEventBus bus) {
+    var d = new TemporalAwareHitlResponseDispatcher(
+            new InProcessHitlResponseDispatcher(hm), store, client);
+    bus.subscribe(d);   // indexes TEMPORAL checkpoints as HitlNotified events arrive
+    return d;
+}
+```
+
+The REST controllers (`CheckpointsResource`, `AgenticanWebSocket`) inject `HitlResponseDispatcher`
+and call `respond`/`cancel` — they don't know which runtime owns the checkpoint and don't need to.
+
+**Used by:** `quarkus-rest` (HTTP + WebSocket HITL endpoints). See [HITL](../hitl.md#routing-responses-hitlresponsedispatcher).
+
 ## Custom executor
 
 Provide a managed `ExecutorService` for task execution:
@@ -108,9 +142,9 @@ When both `quarkus-metrics` and `quarkus-otel` are on the classpath, the produce
 composes all beans of the same type into a chain:
 
 ```
-LlmClientDecorator:    metrics wraps → otel wraps → raw client
-WorkflowRunDecorator:  composed via snapshot() chain
-WorkflowRunListener:   all listeners called for each event
+LlmClientDecorator:        metrics wraps → otel wraps → raw client
+WorkflowRunDecorator:      composed via snapshot() chain
+AgenticanEventListener:    every listener is subscribed; bus dispatches in FIFO order
 ```
 
 No configuration needed — it's automatic via `Instance<T>.stream()`.

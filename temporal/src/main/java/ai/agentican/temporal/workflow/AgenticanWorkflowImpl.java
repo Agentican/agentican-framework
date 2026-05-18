@@ -36,11 +36,19 @@ public class AgenticanWorkflowImpl implements AgenticanWorkflow {
 
     private static final Duration DEFAULT_ACTIVITY_TIMEOUT = Duration.ofMinutes(15);
 
-    private final AgentStepActivity agentActivity = Workflow.newActivityStub(AgentStepActivity.class,
-            ActivityOptions.newBuilder().setStartToCloseTimeout(DEFAULT_ACTIVITY_TIMEOUT).build());
-
+    // Code steps share a single stub at the default timeout (WorkflowStepCode doesn't expose
+    // a per-step timeout today). Agent steps get a per-call stub built from step.timeout() —
+    // see agentActivityFor(step) — so framework and Temporal agree on the deadline.
     private final CodeStepActivity codeActivity = Workflow.newActivityStub(CodeStepActivity.class,
             ActivityOptions.newBuilder().setStartToCloseTimeout(DEFAULT_ACTIVITY_TIMEOUT).build());
+
+    private static AgentStepActivity agentActivityFor(WorkflowStepAgent step) {
+
+        var timeout = step.timeout() != null ? step.timeout() : DEFAULT_ACTIVITY_TIMEOUT;
+
+        return Workflow.newActivityStub(AgentStepActivity.class,
+                ActivityOptions.newBuilder().setStartToCloseTimeout(timeout).build());
+    }
 
     private final Map<String, Deque<List<ToolResult>>> hitlReplies = new HashMap<>();
 
@@ -163,15 +171,18 @@ public class AgenticanWorkflowImpl implements AgenticanWorkflow {
         var req = new AgentInvocationRequest(step.agentName(), rendered, taskId, Workflow.randomUUID().toString(),
                 step.name(), step.timeout(), step.skills(), step.tools());
 
+        var agentActivity = agentActivityFor(step);
+
         var result = agentActivity.invokeAgent(req);
 
-        result = awaitHitlCompletion(result, req, step.name());
+        result = awaitHitlCompletion(result, req, step.name(), agentActivity);
 
         return new StepResult(step.name(), result.text());
     }
 
     private AgentInvocationResult awaitHitlCompletion(AgentInvocationResult result,
-                                                     AgentInvocationRequest req, String stepName) {
+                                                     AgentInvocationRequest req, String stepName,
+                                                     AgentStepActivity agentActivity) {
 
         while (result.status() == AgentStatus.SUSPENDED) {
 

@@ -15,6 +15,7 @@ All mounted under `/agentican`. Override with `quarkus.http.root-path`.
 | `GET` | `/agentican/tasks` | List tasks (`?limit=`, `?status=`, `?since=`) |
 | `GET` | `/agentican/tasks/{id}` | Task summary |
 | `GET` | `/agentican/tasks/{id}/log` | Full log with per-step run data |
+| `GET` | `/agentican/tasks/{id}/steps/{stepName}/runs/{runIndex}/turns/{turnIndex}` | Inspect a single turn — useful for granular debugging |
 | `GET` | `/agentican/tasks/{id}/stream` | SSE event stream |
 | `DELETE` | `/agentican/tasks/{id}` | Cancel (cooperative) |
 
@@ -83,6 +84,62 @@ The parked virtual thread wakes up immediately — no polling, no state machine.
 |---|---|---|
 | `GET` | `/agentican/agents` | List registered agents |
 | `GET` | `/agentican/agents/{name}` | Agent detail |
+| `POST` | `/agentican/agents` | Register / update an agent at runtime (JSON body) |
+| `PUT` | `/agentican/agents/{ref}` | Update an existing agent |
+| `DELETE` | `/agentican/agents/{ref}` | Remove an agent |
+
+### Skills
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/agentican/skills` | List registered skills |
+| `GET` | `/agentican/skills/{ref}` | Skill detail |
+| `POST` | `/agentican/skills` | Create a skill |
+| `PUT` | `/agentican/skills/{ref}` | Update a skill |
+| `DELETE` | `/agentican/skills/{ref}` | Remove a skill |
+
+### Workflows (aka plans)
+
+`/agentican/plans` is the canonical path; treat the `plans` ↔ `workflows` distinction as
+interchangeable (both terms appear in catalog/code for historical reasons).
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/agentican/plans` | List registered workflow definitions |
+| `GET` | `/agentican/plans/{ref}` | Workflow detail |
+| `POST` | `/agentican/plans` | Register a workflow (JSON or YAML body via `Content-Type`) |
+| `PUT` | `/agentican/plans/{ref}` | Update a workflow |
+| `DELETE` | `/agentican/plans/{ref}` | Remove a workflow |
+
+### Tools
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/agentican/tools` | List registered toolkits and the tools they expose (slug, display name, description). Useful for UIs that need to render the agent's tool surface. |
+
+### Config
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/agentican/config` | Read the application's effective Agentican-related Quarkus config properties (OTel endpoint, HTTP port, CORS, etc.) |
+| `GET` | `/agentican/config/export` | Export the live catalog (agents + skills + workflows) as JSON |
+| `GET` | `/agentican/config/export.yaml` | Same as above, but in catalog YAML format suitable for committing |
+| `POST` | `/agentican/config/import` | Import a catalog YAML/JSON document; merges into the registries. Useful for multi-env catalog migration. |
+
+### Audit
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/agentican/audit` | Catalog-mutation audit trail. Filters: `entityType`, `entityRef`, `since` (ISO timestamp), `limit`. |
+| `DELETE` | `/agentican/audit` | Prune audit entries older than `before` (ISO timestamp). |
+
+### Traces
+
+Available only when `agentican-quarkus-otel` is on the classpath.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/agentican/traces/{taskId}` | Returns the OTel `SpanView` list for a given task. By default spans live in an in-memory LRU of 100 traces; add `agentican-quarkus-otel-store-jpa` for Postgres-backed persistence. |
 
 ## SSE streaming
 
@@ -103,13 +160,34 @@ es.addEventListener('task_completed', e => { es.close(); });
 
 ### Event types
 
-| Name | Payload | Description |
+The SSE channel emits one event per framework lifecycle moment. The full set, in
+the order they typically appear within a task, is below — clients can ignore any
+event they don't care about, but should not be surprised by them. (Source of truth:
+[`SseEventTypes.java`](../../quarkus-rest/src/main/java/ai/agentican/quarkus/rest/sse/SseEventTypes.java).)
+
+| Name | Payload shape | Fires when |
 |---|---|---|
-| `task_started` | `{ taskId, taskName }` | Task began |
-| `step_completed` | `{ taskId, stepName, status }` | Step reached terminal state |
-| `hitl_checkpoint` | `{ taskId, stepName, checkpoint }` | Step parked on HITL |
-| `task_completed` | `{ taskId, taskName, status }` | Task reached terminal state |
-| `heartbeat` | (comment) | Keep-alive every 30s |
+| `plan_started` | `{ taskId, taskDescription }` | Planning began (only when the workflow planner is in play) |
+| `plan_completed` | `{ taskId, taskName, planId }` | Plan resolved; execution about to begin |
+| `task_started` | `{ taskId, taskName, parentTaskId }` | Task entered the executor |
+| `step_started` | `{ stepId, taskId, stepName }` | Step began |
+| `step_completed` | `{ stepId, taskId, stepName, status }` | Step reached a terminal status |
+| `run_started` | `{ runId, stepId, agentName, runIndex, taskId }` | An agent run started within a step (resume → multiple runs per step) |
+| `run_completed` | `{ runId, stepId, agentName, runIndex, taskId }` | Run finished |
+| `turn_started` | `{ turnId, runId, agentName, turn, taskId }` | One LLM round-trip began within a run |
+| `turn_completed` | `{ turnId, runId, agentName, turn, taskId }` | Turn finished |
+| `message_sent` | `{ messageId, turnId, agentName, turn, taskId }` | LLM request dispatched |
+| `response_received` | `{ responseId, turnId, agentName, turn, stopReason, inputTokens, outputTokens, toolCallCount, taskId }` | LLM responded |
+| `tool_call_started` | `{ toolCallId, turnId, toolName, taskId }` | Tool invocation began |
+| `tool_call_completed` | `{ toolCallId, turnId, toolName, isError, taskId }` | Tool invocation finished |
+| `hitl_checkpoint` | `{ taskId, stepId, stepName, checkpoint }` | Step parked awaiting a human response |
+| `iteration_started` | `{ taskId, parentStepId, parentTaskId, taskName, iterationIndex }` | A loop-body sub-task began |
+| `iteration_completed` | `{ taskId, parentStepId, parentTaskId, status }` | Loop-body sub-task finished |
+| `task_completed` | `{ taskId, taskName, status }` | Task reached a terminal status |
+| `heartbeat` | (SSE comment) | Keep-alive every 30s |
+
+The unknown / fallback name is `event` — emitted only if a future framework event lacks
+an explicit mapping. Clients that switch on event name should treat it as ignorable.
 
 ### Replay with `Last-Event-ID`
 

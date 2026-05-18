@@ -45,6 +45,12 @@ public class TaskEntity extends PanacheEntityBase {
     @Column(name = "completed_at")
     public Instant completedAt;
 
+    @Column(name = "runtime", nullable = false, length = 16)
+    public String runtime;
+
+    @Column(name = "temporal_workflow_id")
+    public String temporalWorkflowId;
+
     @Version
     public long version;
 }

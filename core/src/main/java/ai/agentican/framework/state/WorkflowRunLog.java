@@ -27,23 +27,29 @@ public class WorkflowRunLog {
     private final String parentStepId;
     private final int iterationIndex;
 
+    private final RuntimeOwner runtime;
+    private final String temporalWorkflowId;
+
     private volatile WorkflowRunStatus status;
     private volatile Instant completedAt;
     private volatile boolean planSnapshotCorrupt;
 
     public WorkflowRunLog(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params) {
 
-        this(taskId, taskName, plan, params, null, null, 0);
+        this(taskId, taskName, plan, params, null, null, 0,
+                RuntimeOwner.IN_PROCESS, null, Instant.now());
     }
 
     public WorkflowRunLog(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params,
                    String parentTaskId, String parentStepId, int iterationIndex) {
 
-        this(taskId, taskName, plan, params, parentTaskId, parentStepId, iterationIndex, Instant.now());
+        this(taskId, taskName, plan, params, parentTaskId, parentStepId, iterationIndex,
+                RuntimeOwner.IN_PROCESS, null, Instant.now());
     }
 
     public WorkflowRunLog(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params,
-                   String parentTaskId, String parentStepId, int iterationIndex, Instant createdAt) {
+                   String parentTaskId, String parentStepId, int iterationIndex,
+                   RuntimeOwner runtime, String temporalWorkflowId, Instant createdAt) {
 
         this.taskId = taskId;
         this.taskName = taskName;
@@ -53,6 +59,8 @@ public class WorkflowRunLog {
         this.parentTaskId = parentTaskId;
         this.parentStepId = parentStepId;
         this.iterationIndex = iterationIndex;
+        this.runtime = runtime != null ? runtime : RuntimeOwner.IN_PROCESS;
+        this.temporalWorkflowId = temporalWorkflowId;
     }
 
     @JsonCreator
@@ -63,6 +71,8 @@ public class WorkflowRunLog {
                           @JsonProperty("parentTaskId") String parentTaskId,
                           @JsonProperty("parentStepId") String parentStepId,
                           @JsonProperty("iterationIndex") int iterationIndex,
+                          @JsonProperty("runtime") RuntimeOwner runtime,
+                          @JsonProperty("temporalWorkflowId") String temporalWorkflowId,
                           @JsonProperty("createdAt") Instant createdAt,
                           @JsonProperty("status") WorkflowRunStatus status,
                           @JsonProperty("completedAt") Instant completedAt,
@@ -70,7 +80,8 @@ public class WorkflowRunLog {
                           @JsonProperty("steps") Map<String, StepLog> steps) {
 
         this(taskId, taskName, plan, params != null ? params : Map.of(),
-                parentTaskId, parentStepId, iterationIndex, createdAt);
+                parentTaskId, parentStepId, iterationIndex,
+                runtime, temporalWorkflowId, createdAt);
 
         if (status != null)      setStatus(status);
         if (completedAt != null) setCompletedAt(completedAt);
@@ -90,6 +101,9 @@ public class WorkflowRunLog {
     public String parentTaskId() { return parentTaskId; }
     public String parentStepId() { return parentStepId; }
     public int iterationIndex() { return iterationIndex; }
+
+    public RuntimeOwner runtime() { return runtime; }
+    public String temporalWorkflowId() { return temporalWorkflowId; }
 
     public TokenUsage tokenUsage() {
         return TokenUsage.sum(steps.values().stream().map(StepLog::tokenUsage));

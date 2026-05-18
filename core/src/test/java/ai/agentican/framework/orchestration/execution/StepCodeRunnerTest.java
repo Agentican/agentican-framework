@@ -45,7 +45,7 @@ class StepCodeRunnerTest {
     private WorkflowRunner taskRunner(AgentRegistryMemory agents, CodeStepRegistry codeSteps) {
 
         return new WorkflowRunner(agents, autoApproveHitl(), new ToolkitRegistry(),
-                new WorkflowRunStoreMemory(), null, 0, null, codeSteps);
+                new WorkflowRunStoreMemory(), null, null, 0, null, codeSteps);
     }
 
     @Test

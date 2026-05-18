@@ -1,5 +1,13 @@
 package ai.agentican.framework.orchestration.execution;
 
+import ai.agentican.framework.event.AgenticanEventBus;
+import ai.agentican.framework.event.HitlNotified;
+import ai.agentican.framework.event.HitlResponded;
+import ai.agentican.framework.event.StepCompleted;
+import ai.agentican.framework.event.StepStarted;
+import ai.agentican.framework.event.StepTokenUsageAggregated;
+import ai.agentican.framework.event.TaskCompleted;
+import ai.agentican.framework.event.TaskStarted;
 import ai.agentican.framework.registry.AgentRegistry;
 import ai.agentican.framework.agent.AgentResult;
 import ai.agentican.framework.agent.AgentStatus;
@@ -11,6 +19,7 @@ import ai.agentican.framework.hitl.HitlCheckpoint;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.state.RunLog;
+import ai.agentican.framework.state.RuntimeOwner;
 import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.framework.orchestration.model.*;
 import ai.agentican.framework.tools.ToolResult;
@@ -31,6 +40,11 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import ai.agentican.framework.event.WorkflowRunStorePersister;
+import ai.agentican.framework.llm.StructuredOutput;
+import ai.agentican.framework.orchestration.code.CodeStepRegistry;
+import ai.agentican.framework.state.StepLog;
+import ai.agentican.framework.state.WorkflowRunLog;
 
 public class WorkflowRunner {
 
@@ -51,6 +65,7 @@ public class WorkflowRunner {
     private final HitlManager hitlManager;
     private final ToolkitRegistry toolkitRegistry;
     private final WorkflowRunStore workflowRunStore;
+    private final AgenticanEventBus eventBus;
     private final Duration taskTimeout;
     private final StepAgentRunner stepAgentRunner;
 
@@ -60,14 +75,16 @@ public class WorkflowRunner {
     private final StepCodeRunner stepCodeRunner;
 
     public WorkflowRunner(AgentRegistry agentRegistry, HitlManager hitlManager,
-                      ToolkitRegistry toolkitRegistry, WorkflowRunStore workflowRunStore, Duration taskTimeout,
+                      ToolkitRegistry toolkitRegistry, WorkflowRunStore workflowRunStore,
+                      AgenticanEventBus eventBus, Duration taskTimeout,
                       int maxStepRetries, WorkflowRunDecorator workflowRunDecorator,
-                      ai.agentican.framework.orchestration.code.CodeStepRegistry codeStepRegistry) {
+                      CodeStepRegistry codeStepRegistry) {
 
         this.agentRegistry = agentRegistry;
         this.hitlManager = hitlManager;
         this.toolkitRegistry = toolkitRegistry;
         this.workflowRunStore = workflowRunStore;
+        this.eventBus = eventBus != null ? eventBus : defaultBusFor(workflowRunStore);
         this.taskTimeout = taskTimeout;
         this.maxStepRetries = maxStepRetries > 0 ? maxStepRetries : WorkerConfig.DEFAULT_MAX_STEP_RETRIES;
         this.workflowRunDecorator = workflowRunDecorator;
@@ -82,7 +99,14 @@ public class WorkflowRunner {
                 (subPlan, subParams, subCancelled, subOutputs, parentTaskId, parentStepId, iterationIndex) ->
                         wrapSubTask(() -> run(subPlan, newTaskId(), parentTaskId, parentStepId, iterationIndex,
                                 subParams, subCancelled, subOutputs)),
-                workflowRunStore);
+                this.eventBus);
+    }
+
+    private static AgenticanEventBus defaultBusFor(WorkflowRunStore store) {
+
+        var bus = new AgenticanEventBus();
+        bus.subscribeFirst(new WorkflowRunStorePersister(store));
+        return bus;
     }
 
     private WorkflowRunResult wrapSubTask(java.util.function.Supplier<WorkflowRunResult> subTask) {
@@ -159,7 +183,7 @@ public class WorkflowRunner {
         var stepResults = new ArrayList<WorkflowStepResult>();
 
         var resumedStepName = classified.inFlightStep()
-                .map(ai.agentican.framework.state.StepLog::stepName).orElse(null);
+                .map(StepLog::stepName).orElse(null);
 
         if (classified.inFlightStep().isPresent()) {
 
@@ -182,7 +206,7 @@ public class WorkflowRunner {
 
             if (resumeStepResult.status() != WorkflowRunStatus.COMPLETED) {
 
-                workflowRunStore.taskCompleted(taskId, WorkflowRunStatus.FAILED);
+                eventBus.publish(new TaskCompleted(taskId, WorkflowRunStatus.FAILED));
                 return new WorkflowRunResult(plan.name(), WorkflowRunStatus.FAILED, stepResults);
             }
 
@@ -200,7 +224,7 @@ public class WorkflowRunner {
         return remainingResult;
     }
 
-    private WorkflowStepResult resumeInFlightStep(WorkflowStep planStep, ai.agentican.framework.state.StepLog stepLog,
+    private WorkflowStepResult resumeInFlightStep(WorkflowStep planStep, StepLog stepLog,
                                                ResumePlan classified, Map<String, String> parentOutputs,
                                                Map<String, String> taskParams, String taskId,
                                                AtomicBoolean cancelled) {
@@ -256,21 +280,22 @@ public class WorkflowRunner {
         if (agentResult.status() == AgentStatus.COMPLETED) {
 
             var output = agentResult.text();
-            workflowRunStore.stepCompleted(taskId, stepLog.id(), WorkflowRunStatus.COMPLETED, output);
+            eventBus.publish(new StepCompleted(taskId, stepLog.id(), stepLog.stepName(),
+                    WorkflowRunStatus.COMPLETED, output));
 
             return new WorkflowStepResult(planStep.name(), WorkflowRunStatus.COMPLETED,
                     output != null ? output : "", List.of(agentResult));
         }
 
         var status = agentResult.status() == AgentStatus.SUSPENDED ? WorkflowRunStatus.SUSPENDED : WorkflowRunStatus.FAILED;
-        workflowRunStore.stepCompleted(taskId, stepLog.id(), status, agentResult.text());
+        eventBus.publish(new StepCompleted(taskId, stepLog.id(), stepLog.stepName(), status, agentResult.text()));
 
         return new WorkflowStepResult(planStep.name(), status,
                 agentResult.text() != null ? agentResult.text() : "", List.of(agentResult));
     }
 
     private WorkflowStepResult resumeSuspendedAgentStep(WorkflowStepAgent agentStep,
-                                                     ai.agentican.framework.state.StepLog stepLog,
+                                                     StepLog stepLog,
                                                      Map<String, String> parentOutputs,
                                                      Map<String, String> taskParams,
                                                      String taskId,
@@ -306,8 +331,8 @@ public class WorkflowRunner {
             LOG.info("Step '{}' rejected via HITL; marking step FAILED with feedback",
                     agentStep.name());
             var msg = persistedResponse.feedback() != null ? persistedResponse.feedback() : "rejected";
-            workflowRunStore.stepCompleted(taskId, stepLog.id(), WorkflowRunStatus.FAILED,
-                    "HITL rejected on resume: " + msg);
+            eventBus.publish(new StepCompleted(taskId, stepLog.id(), stepLog.stepName(),
+                    WorkflowRunStatus.FAILED, "HITL rejected on resume: " + msg));
             return new WorkflowStepResult(agentStep.name(), WorkflowRunStatus.FAILED, msg, List.of());
         }
 
@@ -330,13 +355,13 @@ public class WorkflowRunner {
                 : agentResult.status() == AgentStatus.SUSPENDED ? WorkflowRunStatus.SUSPENDED
                 : WorkflowRunStatus.FAILED;
 
-        workflowRunStore.stepCompleted(taskId, stepLog.id(), status, agentResult.text());
+        eventBus.publish(new StepCompleted(taskId, stepLog.id(), stepLog.stepName(), status, agentResult.text()));
         return new WorkflowStepResult(agentStep.name(), status,
                 agentResult.text() != null ? agentResult.text() : "", List.of(agentResult));
     }
 
     private WorkflowStepResult resumeLoopStep(WorkflowStepLoop loopStep,
-                                           ai.agentican.framework.state.StepLog stepLog,
+                                           StepLog stepLog,
                                            Map<String, String> parentOutputs,
                                            Map<String, String> taskParams,
                                            String taskId,
@@ -355,7 +380,7 @@ public class WorkflowRunner {
                 .sorted(java.util.Comparator.comparingInt(t -> t.iterationIndex()))
                 .toList();
 
-        var childrenByIter = new java.util.HashMap<Integer, ai.agentican.framework.state.WorkflowRunLog>();
+        var childrenByIter = new java.util.HashMap<Integer, WorkflowRunLog>();
         for (var c : existingChildren) childrenByIter.put(c.iterationIndex(), c);
 
         LOG.info("Resuming loop step '{}': {} items, {} existing children", loopStep.name(),
@@ -422,7 +447,7 @@ public class WorkflowRunner {
     }
 
     private WorkflowStepResult resumeBranchStep(WorkflowStepBranch branchStep,
-                                             ai.agentican.framework.state.StepLog stepLog,
+                                             StepLog stepLog,
                                              Map<String, String> parentOutputs,
                                              Map<String, String> taskParams,
                                              String taskId,
@@ -488,7 +513,7 @@ public class WorkflowRunner {
                 subResult.output() != null ? subResult.output() : "", List.of());
     }
 
-    private static String lastStepOutput(ai.agentican.framework.state.WorkflowRunLog log) {
+    private static String lastStepOutput(WorkflowRunLog log) {
 
         String last = null;
         for (var step : log.steps().values()) {
@@ -497,15 +522,16 @@ public class WorkflowRunner {
         return last;
     }
 
-    private void failTask(String taskId, ai.agentican.framework.state.WorkflowRunLog taskLog, String reason) {
+    private void failTask(String taskId, WorkflowRunLog taskLog, String reason) {
 
         if (taskLog != null) {
             for (var step : taskLog.steps().values()) {
                 if (step.status() == null)
-                    workflowRunStore.stepCompleted(taskId, step.id(), WorkflowRunStatus.FAILED, "reaped: " + reason);
+                    eventBus.publish(new StepCompleted(taskId, step.id(), step.stepName(),
+                            WorkflowRunStatus.FAILED, "reaped: " + reason));
             }
         }
-        workflowRunStore.taskCompleted(taskId, WorkflowRunStatus.FAILED);
+        eventBus.publish(new TaskCompleted(taskId, WorkflowRunStatus.FAILED));
     }
 
     private WorkflowRunResult run(WorkflowDefinition plan, String taskId, String parentTaskId, String parentStepId, int iterationIndex,
@@ -529,8 +555,9 @@ public class WorkflowRunner {
         LOG.info(Logs.RUNNER_TASK_RUNNING, taskName);
 
         if (!skipTaskStart) {
-            workflowRunStore.taskStarted(taskId, taskName, plan, taskParams,
-                    parentTaskId, parentStepId, iterationIndex);
+            eventBus.publish(new TaskStarted(taskId, taskName, plan, taskParams,
+                    parentTaskId, parentStepId, iterationIndex,
+                    RuntimeOwner.IN_PROCESS, null));
         }
 
         if (workflowRunDecorator != null)
@@ -570,7 +597,7 @@ public class WorkflowRunner {
 
         Function<WorkflowRunStatus, WorkflowRunResult> completeTask = taskStatus -> {
 
-            workflowRunStore.taskCompleted(taskId, taskStatus);
+            eventBus.publish(new TaskCompleted(taskId, taskStatus));
 
             return new WorkflowRunResult(taskName, taskStatus, List.copyOf(taskStepResults));
         };
@@ -672,7 +699,8 @@ public class WorkflowRunner {
                             () -> LOG.info("Step '{}' suspended, waiting for other stepConfigs to finish", taskStepResult.name()));
 
                     var suspStepId = stepNameToStepId.get(taskStepResult.name());
-                    workflowRunStore.stepCompleted(taskId, suspStepId, WorkflowRunStatus.SUSPENDED, taskStepResult.output());
+                    eventBus.publish(new StepCompleted(taskId, suspStepId, taskStepResult.name(),
+                            WorkflowRunStatus.SUSPENDED, taskStepResult.output()));
                     suspendedResults.put(taskStepResult.name(), taskStepResult);
                     taskStepsSuspended++;
 
@@ -724,8 +752,8 @@ public class WorkflowRunner {
         taskStepResults.add(result);
 
         var stepId = stepNameToStepId.get(result.name());
-        workflowRunStore.stepCompleted(taskId, stepId, result.status(), result.output());
-        workflowRunStore.stepTokenUsageAggregated(taskId, stepId, result.tokenUsage());
+        eventBus.publish(new StepCompleted(taskId, stepId, result.name(), result.status(), result.output()));
+        eventBus.publish(new StepTokenUsageAggregated(taskId, stepId, result.tokenUsage()));
 
         LOG.info(Logs.RUNNER_STEP_FINISHED, result.name(), result.status());
     }
@@ -789,7 +817,7 @@ public class WorkflowRunner {
 
         var taskStepRunner = Mdc.propagate(() -> {
 
-            workflowRunStore.stepStarted(taskId, stepId, taskStep.name());
+            eventBus.publish(new StepStarted(taskId, stepId, taskStep.name()));
 
             try {
 
@@ -803,7 +831,8 @@ public class WorkflowRunner {
 
                 LOG.error("Node '{}' threw unexpected throwable: {}", taskStep.name(), t.toString(), t);
 
-                workflowRunStore.stepCompleted(taskId, stepId, WorkflowRunStatus.FAILED, "Error: " + t.getMessage());
+                eventBus.publish(new StepCompleted(taskId, stepId, taskStep.name(),
+                        WorkflowRunStatus.FAILED, "Error: " + t.getMessage()));
 
                 try {
 
@@ -823,7 +852,7 @@ public class WorkflowRunner {
         pool.submit(stepDec != null ? stepDec.decorate(taskStepRunner) : taskStepRunner);
     }
 
-    private static ai.agentican.framework.llm.StructuredOutput structuredOutputFor(WorkflowStepAgent step) {
+    private static StructuredOutput structuredOutputFor(WorkflowStepAgent step) {
 
         var binding = OUTPUT_BINDING.get();
         return binding != null && binding.stepName().equals(step.name()) ? binding.structuredOutput() : null;
@@ -864,13 +893,13 @@ public class WorkflowRunner {
 
         var stepId = stepNameToStepId.get(suspendedStepName);
 
-        workflowRunStore.hitlNotified(taskId, stepId, checkpoint);
+        eventBus.publish(new HitlNotified(taskId, stepId, checkpoint));
 
         LOG.info("Task suspended: waiting for HITL response on step '{}'", suspendedStepName);
 
         var response = hitlManager.awaitResponse(checkpoint.id());
 
-        workflowRunStore.hitlResponded(taskId, stepId, response);
+        eventBus.publish(new HitlResponded(taskId, stepId, checkpoint.id(), response));
 
         LOG.info("Task resuming: HITL response received for step '{}'", suspendedStepName);
 

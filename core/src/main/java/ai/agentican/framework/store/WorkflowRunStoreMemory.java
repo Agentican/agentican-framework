@@ -8,6 +8,7 @@ import ai.agentican.framework.llm.ToolCall;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.state.RunLog;
+import ai.agentican.framework.state.RuntimeOwner;
 import ai.agentican.framework.state.StepLog;
 import ai.agentican.framework.state.WorkflowRunLog;
 import ai.agentican.framework.state.TurnLog;
@@ -17,6 +18,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import ai.agentican.framework.llm.TokenUsage;
 
 public class WorkflowRunStoreMemory implements WorkflowRunStore {
 
@@ -42,16 +44,20 @@ public class WorkflowRunStoreMemory implements WorkflowRunStore {
     }
 
     @Override
-    public void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params) {
+    public void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params,
+                            RuntimeOwner runtime, String temporalWorkflowId) {
 
-        logs.put(taskId, new WorkflowRunLog(taskId, taskName, plan, params));
+        logs.put(taskId, new WorkflowRunLog(taskId, taskName, plan, params,
+                null, null, 0, runtime, temporalWorkflowId, java.time.Instant.now()));
     }
 
     @Override
     public void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params,
-                            String parentTaskId, String parentStepId, int iterationIndex) {
+                            String parentTaskId, String parentStepId, int iterationIndex,
+                            RuntimeOwner runtime, String temporalWorkflowId) {
 
-        logs.put(taskId, new WorkflowRunLog(taskId, taskName, plan, params, parentTaskId, parentStepId, iterationIndex));
+        logs.put(taskId, new WorkflowRunLog(taskId, taskName, plan, params,
+                parentTaskId, parentStepId, iterationIndex, runtime, temporalWorkflowId, java.time.Instant.now()));
     }
 
     @Override
@@ -86,7 +92,7 @@ public class WorkflowRunStoreMemory implements WorkflowRunStore {
     }
 
     @Override
-    public void stepTokenUsageAggregated(String taskId, String stepId, ai.agentican.framework.llm.TokenUsage usage) {
+    public void stepTokenUsageAggregated(String taskId, String stepId, TokenUsage usage) {
 
         var stepLog = requireLog(taskId).findStepById(stepId);
 

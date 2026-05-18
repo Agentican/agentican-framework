@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import ai.agentican.framework.tools.Tool;
 
 class AgenticanVectorIndexTest {
 
@@ -96,7 +97,7 @@ class AgenticanVectorIndexTest {
                     .end()
                 .llm("default", request -> endTurn("ok"))
                 .toolkit(RetrievalToolkit.SLUG, new Toolkit() {
-                    @Override public java.util.List<ai.agentican.framework.tools.Tool> tools()
+                    @Override public java.util.List<Tool> tools()
                             { return java.util.List.of(); }
                     @Override public boolean handles(String name) { return false; }
                     @Override public String execute(String n, java.util.Map<String, Object> a) { return ""; }

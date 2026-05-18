@@ -1,7 +1,8 @@
 package ai.agentican.framework.orchestration.execution;
 
+import ai.agentican.framework.event.AgenticanEventBus;
+import ai.agentican.framework.event.BranchPathChosen;
 import ai.agentican.framework.orchestration.model.*;
-import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.framework.util.Ids;
 
 import org.slf4j.Logger;
@@ -16,12 +17,12 @@ class StepBranchRunner {
     private static final Logger LOG = LoggerFactory.getLogger(StepBranchRunner.class);
 
     private final StepLoopRunner.SubPlanRunner subPlanRunner;
-    private final WorkflowRunStore workflowRunStore;
+    private final AgenticanEventBus eventBus;
 
-    StepBranchRunner(StepLoopRunner.SubPlanRunner subPlanRunner, WorkflowRunStore workflowRunStore) {
+    StepBranchRunner(StepLoopRunner.SubPlanRunner subPlanRunner, AgenticanEventBus eventBus) {
 
         this.subPlanRunner = subPlanRunner;
-        this.workflowRunStore = workflowRunStore;
+        this.eventBus = eventBus;
     }
 
     WorkflowStepResult run(WorkflowStepBranch step, Map<String, String> outputs, Map<String, String> params,
@@ -48,7 +49,7 @@ class StepBranchRunner {
 
         LOG.info("Branch step '{}': selected branch '{}'", step.name(), selectedBranch.name());
 
-        workflowRunStore.branchPathChosen(parentTaskId, parentStepId, selectedBranch.name());
+        eventBus.publish(new BranchPathChosen(parentTaskId, parentStepId, selectedBranch.name()));
 
         var subPlan = WorkflowDefinition.builder(Ids.generate(), step.name() + "-" + selectedBranch.name())
                 .description("")

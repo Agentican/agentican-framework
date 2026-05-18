@@ -24,6 +24,12 @@ import static ai.agentican.framework.MockLlmClient.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 import ai.agentican.framework.config.AgentConfig;
+import ai.agentican.framework.state.RuntimeOwner;
+import ai.agentican.framework.llm.LlmRequest;
+import ai.agentican.framework.llm.LlmResponse;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.state.RunLog;
+import ai.agentican.framework.state.TurnLog;
 class SmacAgentRunnerResumeTest {
 
     private static Map<String, Toolkit> toolkitMap(MockToolkit t) {
@@ -49,10 +55,10 @@ class SmacAgentRunnerResumeTest {
         var taskId = "t-" + Ids.generate();
         var stepId = "s-" + Ids.generate();
 
-        store.taskStarted(taskId, "resume", null, Map.of());
+        store.taskStarted(taskId, "resume", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(taskId, stepId, "work");
 
-        var emptyRun = new ai.agentican.framework.state.RunLog(Ids.generate(), 0, "resume-agent");
+        var emptyRun = new RunLog(Ids.generate(), 0, "resume-agent");
 
         var result = runner.resumeAfterCrash(agent(runner), "do it", taskId, stepId, "work", List.of(), Map.of(), null, emptyRun, new AtomicBoolean(false), new ResumePlan(List.of(), java.util.Optional.empty(),
                         java.util.Optional.of(emptyRun), java.util.Optional.empty(),
@@ -78,7 +84,7 @@ class SmacAgentRunnerResumeTest {
         var runId = Ids.generate();
         var deadTurnId = Ids.generate();
 
-        store.taskStarted(taskId, "resume", null, Map.of());
+        store.taskStarted(taskId, "resume", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(taskId, stepId, "work");
         store.runStarted(taskId, stepId, runId, "resume-agent");
         store.turnStarted(taskId, runId, deadTurnId);
@@ -87,7 +93,7 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p", "p").description("")
+                WorkflowDefinition.builder("p", "p").description("")
                         .step().name("work").agent("resume-agent").instructions("do it").end()
                         .build());
 
@@ -100,7 +106,7 @@ class SmacAgentRunnerResumeTest {
         var finalLog = store.load(taskId);
         var deadTurn = finalLog.findTurnById(deadTurnId);
         assertNotNull(deadTurn, "Abandoned turn should still exist in the log");
-        assertEquals(ai.agentican.framework.state.TurnLog.State.ABANDONED, deadTurn.state(),
+        assertEquals(TurnLog.State.ABANDONED, deadTurn.state(),
                 "Turn that had no request must be marked ABANDONED");
     }
 
@@ -126,17 +132,17 @@ class SmacAgentRunnerResumeTest {
         var runId = Ids.generate();
         var turnId = Ids.generate();
 
-        store.taskStarted(taskId, "resume", null, Map.of());
+        store.taskStarted(taskId, "resume", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(taskId, stepId, "work");
         store.runStarted(taskId, stepId, runId, "resume-agent");
         store.turnStarted(taskId, runId, turnId);
 
         store.messageSent(taskId, turnId,
-                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
+                new LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
 
         var tc1 = new ToolCall("tc-1", "FOO", Map.of("x", "a"));
         var tc2 = new ToolCall("tc-2", "FOO", Map.of("x", "b"));
-        var response = new ai.agentican.framework.llm.LlmResponse(
+        var response = new LlmResponse(
                 "run tools", List.of(tc1, tc2), StopReason.TOOL_USE, 1, 1, 0, 0, 0);
         store.responseReceived(taskId, turnId, response);
 
@@ -148,7 +154,7 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p", "p").description("")
+                WorkflowDefinition.builder("p", "p").description("")
                         .step().name("work").agent("resume-agent").instructions("do it").end()
                         .build());
 
@@ -168,7 +174,7 @@ class SmacAgentRunnerResumeTest {
         var finalLog = store.load(taskId);
         var reconciledTurn = finalLog.findTurnById(turnId);
         assertNotNull(reconciledTurn);
-        assertEquals(ai.agentican.framework.state.TurnLog.State.COMPLETED, reconciledTurn.state(),
+        assertEquals(TurnLog.State.COMPLETED, reconciledTurn.state(),
                 "In-flight turn must be marked COMPLETED after resume reconciles the pending tools");
     }
 
@@ -194,16 +200,16 @@ class SmacAgentRunnerResumeTest {
         var runId = Ids.generate();
         var turnId = Ids.generate();
 
-        store.taskStarted(taskId, "resume", null, Map.of());
+        store.taskStarted(taskId, "resume", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(taskId, stepId, "work");
         store.runStarted(taskId, stepId, runId, "resume-agent");
         store.turnStarted(taskId, runId, turnId);
 
         store.messageSent(taskId, turnId,
-                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
+                new LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
 
         var tc = new ToolCall("tc-1", "BAR", Map.of());
-        var response = new ai.agentican.framework.llm.LlmResponse(
+        var response = new LlmResponse(
                 "call bar", List.of(tc), StopReason.TOOL_USE, 1, 1, 0, 0, 0);
         store.responseReceived(taskId, turnId, response);
 
@@ -211,7 +217,7 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p", "p").description("")
+                WorkflowDefinition.builder("p", "p").description("")
                         .step().name("work").agent("resume-agent").instructions("do it").end()
                         .build());
 
@@ -245,18 +251,18 @@ class SmacAgentRunnerResumeTest {
         var runId = Ids.generate();
         var deadTurnId = Ids.generate();
 
-        store.taskStarted(taskId, "resume", null, Map.of());
+        store.taskStarted(taskId, "resume", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(taskId, stepId, "work");
         store.runStarted(taskId, stepId, runId, "resume-agent");
         store.turnStarted(taskId, runId, deadTurnId);
         store.messageSent(taskId, deadTurnId,
-                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
+                new LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
 
         var taskLog = store.load(taskId);
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p", "p").description("")
+                WorkflowDefinition.builder("p", "p").description("")
                         .step().name("work").agent("resume-agent").instructions("do it").end()
                         .build());
 
@@ -268,7 +274,7 @@ class SmacAgentRunnerResumeTest {
 
         var finalLog = store.load(taskId);
         var deadTurn = finalLog.findTurnById(deadTurnId);
-        assertEquals(ai.agentican.framework.state.TurnLog.State.ABANDONED, deadTurn.state());
+        assertEquals(TurnLog.State.ABANDONED, deadTurn.state());
     }
 
     @Test
@@ -289,14 +295,14 @@ class SmacAgentRunnerResumeTest {
         var runId = Ids.generate();
         var turnId = Ids.generate();
 
-        store.taskStarted(taskId, "resume", null, Map.of());
+        store.taskStarted(taskId, "resume", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(taskId, stepId, "work");
         store.runStarted(taskId, stepId, runId, "resume-agent");
         store.turnStarted(taskId, runId, turnId);
         store.messageSent(taskId, turnId,
-                new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
+                new LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
 
-        var response = new ai.agentican.framework.llm.LlmResponse(
+        var response = new LlmResponse(
                 "all done", List.of(), StopReason.END_TURN, 1, 1, 0, 0, 0);
         store.responseReceived(taskId, turnId, response);
         store.turnCompleted(taskId, turnId);
@@ -305,7 +311,7 @@ class SmacAgentRunnerResumeTest {
         var run = taskLog.findStepById(stepId).lastRun();
 
         var resumePlan = ResumeClassifier.classify(taskLog,
-                ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("p", "p").description("")
+                WorkflowDefinition.builder("p", "p").description("")
                         .step().name("work").agent("resume-agent").instructions("do it").end()
                         .build());
 

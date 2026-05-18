@@ -1,6 +1,9 @@
 package ai.agentican.framework;
 
 import ai.agentican.framework.agent.AgentFactory;
+import ai.agentican.framework.event.AgenticanEventBus;
+import ai.agentican.framework.event.AgenticanEventListener;
+import ai.agentican.framework.event.WorkflowRunStorePersister;
 import ai.agentican.framework.orchestration.execution.*;
 import ai.agentican.framework.registry.AgentRegistry;
 import ai.agentican.framework.registry.AgentRegistryMemory;
@@ -38,7 +41,6 @@ import ai.agentican.framework.orchestration.code.CodeStepRegistry;
 import ai.agentican.framework.orchestration.code.CodeStepSpec;
 import ai.agentican.framework.orchestration.model.WorkflowStepCode;
 import ai.agentican.framework.store.WorkflowRunStoreMemory;
-import ai.agentican.framework.store.WorkflowRunStoreNotifying;
 import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.framework.registry.WorkflowRegistryMemory;
 import ai.agentican.framework.registry.WorkflowRegistry;
@@ -121,6 +123,19 @@ public class Agentican implements AutoCloseable {
         return workflowEngine.registry();
     }
 
+    /**
+     * The framework's lifecycle event bus — the singleton onto which the in-process
+     * runtime publishes {@link ai.agentican.framework.event.AgenticanEvent}s.
+     * Exposed so external runtimes (e.g. Temporal activity workers) can publish
+     * incoming events onto the same bus, so the same listener set (persister,
+     * knowledge ingestor, metrics, OTel, custom hooks) handles events identically
+     * regardless of which runtime produced them.
+     */
+    public AgenticanEventBus eventBus() {
+
+        return workflowEngine.eventBus();
+    }
+
     public AgenticanRecovery recovery() {
 
         return new AgenticanRecovery(workflowEngine);
@@ -152,7 +167,8 @@ public class Agentican implements AutoCloseable {
         private WorkflowRegistry workflowRegistry;
         private LlmClientDecorator llmDecorator;
         private WorkflowRunDecorator workflowRunDecorator;
-        private WorkflowRunListener workflowRunListener;
+        private AgenticanEventBus eventBus;
+        private final List<AgenticanEventListener> additionalListeners = new ArrayList<>();
         private WorkflowRunStore workflowRunStore;
         private ExecutorService taskExecutor;
 
@@ -221,7 +237,11 @@ public class Agentican implements AutoCloseable {
             var hm = hitlManager != null ? hitlManager : new HitlManager(HitlNotifier.logging());
             var ks = knowledgeStore != null ? knowledgeStore : new KnowledgeStoreMemory();
             var tss = workflowRunStore != null ? workflowRunStore : new WorkflowRunStoreMemory();
-            var tl = workflowRunListener != null ? workflowRunListener : new WorkflowRunListener() {};
+            var bus = eventBus != null ? eventBus : new AgenticanEventBus();
+
+            // Persister runs before observers so they see a consistent store.
+            bus.subscribeFirst(new WorkflowRunStorePersister(tss));
+
             var ownsExecutor = (taskExecutor == null);
             var executor = taskExecutor != null ? taskExecutor : Executors.newVirtualThreadPerTaskExecutor();
 
@@ -256,8 +276,6 @@ public class Agentican implements AutoCloseable {
 
             var llmClients = Collections.unmodifiableMap(mutableLlms);
 
-            var notifyingStore = new WorkflowRunStoreNotifying(tss, tl);
-
             KnowledgeIngestor knowledgeIngestor = null;
 
             var defaultLlm = llmClients.get(LlmConfig.DEFAULT);
@@ -266,11 +284,15 @@ public class Agentican implements AutoCloseable {
 
                 var extractor = new LlmKnowledgeExtractor(defaultLlm);
 
-                knowledgeIngestor = new KnowledgeIngestor(tss, ks, extractor, executor);
-                notifyingStore = new WorkflowRunStoreNotifying(notifyingStore, knowledgeIngestor);
+                knowledgeIngestor = new KnowledgeIngestor(ks, extractor, executor);
+                bus.subscribe(knowledgeIngestor);
             }
 
-            var finalTss = notifyingStore;
+            // Register user-supplied listeners after framework defaults so explicit
+            // additions can react to events the persister and ingestor have already handled.
+            for (var listener : additionalListeners) bus.subscribe(listener);
+
+            var finalTss = tss;
 
             var toolkitRegistry = new ToolkitRegistry();
 
@@ -322,7 +344,7 @@ public class Agentican implements AutoCloseable {
                     .knowledgeStore(ks)
                     .workflowRunStore(finalTss)
                     .skillRegistry(sr)
-                    .workflowRunListener(tl)
+                    .eventBus(bus)
                     .build();
 
             var ar = agentRegistry != null ? agentRegistry : new AgentRegistryMemory();
@@ -354,7 +376,8 @@ public class Agentican implements AutoCloseable {
 
             var taskPlanner = new WorkflowPlannerAgent(defaultLlm, ar, toolkitRegistry, sr, pr, agentFactory::build, strict);
 
-            var taskRunner = new WorkflowRunner(ar, hm, toolkitRegistry, finalTss, agentRunnerConfig.taskTimeout(),
+            var taskRunner = new WorkflowRunner(ar, hm, toolkitRegistry, finalTss, bus,
+                    agentRunnerConfig.taskTimeout(),
                     agentRunnerConfig.maxStepRetries(), workflowRunDecorator, codeStepRegistry);
 
             LOG.info(Logs.AGENTICAN_INIT,
@@ -362,7 +385,7 @@ public class Agentican implements AutoCloseable {
 
             var agenticanRegistry = new AgenticanRegistry(pr, ar, toolkitRegistry, sr, vectorIndexRegistry);
 
-            var engine = new WorkflowEngine(agenticanRegistry, finalTss, tl, taskRunner, executor,
+            var engine = new WorkflowEngine(agenticanRegistry, finalTss, bus, taskRunner, executor,
                     workflowRunDecorator, hm, knowledgeIngestor, ownsExecutor);
 
             return new Agentican(taskPlanner, engine, llmClients);
@@ -380,7 +403,11 @@ public class Agentican implements AutoCloseable {
         public Builder workflowRegistry(WorkflowRegistry workflowRegistry) { this.workflowRegistry = workflowRegistry; return this; }
         public Builder llmDecorator(LlmClientDecorator llmDecorator) { this.llmDecorator = llmDecorator; return this; }
         public Builder workflowRunDecorator(WorkflowRunDecorator workflowRunDecorator) { this.workflowRunDecorator = workflowRunDecorator; return this; }
-        public Builder workflowRunListener(WorkflowRunListener workflowRunListener) { this.workflowRunListener = workflowRunListener; return this; }
+        public Builder eventBus(AgenticanEventBus eventBus) { this.eventBus = eventBus; return this; }
+        public Builder addListener(AgenticanEventListener listener) {
+            if (listener != null) this.additionalListeners.add(listener);
+            return this;
+        }
         public Builder workflowRunStore(WorkflowRunStore workflowRunStore) { this.workflowRunStore = workflowRunStore; return this; }
         public Builder taskExecutor(ExecutorService taskExecutor) { this.taskExecutor = taskExecutor; return this; }
 

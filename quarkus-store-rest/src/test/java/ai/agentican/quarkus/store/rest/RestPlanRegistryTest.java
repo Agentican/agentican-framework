@@ -8,12 +8,13 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import ai.agentican.framework.util.Json;
 
 class RestPlanRegistryTest {
 
     private static String plansArrayJson(WorkflowDefinition... plans) throws Exception {
 
-        var mapper = ai.agentican.framework.util.Json.mapper();
+        var mapper = Json.mapper();
         var arr = mapper.createArrayNode();
 
         for (var p : plans) {

@@ -15,6 +15,7 @@ import static ai.agentican.framework.MockLlmClient.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 import ai.agentican.framework.config.AgentConfig;
+import ai.agentican.framework.orchestration.code.CodeStepRegistry;
 class TaskRunnerBranchTest {
 
     private HitlManager autoApproveHitl() {
@@ -50,7 +51,7 @@ class TaskRunnerBranchTest {
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("branch-task", "branch-task")
                 .step().name("decide").agent("producer-agent").instructions("Pick a path").end()
@@ -91,7 +92,7 @@ class TaskRunnerBranchTest {
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("default-branch-task", "default-branch-task")
                 .step().name("decide").agent("producer-agent").instructions("Pick a path").end()
@@ -133,7 +134,7 @@ class TaskRunnerBranchTest {
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("no-match-branch-task", "no-match-branch-task")
                 .step().name("decide").agent("producer-agent").instructions("Pick a path").end()
@@ -173,7 +174,7 @@ class TaskRunnerBranchTest {
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("json-array-branch-task", "json-array-branch-task")
                 .step().name("decide").agent("producer-agent").instructions("Pick a path").end()
@@ -214,7 +215,7 @@ class TaskRunnerBranchTest {
         registry.register(createAgent("path-a-agent", pathALlm));
         registry.register(createAgent("path-b-agent", pathBLlm));
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("contains-branch-task", "contains-branch-task")
                 .step().name("decide").agent("producer-agent").instructions("Pick a path").end()

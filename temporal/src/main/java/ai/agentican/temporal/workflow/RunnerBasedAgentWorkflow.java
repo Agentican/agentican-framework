@@ -3,6 +3,7 @@ package ai.agentican.temporal.workflow;
 import io.temporal.workflow.SignalMethod;
 import io.temporal.workflow.WorkflowInterface;
 import io.temporal.workflow.WorkflowMethod;
+import ai.agentican.framework.hitl.HitlResponse;
 
 @WorkflowInterface
 public interface RunnerBasedAgentWorkflow {
@@ -11,5 +12,5 @@ public interface RunnerBasedAgentWorkflow {
     String run(RunnerBasedAgentInput input);
 
     @SignalMethod
-    void provideHitlResponse(String checkpointId, ai.agentican.framework.hitl.HitlResponse response);
+    void provideHitlResponse(String checkpointId, HitlResponse response);
 }

@@ -6,6 +6,9 @@ import ai.agentican.framework.orchestration.model.WorkflowStep;
 
 import java.util.ArrayList;
 import java.util.List;
+import ai.agentican.framework.orchestration.execution.WorkflowRunResult;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
+import ai.agentican.framework.util.Ids;
 
 public final class WorkflowBuilder {
 
@@ -88,7 +91,7 @@ public final class WorkflowBuilder {
     public WorkflowBuilder step(String stepName, String agentName, String instructions) {
 
         checkInline();
-        inlineSteps.add(ai.agentican.framework.orchestration.model.WorkflowStepAgent.builder(stepName)
+        inlineSteps.add(WorkflowStepAgent.builder(stepName)
                 .agent(agentName)
                 .instructions(instructions)
                 .build());
@@ -131,11 +134,11 @@ public final class WorkflowBuilder {
      * instead.
      */
     @SuppressWarnings("unchecked")
-    public Workflow<java.util.Map<String, String>, ai.agentican.framework.orchestration.execution.WorkflowRunResult> raw() {
+    public Workflow<java.util.Map<String, String>, WorkflowRunResult> raw() {
 
         return new Typed<java.util.Map<String, String>,
-                ai.agentican.framework.orchestration.execution.WorkflowRunResult>(this,
-                ai.agentican.framework.orchestration.execution.WorkflowRunResult.class).build();
+                WorkflowRunResult>(this,
+                WorkflowRunResult.class).build();
     }
 
     private void checkInline() {
@@ -154,7 +157,7 @@ public final class WorkflowBuilder {
 
         if (!inlineSteps.isEmpty()) {
 
-            return WorkflowDefinition.builder(ai.agentican.framework.util.Ids.generate(), workflowName)
+            return WorkflowDefinition.builder(Ids.generate(), workflowName)
                     .description(inlineDescription)
                     .params(inlineParams)
                     .steps(inlineSteps)

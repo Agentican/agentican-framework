@@ -17,7 +17,17 @@ import java.util.List;
 import java.util.Map;
 
 import static ai.agentican.framework.MockLlmClient.*;
+import ai.agentican.framework.state.RuntimeOwner;
 import static org.junit.jupiter.api.Assertions.*;
+import ai.agentican.framework.hitl.HitlCheckpoint;
+import ai.agentican.framework.llm.LlmRequest;
+import ai.agentican.framework.llm.LlmResponse;
+import ai.agentican.framework.llm.StopReason;
+import ai.agentican.framework.orchestration.execution.resume.ReapReason;
+import ai.agentican.framework.orchestration.execution.resume.ResumeClassifier;
+import ai.agentican.framework.orchestration.model.WorkflowStepBranch;
+import ai.agentican.framework.orchestration.model.WorkflowStepLoop;
+import ai.agentican.framework.util.Ids;
 
 class AgenticanTest {
 
@@ -590,9 +600,9 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var taskId = "orphan-" + ai.agentican.framework.util.Ids.generate();
-            store.taskStarted(taskId, "left running", null, Map.of());
-            var stepId = "step-" + ai.agentican.framework.util.Ids.generate();
+            var taskId = "orphan-" + Ids.generate();
+            store.taskStarted(taskId, "left running", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
+            var stepId = "step-" + Ids.generate();
             store.stepStarted(taskId, stepId, "running-step");
 
             var reaped = service.reapOrphans();
@@ -620,8 +630,8 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var taskId = "done-" + ai.agentican.framework.util.Ids.generate();
-            store.taskStarted(taskId, "already done", null, Map.of());
+            var taskId = "done-" + Ids.generate();
+            store.taskStarted(taskId, "already done", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
             store.taskCompleted(taskId, WorkflowRunStatus.COMPLETED);
 
             var reaped = service.reapOrphans();
@@ -663,19 +673,19 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var taskId = "t-" + ai.agentican.framework.util.Ids.generate();
-            var stepId = "s-" + ai.agentican.framework.util.Ids.generate();
-            var runId = ai.agentican.framework.util.Ids.generate();
-            var turnId = ai.agentican.framework.util.Ids.generate();
+            var taskId = "t-" + Ids.generate();
+            var stepId = "s-" + Ids.generate();
+            var runId = Ids.generate();
+            var turnId = Ids.generate();
 
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Resume Task", "Resume Task")
+            var plan = WorkflowDefinition.builder("Resume Task", "Resume Task")
                     .description("test")
                     .step().name("do-work").agent("worker").instructions("Run to completion after resume").end()
                     .build();
 
             agentican.registry().workflows().register(plan);
 
-            store.taskStarted(taskId, "Resume Task", plan, Map.of());
+            store.taskStarted(taskId, "Resume Task", plan, Map.of(), RuntimeOwner.IN_PROCESS, null);
             store.stepStarted(taskId, stepId, "do-work");
             store.runStarted(taskId, stepId, runId, "worker");
             store.turnStarted(taskId, runId, turnId);
@@ -714,17 +724,17 @@ class AgenticanTest {
                 .workflowRunStore(store)
                 .build()) {
 
-            var taskId = "t-corrupt-" + ai.agentican.framework.util.Ids.generate();
-            store.taskStarted(taskId, "corrupt-plan-task", null, Map.of());
+            var taskId = "t-corrupt-" + Ids.generate();
+            store.taskStarted(taskId, "corrupt-plan-task", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
 
             var taskLog = store.load(taskId);
             taskLog.setPlanSnapshotCorrupt(true);
 
-            var classified = ai.agentican.framework.orchestration.execution.resume.ResumeClassifier
+            var classified = ResumeClassifier
                     .classify(taskLog, null);
 
             assertTrue(classified.reapOnly());
-            assertEquals(ai.agentican.framework.orchestration.execution.resume.ReapReason.PLAN_CORRUPT, classified.reapReason());
+            assertEquals(ReapReason.PLAN_CORRUPT, classified.reapReason());
         }
     }
 
@@ -742,11 +752,11 @@ class AgenticanTest {
                 .workflowRunStore(store)
                 .build()) {
 
-            var runningId = "run-" + ai.agentican.framework.util.Ids.generate();
-            var doneId = "done-" + ai.agentican.framework.util.Ids.generate();
+            var runningId = "run-" + Ids.generate();
+            var doneId = "done-" + Ids.generate();
 
-            store.taskStarted(runningId, "running", null, Map.of());
-            store.taskStarted(doneId, "done", null, Map.of());
+            store.taskStarted(runningId, "running", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
+            store.taskStarted(doneId, "done", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
             store.taskCompleted(doneId, WorkflowRunStatus.COMPLETED);
 
             var inProgressIds = store.listInProgress().stream()
@@ -776,16 +786,16 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Bounded Resume", "Bounded Resume")
+            var plan = WorkflowDefinition.builder("Bounded Resume", "Bounded Resume")
                     .description("test")
                     .step().name("do").agent("worker").instructions("do it").end()
                     .build();
             agentican.registry().workflows().register(plan);
 
             for (int i = 0; i < 3; i++) {
-                var taskId = "t-" + i + "-" + ai.agentican.framework.util.Ids.generate();
-                store.taskStarted(taskId, "Bounded Resume", plan, Map.of());
-                var stepId = "s-" + i + "-" + ai.agentican.framework.util.Ids.generate();
+                var taskId = "t-" + i + "-" + Ids.generate();
+                store.taskStarted(taskId, "Bounded Resume", plan, Map.of(), RuntimeOwner.IN_PROCESS, null);
+                var stepId = "s-" + i + "-" + Ids.generate();
                 store.stepStarted(taskId, stepId, "do");
             }
 
@@ -829,27 +839,27 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var siblingA = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
+            var siblingA = new WorkflowStepAgent(
                     "sibling-a", "worker", "sibling-a", List.of(), false, List.of(), List.of());
-            var siblingB = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
+            var siblingB = new WorkflowStepAgent(
                     "sibling-b", "worker", "sibling-b", List.of(), false, List.of(), List.of());
-            var siblingC = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
+            var siblingC = new WorkflowStepAgent(
                     "sibling-c", "worker", "sibling-c", List.of(), false, List.of(), List.of());
-            var synth = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
+            var synth = new WorkflowStepAgent(
                     "synthesize", "worker", "synthesize",
                     List.of("sibling-a", "sibling-b", "sibling-c"), false, List.of(), List.of());
 
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Parallel Resume", "Parallel Resume")
+            var plan = WorkflowDefinition.builder("Parallel Resume", "Parallel Resume")
                     .description("test")
                     .steps(List.of(siblingA, siblingB, siblingC, synth))
                     .build();
 
             agentican.registry().workflows().register(plan);
 
-            var taskId = "t-" + ai.agentican.framework.util.Ids.generate();
-            store.taskStarted(taskId, "Parallel Resume", plan, Map.of());
+            var taskId = "t-" + Ids.generate();
+            store.taskStarted(taskId, "Parallel Resume", plan, Map.of(), RuntimeOwner.IN_PROCESS, null);
 
-            var aStepId = ai.agentican.framework.util.Ids.generate();
+            var aStepId = Ids.generate();
             store.stepStarted(taskId, aStepId, "sibling-a");
             store.stepCompleted(taskId, aStepId, WorkflowRunStatus.COMPLETED, "A done");
 
@@ -894,9 +904,9 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var taskId = "interrupted-" + ai.agentican.framework.util.Ids.generate();
-            store.taskStarted(taskId, "mid-step-crash", null, Map.of());
-            var stepId = "step-" + ai.agentican.framework.util.Ids.generate();
+            var taskId = "interrupted-" + Ids.generate();
+            store.taskStarted(taskId, "mid-step-crash", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
+            var stepId = "step-" + Ids.generate();
             store.stepStarted(taskId, stepId, "working-step");
 
             var handled = service.resumeInterrupted();
@@ -924,13 +934,13 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var parentId = "parent-" + ai.agentican.framework.util.Ids.generate();
-            var childId = "child-" + ai.agentican.framework.util.Ids.generate();
-            var stepId = "s-" + ai.agentican.framework.util.Ids.generate();
+            var parentId = "parent-" + Ids.generate();
+            var childId = "child-" + Ids.generate();
+            var stepId = "s-" + Ids.generate();
 
-            store.taskStarted(parentId, "parent", null, Map.of());
+            store.taskStarted(parentId, "parent", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
             store.stepStarted(parentId, stepId, "loop-step");
-            store.taskStarted(childId, "iter-0", null, Map.of(), parentId, stepId, 0);
+            store.taskStarted(childId, "iter-0", null, Map.of(), parentId, stepId, 0, RuntimeOwner.IN_PROCESS, null);
 
             var reaped = service.reapOrphans();
 
@@ -968,40 +978,40 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var pathBodyStep = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
+            var pathBodyStep = new WorkflowStepAgent(
                     "path-body", "worker", "do path", List.of(), false, List.of(), List.of());
-            var sourceForBranch = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
+            var sourceForBranch = new WorkflowStepAgent(
                     "source", "worker", "produce", List.of(), false, List.of(), List.of());
-            var branch = new ai.agentican.framework.orchestration.model.WorkflowStepBranch(
+            var branch = new WorkflowStepBranch(
                     "choose", "source",
-                    List.of(new ai.agentican.framework.orchestration.model.WorkflowStepBranch.Branch(
+                    List.of(new WorkflowStepBranch.Branch(
                             "A", List.of(pathBodyStep))),
                     "A", List.of(), false);
 
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Branch Resume", "Branch Resume")
+            var plan = WorkflowDefinition.builder("Branch Resume", "Branch Resume")
                     .description("test")
                     .steps(List.of(sourceForBranch, branch))
                     .build();
 
             agentican.registry().workflows().register(plan);
 
-            var taskId = "t-branch-" + ai.agentican.framework.util.Ids.generate();
-            var stepId = "s-" + ai.agentican.framework.util.Ids.generate();
-            var childId = "c-" + ai.agentican.framework.util.Ids.generate();
-            var childStepId = "cs-" + ai.agentican.framework.util.Ids.generate();
+            var taskId = "t-branch-" + Ids.generate();
+            var stepId = "s-" + Ids.generate();
+            var childId = "c-" + Ids.generate();
+            var childStepId = "cs-" + Ids.generate();
 
-            store.taskStarted(taskId, "Branch Resume", plan, Map.of());
+            store.taskStarted(taskId, "Branch Resume", plan, Map.of(), RuntimeOwner.IN_PROCESS, null);
 
-            var sourceStepId = "src-" + ai.agentican.framework.util.Ids.generate();
+            var sourceStepId = "src-" + Ids.generate();
             store.stepStarted(taskId, sourceStepId, "source");
             store.stepCompleted(taskId, sourceStepId, WorkflowRunStatus.COMPLETED, "source-output");
 
             store.stepStarted(taskId, stepId, "choose");
             store.branchPathChosen(taskId, stepId, "A");
 
-            var childPlan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("choose-A", "choose-A")
+            var childPlan = WorkflowDefinition.builder("choose-A", "choose-A")
                     .description("").steps(List.of(pathBodyStep)).build();
-            store.taskStarted(childId, "choose-A", childPlan, Map.of(), taskId, stepId, 0);
+            store.taskStarted(childId, "choose-A", childPlan, Map.of(), taskId, stepId, 0, RuntimeOwner.IN_PROCESS, null);
             store.stepStarted(childId, childStepId, "path-body");
             store.stepCompleted(childId, childStepId, WorkflowRunStatus.COMPLETED, "prerecorded path output");
             store.taskCompleted(childId, WorkflowRunStatus.COMPLETED);
@@ -1053,29 +1063,29 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var source = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
+            var source = new WorkflowStepAgent(
                     "source", "worker", "produce items", List.of(), false, List.of(), List.of());
 
-            var bodyStep = new ai.agentican.framework.orchestration.model.WorkflowStepAgent(
+            var bodyStep = new WorkflowStepAgent(
                     "iter-body", "worker", "iter-body", List.of(), false, List.of(), List.of());
 
-            var loop = new ai.agentican.framework.orchestration.model.WorkflowStepLoop(
+            var loop = new WorkflowStepLoop(
                     "each", "source", List.of(bodyStep), List.of(), false);
 
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Loop Resume", "Loop Resume")
+            var plan = WorkflowDefinition.builder("Loop Resume", "Loop Resume")
                     .description("test")
                     .steps(List.of(source, loop))
                     .build();
 
             agentican.registry().workflows().register(plan);
 
-            var taskId = "t-loop-" + ai.agentican.framework.util.Ids.generate();
-            var sourceStepId = "src-" + ai.agentican.framework.util.Ids.generate();
-            var loopStepId = "loop-" + ai.agentican.framework.util.Ids.generate();
-            var iter0Id = "i0-" + ai.agentican.framework.util.Ids.generate();
-            var iter0StepId = "i0s-" + ai.agentican.framework.util.Ids.generate();
+            var taskId = "t-loop-" + Ids.generate();
+            var sourceStepId = "src-" + Ids.generate();
+            var loopStepId = "loop-" + Ids.generate();
+            var iter0Id = "i0-" + Ids.generate();
+            var iter0StepId = "i0s-" + Ids.generate();
 
-            store.taskStarted(taskId, "Loop Resume", plan, Map.of());
+            store.taskStarted(taskId, "Loop Resume", plan, Map.of(), RuntimeOwner.IN_PROCESS, null);
 
             store.stepStarted(taskId, sourceStepId, "source");
             store.stepCompleted(taskId, sourceStepId, WorkflowRunStatus.COMPLETED,
@@ -1083,9 +1093,9 @@ class AgenticanTest {
 
             store.stepStarted(taskId, loopStepId, "each");
 
-            var iterPlan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("each-iter-1", "each-iter-1")
+            var iterPlan = WorkflowDefinition.builder("each-iter-1", "each-iter-1")
                     .description("").steps(List.of(bodyStep)).build();
-            store.taskStarted(iter0Id, "each-iter-1", iterPlan, Map.of(), taskId, loopStepId, 0);
+            store.taskStarted(iter0Id, "each-iter-1", iterPlan, Map.of(), taskId, loopStepId, 0, RuntimeOwner.IN_PROCESS, null);
             store.stepStarted(iter0Id, iter0StepId, "iter-body");
             store.stepCompleted(iter0Id, iter0StepId, WorkflowRunStatus.COMPLETED, "iter-0 prerecorded");
             store.taskCompleted(iter0Id, WorkflowRunStatus.COMPLETED);
@@ -1137,32 +1147,32 @@ class AgenticanTest {
                 .build();
                  var service = agentican.recovery()) {
 
-            var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Rejected-Output Resume", "Rejected-Output Resume")
+            var plan = WorkflowDefinition.builder("Rejected-Output Resume", "Rejected-Output Resume")
                     .description("test")
                     .step().name("review").agent("worker").instructions("review draft").hitl().end()
                     .build();
 
             agentican.registry().workflows().register(plan);
 
-            var taskId = "t-rej-" + ai.agentican.framework.util.Ids.generate();
-            var stepId = "s-" + ai.agentican.framework.util.Ids.generate();
-            var runId = ai.agentican.framework.util.Ids.generate();
-            var turnId = ai.agentican.framework.util.Ids.generate();
+            var taskId = "t-rej-" + Ids.generate();
+            var stepId = "s-" + Ids.generate();
+            var runId = Ids.generate();
+            var turnId = Ids.generate();
 
-            store.taskStarted(taskId, "Rejected-Output Resume", plan, Map.of());
+            store.taskStarted(taskId, "Rejected-Output Resume", plan, Map.of(), RuntimeOwner.IN_PROCESS, null);
             store.stepStarted(taskId, stepId, "review");
             store.runStarted(taskId, stepId, runId, "worker");
             store.turnStarted(taskId, runId, turnId);
             store.messageSent(taskId, turnId,
-                    new ai.agentican.framework.llm.LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
+                    new LlmRequest("sys", null, "u", List.of(), 0, "d", "a", "c", null, java.util.List.of()));
             store.responseReceived(taskId, turnId,
-                    new ai.agentican.framework.llm.LlmResponse("draft", List.of(),
-                            ai.agentican.framework.llm.StopReason.END_TURN, 1, 1, 0, 0, 0));
+                    new LlmResponse("draft", List.of(),
+                            StopReason.END_TURN, 1, 1, 0, 0, 0));
             store.turnCompleted(taskId, turnId);
 
-            var checkpoint = new ai.agentican.framework.hitl.HitlCheckpoint(
-                    ai.agentican.framework.util.Ids.generate(),
-                    ai.agentican.framework.hitl.HitlCheckpoint.Type.STEP_OUTPUT,
+            var checkpoint = new HitlCheckpoint(
+                    Ids.generate(),
+                    HitlCheckpoint.Type.STEP_OUTPUT,
                     "review", "Step output: review", "draft");
             store.hitlNotified(taskId, stepId, checkpoint);
             store.hitlResponded(taskId, stepId, HitlResponse.reject("needs more polish"));

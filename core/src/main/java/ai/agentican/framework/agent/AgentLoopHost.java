@@ -5,6 +5,7 @@ import ai.agentican.framework.hitl.HitlResponse;
 import ai.agentican.framework.knowledge.KnowledgeEntry;
 import ai.agentican.framework.llm.LlmRequest;
 import ai.agentican.framework.llm.LlmResponse;
+import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.llm.ToolCall;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import ai.agentican.framework.state.WorkflowRunLog;
@@ -32,11 +33,11 @@ public interface AgentLoopHost {
 
     void runStarted(String taskId, String stepId, String runId, String agentName);
 
-    void runCompleted(String taskId, String runId);
+    void runCompleted(String taskId, String stepId, String runId, AgentStatus status, TokenUsage tokenUsage);
 
-    void turnStarted(String taskId, String runId, String turnId);
+    void turnStarted(String taskId, String runId, String turnId, int index);
 
-    void turnCompleted(String taskId, String turnId);
+    void turnCompleted(String taskId, String turnId, int index, TokenUsage tokenUsage);
 
     void turnAbandoned(String taskId, String turnId);
 
@@ -50,8 +51,6 @@ public interface AgentLoopHost {
 
     void hitlNotified(String taskId, String stepId, HitlCheckpoint checkpoint);
 
-    void hitlResponded(String taskId, String stepId, HitlResponse response);
-
     HitlCheckpoint createToolApprovalCheckpoint(ToolCall call, String stepName);
 
     HitlCheckpoint createQuestionCheckpoint(String question, String context, String stepName);
@@ -61,4 +60,6 @@ public interface AgentLoopHost {
     KnowledgeEntry knowledgeEntry(String entryId);
 
     boolean isCancelled();
+
+    default boolean isManaged() { return false; }
 }

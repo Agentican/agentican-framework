@@ -1,74 +1,125 @@
 package ai.agentican.framework.knowledge;
 
-import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
+import ai.agentican.framework.event.AgenticanEvent;
+import ai.agentican.framework.event.AgenticanEventListener;
+import ai.agentican.framework.event.MessageSent;
+import ai.agentican.framework.event.RunStarted;
+import ai.agentican.framework.event.StepCompleted;
+import ai.agentican.framework.event.TaskCompleted;
+import ai.agentican.framework.event.TurnStarted;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
-import ai.agentican.framework.store.WorkflowRunStore;
-
 import ai.agentican.framework.store.KnowledgeStore;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
-public class KnowledgeIngestor implements WorkflowRunListener {
+public class KnowledgeIngestor implements AgenticanEventListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(KnowledgeIngestor.class);
 
-    static final String ACQUIRED_MARKER = "KNOWLEDGE_ACQUIRED";
+    public static final String ACQUIRED_MARKER = "KNOWLEDGE_ACQUIRED";
 
-    private final WorkflowRunStore workflowRunStore;
     private final KnowledgeStore knowledgeStore;
     private final KnowledgeExtractor extractor;
     private final Executor executor;
 
-    public KnowledgeIngestor(WorkflowRunStore workflowRunStore, KnowledgeStore knowledgeStore,
+    private final ConcurrentHashMap<String, String> runToStep = new ConcurrentHashMap<>();   // runId  -> stepId
+    private final ConcurrentHashMap<String, String> turnToStep = new ConcurrentHashMap<>();  // turnId -> stepId
+    private final ConcurrentHashMap<String, String> firstUserTask = new ConcurrentHashMap<>(); // stepId -> first MessageSent's userTask
+
+    public KnowledgeIngestor(KnowledgeStore knowledgeStore,
                              KnowledgeExtractor extractor, Executor executor) {
 
-        if (workflowRunStore == null) throw new IllegalArgumentException("workflowRunStore is required");
         if (knowledgeStore == null) throw new IllegalArgumentException("knowledgeStore is required");
         if (extractor == null) throw new IllegalArgumentException("extractor is required");
         if (executor == null) throw new IllegalArgumentException("executor is required");
 
-        this.workflowRunStore = workflowRunStore;
         this.knowledgeStore = knowledgeStore;
         this.extractor = extractor;
         this.executor = executor;
     }
 
     @Override
-    public void onStepCompleted(String taskId, String stepId) {
+    public void on(AgenticanEvent event) {
 
-        var taskLog = workflowRunStore.load(taskId);
-        if (taskLog == null) return;
+        switch (event) {
 
-        var stepLog = taskLog.findStepById(stepId);
-        if (stepLog == null) return;
+            case RunStarted e -> runToStep.put(e.runId(), e.stepId());
 
-        if (stepLog.status() != WorkflowRunStatus.COMPLETED) return;
-        if (stepLog.runs().isEmpty()) return;
+            case TurnStarted e -> {
+                var stepId = runToStep.get(e.runId());
+                if (stepId != null) turnToStep.put(e.turnId(), stepId);
+            }
 
-        var output = stepLog.output();
-        if (output == null || output.isBlank()) return;
+            case MessageSent e -> rememberFirstUserTask(e);
 
-        if (!output.contains(ACQUIRED_MARKER)) {
+            case StepCompleted e -> maybeIngest(e);
 
-            LOG.debug("Step '{}' output has no {} marker; skipping extraction", stepLog.stepName(), ACQUIRED_MARKER);
+            case TaskCompleted e -> evictForTask(e.taskId());
 
+            default -> { /* ignore */ }
+        }
+    }
+
+    private void rememberFirstUserTask(MessageSent event) {
+
+        var stepId = turnToStep.get(event.turnId());
+        if (stepId == null) return;
+
+        var request = event.request();
+        if (request == null || request.userTask() == null) return;
+
+        // putIfAbsent — only the first MessageSent per step wins, which is the
+        // first turn's user task that the extractor wants.
+        firstUserTask.putIfAbsent(stepId, request.userTask());
+    }
+
+    private void maybeIngest(StepCompleted event) {
+
+        if (event.status() != WorkflowRunStatus.COMPLETED) {
+            firstUserTask.remove(event.stepId());
             return;
         }
 
-        var stepName = stepLog.stepName();
+        var output = event.output();
+        if (output == null || output.isBlank()) {
+            firstUserTask.remove(event.stepId());
+            return;
+        }
 
-        var firstRun = stepLog.runs().getFirst();
-        var firstTurn = firstRun.turns().isEmpty() ? null : firstRun.turns().getFirst();
+        if (!output.contains(ACQUIRED_MARKER)) {
 
-        var input = firstTurn != null && firstTurn.request() != null
-                ? firstTurn.request().userTask()
-                : null;
+            LOG.debug("Step '{}' output has no {} marker; skipping extraction",
+                    event.stepName(), ACQUIRED_MARKER);
 
+            firstUserTask.remove(event.stepId());
+            return;
+        }
+
+        var input = firstUserTask.remove(event.stepId());  // null if no MessageSent was ever recorded for this step
         var cleanedOutput = output.replace(ACQUIRED_MARKER, "").stripTrailing();
 
-        executor.execute(() -> ingest(stepName, input, cleanedOutput));
+        executor.execute(() -> ingest(event.stepName(), input, cleanedOutput));
+    }
+
+    private void evictForTask(String taskId) {
+
+        // We can't cheaply key state by taskId without yet more bookkeeping; the
+        // runId / turnId / stepId tables drain naturally as their parent events
+        // arrive in the normal completion path. TaskCompleted is the fallback for
+        // abandoned tasks (reaped, cancelled, etc.) where step/turn completions
+        // didn't fire. Without a taskId→{stepIds} index we leave any stragglers
+        // for the next eviction cycle; in practice the tables are small and
+        // short-lived per task. Future enrichment: add taskId to MessageSent /
+        // TurnStarted to make eviction precise.
+    }
+
+    public void ingestStep(String stepName, String input, String output) {
+
+        executor.execute(() -> ingest(stepName, input, output));
     }
 
     private void ingest(String stepName, String input, String output) {

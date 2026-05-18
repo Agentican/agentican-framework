@@ -1,7 +1,6 @@
 package ai.agentican.quarkus.rest;
 
 import ai.agentican.framework.hitl.HitlCheckpoint;
-import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.quarkus.event.*;
 import ai.agentican.quarkus.rest.sse.EventTimeline;
 import ai.agentican.quarkus.rest.sse.SequencedEvent;
@@ -9,7 +8,6 @@ import io.smallrye.mutiny.Multi;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import jakarta.inject.Inject;
 
 import java.util.List;
 import java.util.Map;
@@ -22,10 +20,9 @@ public class TaskEventBus {
 
     private static final int DEFAULT_BUFFER_CAPACITY = 100;
 
-    @Inject WorkflowRunStore workflowRunStore;
-
     private final ConcurrentMap<String, EventTimeline> timelines = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, List<HitlCheckpoint>> pendingCheckpoints = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, String> parentByTask = new ConcurrentHashMap<>();
 
     public void onPlanStarted(@Observes WfRunStartedEvent event) {
 
@@ -39,6 +36,9 @@ public class TaskEventBus {
 
     public void onTaskStarted(@Observes TaskStartedEvent event) {
 
+        // Track parent linkage so emitAndBubble can walk in-memory instead of via store.load().
+        if (event.parentTaskId() != null) parentByTask.put(event.taskId(), event.parentTaskId());
+
         timelineFor(event.taskId()).emit(event);
     }
 
@@ -50,6 +50,7 @@ public class TaskEventBus {
             timeline.complete(event);
 
         pendingCheckpoints.remove(event.taskId());
+        parentByTask.remove(event.taskId());
     }
 
     public void onIterationStarted(@Observes IterationStartedEvent event) {
@@ -127,13 +128,15 @@ public class TaskEventBus {
 
         timelineFor(taskId).emit(event);
 
-        var taskLog = workflowRunStore != null ? workflowRunStore.load(taskId) : null;
+        // Walk the parent chain in-memory using linkage learned from TaskStartedEvent.
+        // Bounded to prevent infinite loops if linkage somehow becomes cyclic.
+        var current = parentByTask.get(taskId);
         var guard = 0;
 
-        while (taskLog != null && taskLog.parentTaskId() != null && guard++ < 32) {
+        while (current != null && guard++ < 32) {
 
-            timelineFor(taskLog.parentTaskId()).emit(event);
-            taskLog = workflowRunStore.load(taskLog.parentTaskId());
+            timelineFor(current).emit(event);
+            current = parentByTask.get(current);
         }
     }
 

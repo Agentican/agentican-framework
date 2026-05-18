@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.otel;
 
 import ai.agentican.framework.Agentican;
-import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
+import ai.agentican.framework.event.AgenticanEventListener;
 import ai.agentican.framework.orchestration.execution.WorkflowRunDecorator;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
@@ -30,7 +30,7 @@ class TracingIntegrationTest {
     WorkflowRunDecorator workflowRunDecorator;
 
     @Inject
-    Instance<WorkflowRunListener> stepListeners;
+    Instance<AgenticanEventListener> stepListeners;
 
     @Inject
     InMemorySpanExporter spanExporter;
@@ -47,7 +47,7 @@ class TracingIntegrationTest {
 
         assertNotNull(workflowRunDecorator, "WorkflowRunDecorator should be produced");
         assertTrue(stepListeners.stream().count() >= 1,
-                "Should have at least 1 WorkflowRunListener (lifecycle). Got: " + stepListeners.stream().count());
+                "Should have at least 1 AgenticanEventListener (lifecycle). Got: " + stepListeners.stream().count());
     }
 
     @Test

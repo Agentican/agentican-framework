@@ -12,6 +12,7 @@ import ai.agentican.temporal.dto.TokenUsageDto;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import ai.agentican.framework.agent.AgentResult;
 
 public class AgentStepActivityImpl implements AgentStepActivity {
 
@@ -102,7 +103,7 @@ public class AgentStepActivityImpl implements AgentStepActivity {
         return log.findRunById(runId);
     }
 
-    private static AgentInvocationResult mapResult(ai.agentican.framework.agent.AgentResult result) {
+    private static AgentInvocationResult mapResult(AgentResult result) {
 
         var runId = result.run() != null ? result.run().id() : null;
 

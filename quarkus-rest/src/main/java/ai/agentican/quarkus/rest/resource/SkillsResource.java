@@ -29,6 +29,7 @@ import jakarta.ws.rs.core.Response;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import ai.agentican.framework.config.CatalogConfig;
 
 @Path("/agentican/skills")
 @Produces(MediaType.APPLICATION_JSON)
@@ -39,7 +40,7 @@ public class SkillsResource {
     Agentican agentican;
 
     @Inject
-    ai.agentican.framework.config.CatalogConfig catalogConfig;
+    CatalogConfig catalogConfig;
 
     @Inject
     CatalogAuditLog audit;

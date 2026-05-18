@@ -8,6 +8,7 @@ import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.llm.ToolCall;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
+import ai.agentican.framework.state.RuntimeOwner;
 import ai.agentican.framework.state.WorkflowRunLog;
 import ai.agentican.framework.tools.ToolResult;
 
@@ -16,10 +17,12 @@ import java.util.Map;
 
 public interface WorkflowRunStore {
 
-    void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params);
+    void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params,
+                     RuntimeOwner runtime, String temporalWorkflowId);
 
     void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params,
-                     String parentTaskId, String parentStepId, int iterationIndex);
+                     String parentTaskId, String parentStepId, int iterationIndex,
+                     RuntimeOwner runtime, String temporalWorkflowId);
 
     void taskCompleted(String taskId, WorkflowRunStatus status);
 

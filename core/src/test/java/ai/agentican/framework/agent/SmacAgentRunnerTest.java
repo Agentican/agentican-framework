@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.hitl.HitlCheckpoint;
+import ai.agentican.framework.tools.Tool;
 class SmacAgentRunnerTest {
 
     private HitlManager autoApproveHitl() {
@@ -285,7 +286,7 @@ class SmacAgentRunnerTest {
             private final ToolRecord tool = new ToolRecord("FAILING_TOOL", "A failing tool", Map.of());
 
             @Override
-            public List<ai.agentican.framework.tools.Tool> tools() { return List.of(tool); }
+            public List<Tool> tools() { return List.of(tool); }
 
             @Override
             public boolean handles(String toolName) { return "FAILING_TOOL".equals(toolName); }

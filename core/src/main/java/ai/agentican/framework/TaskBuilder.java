@@ -4,6 +4,7 @@ import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 
 import java.util.List;
+import ai.agentican.framework.util.Ids;
 
 public final class TaskBuilder {
 
@@ -135,7 +136,7 @@ public final class TaskBuilder {
             var step = new WorkflowStepAgent(
                     STEP_NAME, parent.agentName, parent.instructions, null, parent.hitl, parent.skills, parent.tools);
 
-            var workflow = WorkflowDefinition.builder(ai.agentican.framework.util.Ids.generate(), parent.taskName)
+            var workflow = WorkflowDefinition.builder(Ids.generate(), parent.taskName)
                     .params(params)
                     .steps(List.of(step))
                     .outputStep(STEP_NAME)

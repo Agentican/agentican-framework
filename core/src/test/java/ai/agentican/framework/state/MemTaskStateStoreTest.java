@@ -6,6 +6,7 @@ import ai.agentican.framework.store.WorkflowRunStoreMemory;
 import org.junit.jupiter.api.Test;
 
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
+import ai.agentican.framework.state.RuntimeOwner;
 
 import java.util.Map;
 
@@ -25,7 +26,7 @@ class MemTaskStateStoreTest {
 
         var store = new WorkflowRunStoreMemory();
 
-        store.taskStarted("task-1", "Test", dummyTask(), Map.of());
+        store.taskStarted("task-1", "Test", dummyTask(), Map.of(), RuntimeOwner.IN_PROCESS, null);
 
         var loaded = store.load("task-1");
 
@@ -47,8 +48,8 @@ class MemTaskStateStoreTest {
 
         var store = new WorkflowRunStoreMemory();
 
-        store.taskStarted("t1", "Task 1", dummyTask(), Map.of());
-        store.taskStarted("t2", "Task 2", dummyTask(), Map.of());
+        store.taskStarted("t1", "Task 1", dummyTask(), Map.of(), RuntimeOwner.IN_PROCESS, null);
+        store.taskStarted("t2", "Task 2", dummyTask(), Map.of(), RuntimeOwner.IN_PROCESS, null);
 
         var all = store.list();
 
@@ -60,7 +61,7 @@ class MemTaskStateStoreTest {
 
         var store = new WorkflowRunStoreMemory();
 
-        store.taskStarted("id1", "task1", dummyTask(), Map.of());
+        store.taskStarted("id1", "task1", dummyTask(), Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.taskCompleted("id1", WorkflowRunStatus.COMPLETED);
 
         var loaded = store.load("id1");

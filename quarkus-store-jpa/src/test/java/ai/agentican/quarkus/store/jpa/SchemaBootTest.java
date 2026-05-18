@@ -89,6 +89,7 @@ class SchemaBootTest {
         task.taskName = "a task";
         task.iterationIndex = 0;
         task.status = "RUNNING";
+        task.runtime = "IN_PROCESS";
         task.createdAt = Instant.now();
         task.persist();
 
@@ -107,6 +108,7 @@ class SchemaBootTest {
         subTask.parentStepId = taskStep.id;
         subTask.iterationIndex = 0;
         subTask.status = "RUNNING";
+        subTask.runtime = "IN_PROCESS";
         subTask.createdAt = Instant.now();
         subTask.persist();
 

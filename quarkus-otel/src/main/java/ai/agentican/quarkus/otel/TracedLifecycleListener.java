@@ -1,13 +1,25 @@
 package ai.agentican.quarkus.otel;
 
-import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
 import ai.agentican.framework.agent.AgentStatus;
-import ai.agentican.framework.llm.StopReason;
-import ai.agentican.framework.state.StepLog;
+import ai.agentican.framework.event.AgenticanEvent;
+import ai.agentican.framework.event.AgenticanEventListener;
+import ai.agentican.framework.event.HitlNotified;
+import ai.agentican.framework.event.HitlResponded;
+import ai.agentican.framework.event.MessageSent;
+import ai.agentican.framework.event.ResponseReceived;
+import ai.agentican.framework.event.RunCompleted;
+import ai.agentican.framework.event.RunStarted;
+import ai.agentican.framework.event.StepCompleted;
+import ai.agentican.framework.event.StepStarted;
+import ai.agentican.framework.event.TaskCompleted;
+import ai.agentican.framework.event.TaskResumed;
+import ai.agentican.framework.event.TaskStarted;
+import ai.agentican.framework.event.ToolCallCompleted;
+import ai.agentican.framework.event.ToolCallStarted;
+import ai.agentican.framework.event.TurnCompleted;
+import ai.agentican.framework.event.TurnStarted;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 
-import ai.agentican.framework.store.WorkflowRunStore;
-import ai.agentican.framework.hitl.HitlCheckpoint;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
@@ -18,7 +30,23 @@ import io.opentelemetry.context.Scope;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-public class TracedLifecycleListener implements WorkflowRunListener {
+/**
+ * Subscribes to {@link AgenticanEvent}s and opens / closes OTel spans for
+ * tasks, steps, runs, turns, LLM calls, tool calls, and HITL checkpoints.
+ *
+ * <p>All span attributes come from event payloads — no {@code store.load()}
+ * inside event handlers (event-payload-sufficiency principle). Agent name
+ * is tracked per-run via a small {@link ConcurrentHashMap} keyed by
+ * {@code runId} (populated on {@link RunStarted}, cleared on
+ * {@link RunCompleted}) so {@link TurnStarted} spans can be labelled
+ * without back-references to the store.
+ *
+ * <p>Span timestamps default to OTel's {@code Instant.now()} rather than
+ * the framework's persisted createdAt/completedAt timestamps — a small
+ * fidelity loss vs. the previous {@code store.load()} pattern, in
+ * exchange for keeping observability event-driven.
+ */
+public class TracedLifecycleListener implements AgenticanEventListener {
 
     private static final String TASK_SPAN = "agentican.task";
     private static final String STEP_SPAN_PREFIX = "agentican.step ";
@@ -53,20 +81,45 @@ public class TracedLifecycleListener implements WorkflowRunListener {
     private static final AttributeKey<String> GEN_AI_FINISH = AttributeKey.stringKey("gen_ai.response.finish_reasons");
 
     private final Tracer tracer;
-    private final WorkflowRunStore workflowRunStore;
-    private final ConcurrentHashMap<String, SpanAndScope> spans = new ConcurrentHashMap<>();
-    private final java.util.Set<String> resumedTaskIds = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    public TracedLifecycleListener(Tracer tracer, WorkflowRunStore workflowRunStore) {
+    private final ConcurrentHashMap<String, SpanAndScope> spans = new ConcurrentHashMap<>();
+    private final java.util.Set<String> resumedTaskIds = ConcurrentHashMap.newKeySet();
+
+    // Per-run agent name, set on RunStarted, used by TurnStarted spans within that run.
+    private final ConcurrentHashMap<String, String> runAgentNames = new ConcurrentHashMap<>();
+    // Per-turn agent name, set on TurnStarted (resolved via runAgentNames), used by tool spans.
+    private final ConcurrentHashMap<String, String> turnAgentNames = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> turnToRun = new ConcurrentHashMap<>();
+    // Per-tool-call name for completion lookup.
+    private final ConcurrentHashMap<String, String> toolNames = new ConcurrentHashMap<>();
+
+    public TracedLifecycleListener(Tracer tracer) {
 
         this.tracer = tracer;
-        this.workflowRunStore = workflowRunStore;
     }
 
     @Override
-    public void onTaskResumed(String taskId) {
+    public void on(AgenticanEvent event) {
 
-        resumedTaskIds.add(taskId);
+        switch (event) {
+
+            case TaskResumed       e -> resumedTaskIds.add(e.taskId());
+            case TaskStarted       e -> onTaskStarted(e);
+            case TaskCompleted     e -> onTaskCompleted(e);
+            case StepStarted       e -> onStepStarted(e);
+            case StepCompleted     e -> onStepCompleted(e);
+            case RunStarted        e -> onRunStarted(e);
+            case RunCompleted      e -> onRunCompleted(e);
+            case TurnStarted       e -> onTurnStarted(e);
+            case TurnCompleted     e -> onTurnCompleted(e);
+            case MessageSent       e -> onMessageSent(e);
+            case ResponseReceived  e -> onResponseReceived(e);
+            case ToolCallStarted   e -> onToolCallStarted(e);
+            case ToolCallCompleted e -> onToolCallCompleted(e);
+            case HitlNotified      e -> onHitlNotified(e);
+            case HitlResponded     e -> onHitlResponded(e);
+            default -> { /* events with no span mapping */ }
+        }
     }
 
     private void stampResumedIfApplicable(io.opentelemetry.api.trace.SpanBuilder builder, String taskId) {
@@ -74,126 +127,101 @@ public class TracedLifecycleListener implements WorkflowRunListener {
         if (resumedTaskIds.contains(taskId)) builder.setAttribute(RESUMED, true);
     }
 
-    @Override
-    public void onTaskStarted(String taskId) {
+    private void onTaskStarted(TaskStarted event) {
 
-        var taskLog = workflowRunStore.load(taskId);
+        var builder = tracer.spanBuilder(TASK_SPAN).setAttribute(TASK_ID, event.taskId());
 
-        var builder = tracer.spanBuilder(TASK_SPAN).setAttribute(TASK_ID, taskId);
-        stampResumedIfApplicable(builder, taskId);
+        stampResumedIfApplicable(builder, event.taskId());
 
-        if (taskLog != null && taskLog.createdAt() != null)
-            builder.setStartTimestamp(taskLog.createdAt());
+        // Parent linking: if this is a sub-task whose parent step's span is open, attach.
+        if (event.parentTaskId() != null && event.parentStepId() != null) {
 
-        if (taskLog != null && taskLog.parentTaskId() != null && taskLog.parentStepId() != null) {
+            var parentEntry = spans.get(stepKey(event.parentTaskId(), event.parentStepId()));
 
-            var parentEntry = spans.get(stepKey(taskLog.parentTaskId(), taskLog.parentStepId()));
-
-            if (parentEntry != null)
-                builder.setParent(Context.current().with(parentEntry.span));
+            if (parentEntry != null) builder.setParent(Context.current().with(parentEntry.span));
         }
 
         var span = builder.startSpan();
 
-        spans.put(taskKey(taskId), new SpanAndScope(span, span.makeCurrent()));
+        spans.put(taskKey(event.taskId()), new SpanAndScope(span, span.makeCurrent()));
     }
 
-    @Override
-    public void onTaskCompleted(String taskId, WorkflowRunStatus status) {
+    private void onTaskCompleted(TaskCompleted event) {
 
-        resumedTaskIds.remove(taskId);
+        resumedTaskIds.remove(event.taskId());
 
-        var entry = spans.remove(taskKey(taskId));
+        var entry = spans.remove(taskKey(event.taskId()));
 
         if (entry == null) return;
 
-        if (status == WorkflowRunStatus.FAILED || status == WorkflowRunStatus.CANCELLED)
-            entry.span.setStatus(StatusCode.ERROR, status.name());
+        if (event.status() == WorkflowRunStatus.FAILED || event.status() == WorkflowRunStatus.CANCELLED)
+            entry.span.setStatus(StatusCode.ERROR, event.status().name());
         else
             entry.span.setStatus(StatusCode.OK);
 
-        var taskLog = workflowRunStore.load(taskId);
-
-        if (taskLog != null && taskLog.completedAt() != null) {
-
-            entry.span.end(taskLog.completedAt());
-            entry.scope.close();
-        }
-        else
-            entry.close();
+        entry.close();
     }
 
-    @Override
-    public void onStepStarted(String taskId, String stepId) {
+    private void onStepStarted(StepStarted event) {
 
-        var step = resolveStepById(taskId, stepId);
-        var stepName = step != null ? step.stepName() : stepId;
+        var stepName = event.stepName() != null ? event.stepName() : event.stepId();
 
         var builder = tracer.spanBuilder(STEP_SPAN_PREFIX + stepName)
-                .setAttribute(TASK_ID, taskId)
+                .setAttribute(TASK_ID, event.taskId())
                 .setAttribute(STEP_NAME, stepName);
 
-        if (step != null && step.createdAt() != null)
-            builder.setStartTimestamp(step.createdAt());
-
-        stampResumedIfApplicable(builder, taskId);
+        stampResumedIfApplicable(builder, event.taskId());
 
         var span = builder.startSpan();
 
-        spans.put(stepKey(taskId, stepId), new SpanAndScope(span, span.makeCurrent()));
+        spans.put(stepKey(event.taskId(), event.stepId()), new SpanAndScope(span, span.makeCurrent()));
     }
 
-    @Override
-    public void onStepCompleted(String taskId, String stepId) {
+    private void onStepCompleted(StepCompleted event) {
 
-        var entry = spans.remove(stepKey(taskId, stepId));
+        var entry = spans.remove(stepKey(event.taskId(), event.stepId()));
 
         if (entry == null) return;
 
-        var step = resolveStepById(taskId, stepId);
-        var status = step != null ? step.status() : null;
+        if (event.status() != null) {
 
-        if (status != null) {
+            entry.span.setAttribute(STEP_STATUS, event.status().name());
 
-            entry.span.setAttribute(STEP_STATUS, status.name());
-
-            if (status == WorkflowRunStatus.FAILED || status == WorkflowRunStatus.CANCELLED)
-                entry.span.setStatus(StatusCode.ERROR, status.name());
+            if (event.status() == WorkflowRunStatus.FAILED || event.status() == WorkflowRunStatus.CANCELLED)
+                entry.span.setStatus(StatusCode.ERROR, event.status().name());
             else
                 entry.span.setStatus(StatusCode.OK);
         }
         else
             entry.span.setStatus(StatusCode.OK);
 
-        if (step != null && step.completedAt() != null) {
-
-            entry.span.end(step.completedAt());
-            entry.scope.close();
-        }
-        else
-            entry.close();
+        entry.close();
     }
 
-    @Override
-    public void onRunStarted(String taskId, String runId) {
+    private void onRunStarted(RunStarted event) {
 
-        var taskLog = workflowRunStore.load(taskId);
-        var run = taskLog != null ? taskLog.findRunById(runId) : null;
-        var agentName = run != null && run.agentName() != null ? run.agentName() : "unknown";
+        var agentName = event.agentName() != null ? event.agentName() : "unknown";
+
+        runAgentNames.put(event.runId(), agentName);
 
         var runBuilder = tracer.spanBuilder(RUN_SPAN).setAttribute(AGENT_NAME, agentName);
-        stampResumedIfApplicable(runBuilder, taskId);
+
+        stampResumedIfApplicable(runBuilder, event.taskId());
+
         var span = runBuilder.startSpan();
 
-        spans.put(runKey(taskId, runId), new SpanAndScope(span, span.makeCurrent()));
+        spans.put(runKey(event.taskId(), event.runId()), new SpanAndScope(span, span.makeCurrent()));
     }
 
-    @Override
-    public void onRunCompleted(String taskId, String runId, AgentStatus status) {
+    private void onRunCompleted(RunCompleted event) {
 
-        var entry = spans.remove(runKey(taskId, runId));
+        var entry = spans.remove(runKey(event.taskId(), event.runId()));
+
+        runAgentNames.remove(event.runId());
 
         if (entry == null) return;
+
+        var status = event.status() != null ? event.status() : AgentStatus.COMPLETED;
 
         entry.span.setAttribute(AGENT_STATUS, status.name());
 
@@ -205,103 +233,64 @@ public class TracedLifecycleListener implements WorkflowRunListener {
         entry.close();
     }
 
-    @Override
-    public void onTurnStarted(String taskId, String turnId) {
+    private void onTurnStarted(TurnStarted event) {
 
-        var taskLog = workflowRunStore.load(taskId);
-        var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
-        var turnIndex = turnLog != null ? turnLog.index() : 0;
+        var agentName = runAgentNames.getOrDefault(event.runId(), "unknown");
 
-        var agentName = "unknown";
+        turnToRun.put(event.turnId(), event.runId());
+        turnAgentNames.put(event.turnId(), agentName);
 
-        if (taskLog != null) {
-
-            outer:
-            for (var step : taskLog.steps().values()) {
-
-                for (var run : step.runs()) {
-
-                    for (var turn : run.turns()) {
-
-                        if (turnId.equals(turn.id())) {
-
-                            agentName = run.agentName() != null ? run.agentName() : "unknown";
-
-                            break outer;
-                        }
-                    }
-                }
-            }
-        }
-
-        var builder = tracer.spanBuilder(TURN_SPAN_PREFIX + turnIndex)
+        var builder = tracer.spanBuilder(TURN_SPAN_PREFIX + event.index())
                 .setAttribute(AGENT_NAME, agentName)
-                .setAttribute(TURN_INDEX, (long) turnIndex);
+                .setAttribute(TURN_INDEX, (long) event.index());
 
-        if (turnLog != null && turnLog.startedAt() != null)
-            builder.setStartTimestamp(turnLog.startedAt());
-
-        stampResumedIfApplicable(builder, taskId);
+        stampResumedIfApplicable(builder, event.taskId());
 
         var span = builder.startSpan();
 
-        spans.put(turnKey(taskId, turnId), new SpanAndScope(span, span.makeCurrent()));
+        spans.put(turnKey(event.taskId(), event.turnId()), new SpanAndScope(span, span.makeCurrent()));
     }
 
-    @Override
-    public void onTurnCompleted(String taskId, String turnId) {
+    private void onTurnCompleted(TurnCompleted event) {
 
-        var entry = spans.remove(turnKey(taskId, turnId));
+        turnToRun.remove(event.turnId());
+        turnAgentNames.remove(event.turnId());
+
+        var entry = spans.remove(turnKey(event.taskId(), event.turnId()));
 
         if (entry == null) return;
 
         entry.span.setStatus(StatusCode.OK);
-
-        var taskLog = workflowRunStore.load(taskId);
-        var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
-
-        if (turnLog != null && turnLog.completedAt() != null) {
-
-            entry.span.end(turnLog.completedAt());
-            entry.scope.close();
-        }
-        else
-            entry.close();
+        entry.close();
     }
 
-    @Override
-    public void onMessageSent(String taskId, String turnId) {
-
-        var taskLog = workflowRunStore.load(taskId);
-        var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
-        var request = turnLog != null ? turnLog.request() : null;
+    private void onMessageSent(MessageSent event) {
 
         var builder = tracer.spanBuilder(LLM_SPAN).setSpanKind(SpanKind.CLIENT);
+
+        var request = event.request();
 
         if (request != null) {
 
             if (request.provider() != null) builder.setAttribute(GEN_AI_SYSTEM, request.provider());
-            if (request.model() != null) builder.setAttribute(GEN_AI_MODEL, request.model());
-            if (request.llmName() != null) builder.setAttribute(LLM_NAME, request.llmName());
+            if (request.model() != null)    builder.setAttribute(GEN_AI_MODEL, request.model());
+            if (request.llmName() != null)  builder.setAttribute(LLM_NAME, request.llmName());
         }
 
-        stampResumedIfApplicable(builder, taskId);
+        stampResumedIfApplicable(builder, event.taskId());
 
         var span = builder.startSpan();
 
-        spans.put(llmKey(taskId, turnId), new SpanAndScope(span, span.makeCurrent()));
+        spans.put(llmKey(event.taskId(), event.turnId()), new SpanAndScope(span, span.makeCurrent()));
     }
 
-    @Override
-    public void onResponseReceived(String taskId, String turnId, StopReason stopReason) {
+    private void onResponseReceived(ResponseReceived event) {
 
-        var entry = spans.remove(llmKey(taskId, turnId));
+        var entry = spans.remove(llmKey(event.taskId(), event.turnId()));
 
         if (entry == null) return;
 
-        var taskLog = workflowRunStore.load(taskId);
-        var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
-        var response = turnLog != null ? turnLog.response() : null;
+        var response = event.response();
 
         if (response != null) {
 
@@ -311,43 +300,48 @@ public class TracedLifecycleListener implements WorkflowRunListener {
             entry.span.setAttribute(GEN_AI_CACHE_WRITE, response.cacheWriteTokens());
             entry.span.setAttribute(TURN_INPUT_TOKENS, response.inputTokens());
             entry.span.setAttribute(TURN_OUTPUT_TOKENS, response.outputTokens());
+
+            if (response.stopReason() != null) {
+                entry.span.setAttribute(GEN_AI_FINISH, response.stopReason().name());
+                entry.span.setAttribute(STOP_REASON, response.stopReason().name());
+            }
         }
 
-        entry.span.setAttribute(GEN_AI_FINISH, stopReason.name());
-        entry.span.setAttribute(STOP_REASON, stopReason.name());
         entry.span.setStatus(StatusCode.OK);
-
         entry.close();
     }
 
-    @Override
-    public void onToolCallStarted(String taskId, String toolCallId) {
+    private void onToolCallStarted(ToolCallStarted event) {
 
-        var taskLog = workflowRunStore.load(taskId);
-        var toolName = resolveToolNameByCallId(taskLog, toolCallId);
+        var toolName = event.toolCall() != null && event.toolCall().name() != null
+                ? event.toolCall().name() : "unknown";
+
+        toolNames.put(event.toolCall().id(), toolName);
 
         var toolBuilder = tracer.spanBuilder(TOOL_SPAN).setAttribute(TOOL_NAME, toolName);
-        stampResumedIfApplicable(toolBuilder, taskId);
+
+        stampResumedIfApplicable(toolBuilder, event.taskId());
+
         var span = toolBuilder.startSpan();
 
-        spans.put(toolKey(taskId, toolCallId), new SpanAndScope(span, span.makeCurrent()));
+        spans.put(toolKey(event.taskId(), event.toolCall().id()), new SpanAndScope(span, span.makeCurrent()));
     }
 
-    @Override
-    public void onToolCallCompleted(String taskId, String toolCallId) {
+    private void onToolCallCompleted(ToolCallCompleted event) {
 
-        var entry = spans.remove(toolKey(taskId, toolCallId));
+        var result = event.toolResult();
+
+        var entry = spans.remove(toolKey(event.taskId(), result.toolCallId()));
+
+        toolNames.remove(result.toolCallId());
 
         if (entry == null) return;
 
-        var taskLog = workflowRunStore.load(taskId);
-        var toolResult = resolveToolResultByCallId(taskLog, toolCallId);
-
-        if (toolResult != null && toolResult.isError()) {
+        if (result.isError()) {
 
             entry.span.setStatus(StatusCode.ERROR, "Tool execution failed");
 
-            if (toolResult.cause() != null) entry.span.recordException(toolResult.cause());
+            if (result.cause() != null) entry.span.recordException(result.cause());
         }
         else
             entry.span.setStatus(StatusCode.OK);
@@ -355,22 +349,24 @@ public class TracedLifecycleListener implements WorkflowRunListener {
         entry.close();
     }
 
-    @Override
-    public void onHitlNotified(String taskId, String hitlId, HitlCheckpoint.Type type) {
+    private void onHitlNotified(HitlNotified event) {
+
+        var cp = event.checkpoint();
 
         var hitlBuilder = tracer.spanBuilder(HITL_SPAN)
-                .setAttribute(HITL_CHECKPOINT_ID, hitlId)
-                .setAttribute(HITL_CHECKPOINT_TYPE, type.name());
-        stampResumedIfApplicable(hitlBuilder, taskId);
+                .setAttribute(HITL_CHECKPOINT_ID, cp.id())
+                .setAttribute(HITL_CHECKPOINT_TYPE, cp.type().name());
+
+        stampResumedIfApplicable(hitlBuilder, event.taskId());
+
         var span = hitlBuilder.startSpan();
 
-        spans.put(hitlKey(taskId, hitlId), new SpanAndScope(span, span.makeCurrent()));
+        spans.put(hitlKey(event.taskId(), cp.id()), new SpanAndScope(span, span.makeCurrent()));
     }
 
-    @Override
-    public void onHitlResponded(String taskId, String hitlId, boolean approved) {
+    private void onHitlResponded(HitlResponded event) {
 
-        var entry = spans.remove(hitlKey(taskId, hitlId));
+        var entry = spans.remove(hitlKey(event.taskId(), event.hitlId()));
 
         if (entry == null) return;
 
@@ -378,66 +374,13 @@ public class TracedLifecycleListener implements WorkflowRunListener {
         entry.close();
     }
 
-    private StepLog resolveStepById(String taskId, String stepId) {
-
-        var taskLog = workflowRunStore.load(taskId);
-
-        return taskLog != null ? taskLog.findStepById(stepId) : null;
-    }
-
-    private static String resolveToolNameByCallId(ai.agentican.framework.state.WorkflowRunLog taskLog, String toolCallId) {
-
-        if (taskLog == null) return "unknown";
-
-        for (var step : taskLog.steps().values()) {
-
-            for (var run : step.runs()) {
-
-                for (var turn : run.turns()) {
-
-                    if (turn.response() != null && turn.response().toolCalls() != null) {
-
-                        for (var tc : turn.response().toolCalls()) {
-
-                            if (toolCallId.equals(tc.id())) return tc.name();
-                        }
-                    }
-                }
-            }
-        }
-
-        return "unknown";
-    }
-
-    private static ai.agentican.framework.tools.ToolResult resolveToolResultByCallId(
-            ai.agentican.framework.state.WorkflowRunLog taskLog, String toolCallId) {
-
-        if (taskLog == null) return null;
-
-        for (var step : taskLog.steps().values()) {
-
-            for (var run : step.runs()) {
-
-                for (var turn : run.turns()) {
-
-                    for (var tr : turn.toolResults()) {
-
-                        if (toolCallId.equals(tr.toolCallId())) return tr;
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private static String taskKey(String taskId) { return taskId + ":task"; }
-    private static String stepKey(String taskId, String stepId) { return taskId + ":step:" + stepId; }
-    private static String runKey(String taskId, String runId) { return taskId + ":run:" + runId; }
-    private static String turnKey(String taskId, String turnId) { return taskId + ":turn:" + turnId; }
-    private static String llmKey(String taskId, String turnId) { return taskId + ":llm:" + turnId; }
-    private static String toolKey(String taskId, String toolCallId) { return taskId + ":tool:" + toolCallId; }
-    private static String hitlKey(String taskId, String checkpointId) { return taskId + ":hitl:" + checkpointId; }
+    private static String taskKey(String taskId)                              { return taskId + ":task"; }
+    private static String stepKey(String taskId, String stepId)               { return taskId + ":step:" + stepId; }
+    private static String runKey(String taskId, String runId)                 { return taskId + ":run:" + runId; }
+    private static String turnKey(String taskId, String turnId)               { return taskId + ":turn:" + turnId; }
+    private static String llmKey(String taskId, String turnId)                { return taskId + ":llm:" + turnId; }
+    private static String toolKey(String taskId, String toolCallId)           { return taskId + ":tool:" + toolCallId; }
+    private static String hitlKey(String taskId, String checkpointId)         { return taskId + ":hitl:" + checkpointId; }
 
     private record SpanAndScope(Span span, Scope scope) {
 

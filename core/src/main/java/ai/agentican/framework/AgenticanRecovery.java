@@ -1,8 +1,14 @@
 package ai.agentican.framework;
 
+import ai.agentican.framework.event.StepCompleted;
+import ai.agentican.framework.event.TaskCompleted;
+import ai.agentican.framework.event.TaskReaped;
+import ai.agentican.framework.event.TaskResumed;
+import ai.agentican.framework.knowledge.KnowledgeIngestor;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.orchestration.execution.resume.ReapReason;
 import ai.agentican.framework.orchestration.execution.resume.ResumeClassifier;
+import ai.agentican.framework.state.RuntimeOwner;
 import ai.agentican.framework.state.StepLog;
 import ai.agentican.framework.state.WorkflowRunLog;
 import ai.agentican.framework.util.Mdc;
@@ -50,6 +56,11 @@ public class AgenticanRecovery implements AutoCloseable {
 
             if (task.status() != null) continue;
             if (task.parentTaskId() != null) continue;
+            if (task.runtime() == RuntimeOwner.TEMPORAL) {
+                LOG.debug("Skipping reap of Temporal-owned task {} ({}, workflowId={}) — Temporal handles its own recovery",
+                        task.taskName(), task.taskId(), task.temporalWorkflowId());
+                continue;
+            }
 
             reapSingleTask(task, reason);
 
@@ -72,7 +83,7 @@ public class AgenticanRecovery implements AutoCloseable {
     public int resumeInterrupted(int maxConcurrent) {
 
         var workflowRunStore = engine.workflowRunStore;
-        var workflowRunListener = engine.workflowRunListener;
+        var eventBus = engine.eventBus;
         var taskRunner = engine.taskRunner;
         var taskExecutor = engine.taskExecutor;
 
@@ -87,6 +98,11 @@ public class AgenticanRecovery implements AutoCloseable {
 
             if (task.status() != null) continue;
             if (task.parentTaskId() != null) continue;
+            if (task.runtime() == RuntimeOwner.TEMPORAL) {
+                LOG.debug("Skipping resume of Temporal-owned task {} ({}, workflowId={}) — Temporal handles its own recovery",
+                        task.taskName(), task.taskId(), task.temporalWorkflowId());
+                continue;
+            }
 
             var plan = task.plan();
 
@@ -125,18 +141,18 @@ public class AgenticanRecovery implements AutoCloseable {
 
                 try {
                     semaphore.acquire();
-                    workflowRunListener.onTaskResumed(taskId);
+                    eventBus.publish(new TaskResumed(taskId));
                     return taskRunner.resume(plan, taskId, params, cancelled);
                 }
                 catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     LOG.warn("Resume of task {} interrupted while waiting for concurrency slot", taskId);
-                    workflowRunListener.onTaskCompleted(taskId, WorkflowRunStatus.CANCELLED);
+                    eventBus.publish(new TaskCompleted(taskId, WorkflowRunStatus.CANCELLED));
                     throw new CompletionException(e);
                 }
                 catch (Exception e) {
                     LOG.error("Resume of task {} failed: {}", taskId, e.getMessage(), e);
-                    workflowRunListener.onTaskCompleted(taskId, WorkflowRunStatus.FAILED);
+                    eventBus.publish(new TaskCompleted(taskId, WorkflowRunStatus.FAILED));
                     throw e;
                 }
                 finally {
@@ -191,6 +207,7 @@ public class AgenticanRecovery implements AutoCloseable {
         int reaped = 0;
         for (var t : inProgress) {
             if (t.parentTaskId() == null) continue;
+            if (t.runtime() == RuntimeOwner.TEMPORAL) continue;  // Temporal owns its sub-task lifecycle
 
             var parent = workflowRunStore.load(t.parentTaskId());
             if (parent == null || parent.status() == null) continue;
@@ -212,22 +229,27 @@ public class AgenticanRecovery implements AutoCloseable {
         if (knowledgeIngestor == null) return;
 
         var taskId = task.taskId();
-        var stepIds = task.steps().values().stream()
+        var completedSteps = task.steps().values().stream()
                 .filter(s -> s.status() == WorkflowRunStatus.COMPLETED)
                 .filter(s -> s.output() != null && !s.output().isBlank())
-                .map(StepLog::id)
+                .filter(s -> s.output().contains(KnowledgeIngestor.ACQUIRED_MARKER))
                 .toList();
 
-        if (stepIds.isEmpty()) return;
+        if (completedSteps.isEmpty()) return;
 
         var future = CompletableFuture.runAsync(() -> {
-            for (var stepId : stepIds) {
+            for (var step : completedSteps) {
                 try {
-                    knowledgeIngestor.onStepCompleted(taskId, stepId);
+                    // Recovery is a batch operation — we resolve the first turn's user task
+                    // from the persisted log ourselves rather than going through the
+                    // event-driven path (whose listener state is empty on startup).
+                    var input = firstTurnUserTask(step);
+                    var cleanedOutput = step.output().replace(KnowledgeIngestor.ACQUIRED_MARKER, "").stripTrailing();
+                    knowledgeIngestor.ingestStep(step.stepName(), input, cleanedOutput);
                 }
                 catch (RuntimeException ex) {
                     LOG.warn("Knowledge re-ingestion for step {} of task {} failed: {}",
-                            stepId, taskId, ex.getMessage());
+                            step.id(), taskId, ex.getMessage());
                 }
             }
         }, taskExecutor);
@@ -264,24 +286,23 @@ public class AgenticanRecovery implements AutoCloseable {
 
     private void reapSingleTask(WorkflowRunLog task, ReapReason reason) {
 
-        var workflowRunStore = engine.workflowRunStore;
-        var workflowRunListener = engine.workflowRunListener;
+        var eventBus = engine.eventBus;
 
         reapOrphanedSubTasks(task.taskId(), reason);
 
         for (var step : task.steps().values()) {
             if (step.status() == null)
-                workflowRunStore.stepCompleted(task.taskId(), step.id(), WorkflowRunStatus.FAILED,
-                        "Step abandoned: " + reason.name());
+                eventBus.publish(new StepCompleted(task.taskId(), step.id(), step.stepName(),
+                        WorkflowRunStatus.FAILED, "Step abandoned: " + reason.name()));
         }
-        workflowRunStore.taskCompleted(task.taskId(), WorkflowRunStatus.FAILED);
-        workflowRunListener.onTaskReaped(task.taskId(), reason);
+        eventBus.publish(new TaskCompleted(task.taskId(), WorkflowRunStatus.FAILED));
+        eventBus.publish(new TaskReaped(task.taskId(), reason));
     }
 
     private void reapOrphanedSubTasks(String parentTaskId, ReapReason reason) {
 
         var workflowRunStore = engine.workflowRunStore;
-        var workflowRunListener = engine.workflowRunListener;
+        var eventBus = engine.eventBus;
 
         var all = workflowRunStore.list();
         for (var candidate : all) {
@@ -292,11 +313,20 @@ public class AgenticanRecovery implements AutoCloseable {
 
             for (var step : candidate.steps().values()) {
                 if (step.status() == null)
-                    workflowRunStore.stepCompleted(candidate.taskId(), step.id(), WorkflowRunStatus.FAILED,
-                            "Step abandoned: " + reason.name());
+                    eventBus.publish(new StepCompleted(candidate.taskId(), step.id(), step.stepName(),
+                            WorkflowRunStatus.FAILED, "Step abandoned: " + reason.name()));
             }
-            workflowRunStore.taskCompleted(candidate.taskId(), WorkflowRunStatus.FAILED);
-            workflowRunListener.onTaskReaped(candidate.taskId(), ReapReason.PARENT_REAPED);
+            eventBus.publish(new TaskCompleted(candidate.taskId(), WorkflowRunStatus.FAILED));
+            eventBus.publish(new TaskReaped(candidate.taskId(), ReapReason.PARENT_REAPED));
         }
+    }
+
+    private static String firstTurnUserTask(StepLog step) {
+
+        if (step.runs().isEmpty()) return null;
+        var firstRun = step.runs().getFirst();
+        if (firstRun.turns().isEmpty()) return null;
+        var firstTurn = firstRun.turns().getFirst();
+        return firstTurn.request() != null ? firstTurn.request().userTask() : null;
     }
 }

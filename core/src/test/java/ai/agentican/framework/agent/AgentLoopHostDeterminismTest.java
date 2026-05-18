@@ -30,6 +30,10 @@ import java.util.Map;
 import static ai.agentican.framework.MockLlmClient.endTurn;
 import static ai.agentican.framework.MockLlmClient.toolUse;
 import static org.junit.jupiter.api.Assertions.*;
+import ai.agentican.framework.agent.AgentStatus;
+import ai.agentican.framework.event.AgenticanEventBus;
+import ai.agentican.framework.event.WorkflowRunStorePersister;
+import ai.agentican.framework.llm.TokenUsage;
 
 /**
  * Determinism harness for the {@link AgentLoopHost} SPI. Runs an agent loop
@@ -64,7 +68,11 @@ class AgentLoopHostDeterminismTest {
                 .maxIterations(5)
                 .build();
 
-        var realHost1 = new InProcessAgentLoopHost(llm1.toLlmClient(), new WorkflowRunStoreMemory(),
+        var hostStore1 = new WorkflowRunStoreMemory();
+        var hostBus1 = new AgenticanEventBus();
+        hostBus1.subscribeFirst(new WorkflowRunStorePersister(hostStore1));
+
+        var realHost1 = new InProcessAgentLoopHost(llm1.toLlmClient(), hostStore1, hostBus1,
                 autoApproveHitl(), null, null);
 
         var recording = new RecordingAgentLoopHost(realHost1);
@@ -112,8 +120,11 @@ class AgentLoopHostDeterminismTest {
                 .maxIterations(5)
                 .build();
 
-        var realHost = new InProcessAgentLoopHost(llm1.toLlmClient(), new WorkflowRunStoreMemory(),
-                null, null, null);
+        var hostStore = new WorkflowRunStoreMemory();
+        var hostBus = new AgenticanEventBus();
+        hostBus.subscribeFirst(new WorkflowRunStorePersister(hostStore));
+
+        var realHost = new InProcessAgentLoopHost(llm1.toLlmClient(), hostStore, hostBus, null, null, null);
 
         var recording = new RecordingAgentLoopHost(realHost);
 
@@ -211,16 +222,15 @@ class AgentLoopHostDeterminismTest {
         @Override public void taskStarted(String t, String n, WorkflowDefinition p, Map<String, String> ps) { delegate.taskStarted(t, n, p, ps); }
         @Override public void stepStarted(String t, String si, String sn)             { delegate.stepStarted(t, si, sn); }
         @Override public void runStarted(String t, String si, String r, String an)    { delegate.runStarted(t, si, r, an); }
-        @Override public void runCompleted(String t, String r)                        { delegate.runCompleted(t, r); }
-        @Override public void turnStarted(String t, String r, String tu)              { delegate.turnStarted(t, r, tu); }
-        @Override public void turnCompleted(String t, String tu)                      { delegate.turnCompleted(t, tu); }
+        @Override public void runCompleted(String t, String si, String r, AgentStatus st, TokenUsage u) { delegate.runCompleted(t, si, r, st, u); }
+        @Override public void turnStarted(String t, String r, String tu, int i)        { delegate.turnStarted(t, r, tu, i); }
+        @Override public void turnCompleted(String t, String tu, int i, TokenUsage u) { delegate.turnCompleted(t, tu, i, u); }
         @Override public void turnAbandoned(String t, String tu)                      { delegate.turnAbandoned(t, tu); }
         @Override public void messageSent(String t, String tu, LlmRequest r)          { delegate.messageSent(t, tu, r); }
         @Override public void responseReceived(String t, String tu, LlmResponse r)    { delegate.responseReceived(t, tu, r); }
         @Override public void toolCallStarted(String t, String tu, ToolCall c)        { delegate.toolCallStarted(t, tu, c); }
         @Override public void toolCallCompleted(String t, String tu, ToolResult r)    { delegate.toolCallCompleted(t, tu, r); }
         @Override public void hitlNotified(String t, String si, HitlCheckpoint c)     { delegate.hitlNotified(t, si, c); }
-        @Override public void hitlResponded(String t, String si, HitlResponse r)      { delegate.hitlResponded(t, si, r); }
     }
 
     // ── Replaying host ──────────────────────────────────────────────────────
@@ -269,15 +279,14 @@ class AgentLoopHostDeterminismTest {
         @Override public void taskStarted(String t, String n, WorkflowDefinition p, Map<String, String> ps) { }
         @Override public void stepStarted(String t, String si, String sn)             { }
         @Override public void runStarted(String t, String si, String r, String an)    { }
-        @Override public void runCompleted(String t, String r)                        { }
-        @Override public void turnStarted(String t, String r, String tu)              { }
-        @Override public void turnCompleted(String t, String tu)                      { }
+        @Override public void runCompleted(String t, String si, String r, AgentStatus st, TokenUsage u) { }
+        @Override public void turnStarted(String t, String r, String tu, int i)        { }
+        @Override public void turnCompleted(String t, String tu, int i, TokenUsage u) { }
         @Override public void turnAbandoned(String t, String tu)                      { }
         @Override public void messageSent(String t, String tu, LlmRequest r)          { }
         @Override public void responseReceived(String t, String tu, LlmResponse r)    { }
         @Override public void toolCallStarted(String t, String tu, ToolCall c)        { }
         @Override public void toolCallCompleted(String t, String tu, ToolResult r)    { }
         @Override public void hitlNotified(String t, String si, HitlCheckpoint c)     { }
-        @Override public void hitlResponded(String t, String si, HitlResponse r)      { }
     }
 }

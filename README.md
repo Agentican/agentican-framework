@@ -35,6 +35,12 @@ This is a multi-module project. Each module has a focused responsibility:
 |---|---|
 | [core](core/) | The framework itself — agents, plans, skills, toolkits, knowledge, HITL, state, planner. Plain Java, no framework dependencies. |
 
+### Alternative orchestrators
+
+| Module | Description |
+|---|---|
+| [temporal](temporal/) | [Temporal.io](https://temporal.io) integration — run agents and plans on a Temporal cluster for durability, retries, and history replay. Generic plan interpreter (`AgenticanWorkflow`) plus a per-LLM-call fine-grained variant. The `TemporalAgentican` adapter wires it all to your existing `Agentican` catalog. |
+
 ### Quarkus integration
 
 | Module | Description |
@@ -156,9 +162,13 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 - [Human in the Loop](docs/hitl.md) — approvals, questions and resumption
 - [Knowledge](docs/knowledge.md) — persistent agent knowledge with facts and recall
 - [Execution State](docs/execution.md) — WorkflowRunLog hierarchy, WorkflowRunStore, querying results
-- [Observability](docs/observability.md) — WorkflowRunListener events, WorkflowRunDecorator, context propagation
+- [Observability](docs/observability.md) — `AgenticanEventBus`, listeners, decorators, context propagation
 - [Configuration](docs/configuration.md) — runtime config reference
 - [Examples](docs/examples.md) — common patterns and recipes
+
+### Alternative orchestrators
+
+- [Temporal Integration](docs/temporal.md) — run agents and plans on a Temporal cluster, coarse-grained or per-LLM-call
 
 ### Quarkus integration
 
@@ -180,6 +190,7 @@ For Quarkus integration (adds CDI, REST, persistence, metrics, tracing):
 - [OTel Store](quarkus-otel-store-jpa/README.md) — persistent span storage, queries
 - [Server](server/README.md) — playground server, web UI, running instructions
 - [Examples](examples/README.md) — 9 showcase examples with feature matrix
+- [Temporal](temporal/README.md) — module overview, minimal worker setup, link to full guide
 
 ## Building
 

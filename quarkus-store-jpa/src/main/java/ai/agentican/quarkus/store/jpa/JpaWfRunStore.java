@@ -11,6 +11,7 @@ import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import ai.agentican.framework.orchestration.model.WorkflowDefinitionCodec;
 import ai.agentican.framework.state.RunLog;
+import ai.agentican.framework.state.RuntimeOwner;
 import ai.agentican.framework.state.StepLog;
 import ai.agentican.framework.state.WorkflowRunLog;
 import ai.agentican.framework.store.WorkflowRunStore;
@@ -56,15 +57,17 @@ public class JpaWfRunStore implements WorkflowRunStore {
 
     @Override
     @Transactional
-    public void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params) {
+    public void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params,
+                            RuntimeOwner runtime, String temporalWorkflowId) {
 
-        taskStarted(taskId, taskName, plan, params, null, null, 0);
+        taskStarted(taskId, taskName, plan, params, null, null, 0, runtime, temporalWorkflowId);
     }
 
     @Override
     @Transactional
     public void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params,
-                            String parentTaskId, String parentStepId, int iterationIndex) {
+                            String parentTaskId, String parentStepId, int iterationIndex,
+                            RuntimeOwner runtime, String temporalWorkflowId) {
 
         if (plan != null && plan.id() != null && !plan.id().isBlank()
                 && WorkflowEntity.findById(plan.id()) == null) {
@@ -88,6 +91,8 @@ public class JpaWfRunStore implements WorkflowRunStore {
         t.status = null;
         t.paramsJson = writeJson(params);
         t.planSnapshotJson = plan != null ? writeJson(plan) : null;
+        t.runtime = (runtime != null ? runtime : RuntimeOwner.IN_PROCESS).name();
+        t.temporalWorkflowId = temporalWorkflowId;
         t.createdAt = Instant.now();
         t.persist();
     }
@@ -338,8 +343,10 @@ public class JpaWfRunStore implements WorkflowRunStore {
         }
 
         if (plan == null && task.planId != null) plan = workflowRegistry.byId(task.planId);
+        var runtime = task.runtime != null ? RuntimeOwner.valueOf(task.runtime) : RuntimeOwner.IN_PROCESS;
         var taskLog = new WorkflowRunLog(task.id, task.taskName, plan, params,
-                task.parentTaskId, task.parentStepId, task.iterationIndex, task.createdAt);
+                task.parentTaskId, task.parentStepId, task.iterationIndex,
+                runtime, task.temporalWorkflowId, task.createdAt);
         taskLog.setPlanSnapshotCorrupt(snapshotCorrupt);
 
         if (task.status != null) taskLog.setStatus(parseStatus(task.status));

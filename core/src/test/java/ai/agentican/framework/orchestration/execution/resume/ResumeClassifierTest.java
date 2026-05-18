@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import ai.agentican.framework.orchestration.execution.resume.ReapReason;
 
 class ResumeClassifierTest {
 
@@ -32,7 +33,7 @@ class ResumeClassifierTest {
 
         var result = ResumeClassifier.classify(null, fakePlan());
         assertTrue(result.reapOnly());
-        assertEquals(ai.agentican.framework.orchestration.execution.resume.ReapReason.TASK_LOG_MISSING, result.reapReason());
+        assertEquals(ReapReason.TASK_LOG_MISSING, result.reapReason());
     }
 
     @Test
@@ -41,7 +42,7 @@ class ResumeClassifierTest {
         var taskLog = new WorkflowRunLog("t-1", "t", null, Map.of());
         var result = ResumeClassifier.classify(taskLog, null);
         assertTrue(result.reapOnly());
-        assertEquals(ai.agentican.framework.orchestration.execution.resume.ReapReason.PLAN_UNAVAILABLE, result.reapReason());
+        assertEquals(ReapReason.PLAN_UNAVAILABLE, result.reapReason());
     }
 
     @Test

@@ -49,14 +49,17 @@ The store interface uses granular mutation methods mirroring the execution hiera
 public interface WorkflowRunStore {
 
     // Task lifecycle
-    void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params);
     void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params,
-                     String parentTaskId, String parentStepId, int iterationIndex);
+                     RuntimeOwner runtime, String temporalWorkflowId);
+    void taskStarted(String taskId, String taskName, WorkflowDefinition plan, Map<String, String> params,
+                     String parentTaskId, String parentStepId, int iterationIndex,
+                     RuntimeOwner runtime, String temporalWorkflowId);
     void taskCompleted(String taskId, WorkflowRunStatus status);
 
     // Step lifecycle
     void stepStarted(String taskId, String stepId, String stepName);
     void stepCompleted(String taskId, String stepId, WorkflowRunStatus status, String output);
+    void stepTokenUsageAggregated(String taskId, String stepId, TokenUsage usage);
 
     // Run lifecycle
     void runStarted(String taskId, String stepId, String runId, String agentName);
@@ -79,14 +82,16 @@ public interface WorkflowRunStore {
     void hitlResponded(String taskId, String stepId, HitlResponse response);
 
     // Queries
-    TaskLog load(String taskId);
-    List<TaskLog> list();
+    WorkflowRunLog load(String taskId);
+    List<WorkflowRunLog> list();
 }
 ```
 
 Each mutation method takes the parent's ID to place the new object in the hierarchy. For example, `runStarted` takes `stepId` so the store knows which step the run belongs to, and `turnStarted` takes `runId`.
 
-The overload of `taskStarted(..., parentTaskId, parentStepId, iterationIndex)` is what loop/branch sub-tasks use so a `TaskLog` can point back at its parent step and iteration index.
+`taskStarted` carries `runtime` (`IN_PROCESS` | `TEMPORAL`) and `temporalWorkflowId` so recovery and HITL routing can defer to the right runtime; see [Runtime owner](#runtime-owner) below.
+
+The overload of `taskStarted(..., parentTaskId, parentStepId, iterationIndex, ...)` is what loop/branch sub-tasks use so a `WorkflowRunLog` can point back at its parent step and iteration index.
 
 ### Reconstitution Constructors
 
@@ -184,6 +189,32 @@ for (var turn : run.turns()) {
 var duration = Duration.between(stepLog.createdAt(), stepLog.completedAt());
 ```
 
+### Runtime owner
+
+Each `WorkflowRunLog` carries a `runtime` field plus an optional `temporalWorkflowId`:
+
+```java
+record RuntimeOwner { IN_PROCESS, TEMPORAL }
+
+taskLog.runtime();              // IN_PROCESS or TEMPORAL
+taskLog.temporalWorkflowId();   // non-null when runtime == TEMPORAL
+```
+
+`InProcessAgentLoopHost` publishes every `TaskStarted` event with `runtime = IN_PROCESS`; `TemporalAgentLoopHost` publishes with `runtime = TEMPORAL` and fills `temporalWorkflowId` from `Workflow.getInfo().getWorkflowId()`. The persister writes both fields onto the row.
+
+The marker is what lets the framework safely coexist with an external runtime that has its own lifecycle machinery (recovery, cancellation, timeouts) — see [Recovery](#recovery) below, and the [Runtime owner section in temporal.md](temporal.md#runtime-owner-how-the-framework-defers-to-temporal) for the full picture.
+
+## Recovery
+
+`AgenticanRecovery` is the framework's restart-aware machinery for tasks left in flight when the JVM went down. Two entry points:
+
+- **`reapOrphans(ReapReason)`** — scans `WorkflowRunStore.listInProgress()`, marks any non-terminal top-level task as `FAILED`, fires synthetic `StepCompleted` / `TaskCompleted` / `TaskReaped` events so downstream listeners observe the cleanup. Useful when a process restart abandoned tasks you can't resume.
+- **`resumeInterrupted(maxConcurrent)`** — for each non-terminal task, classifies whether it's resumable (intact plan, parseable state); resumable ones get re-dispatched via the engine's task runner; unresumable ones are reaped.
+
+Both methods **skip rows where `runtime == TEMPORAL`** and emit a debug log explaining why. The reason: Temporal already replays its workflows from history when a worker restarts; if `AgenticanRecovery` also tried to reap or resume those rows it would race against Temporal and produce inconsistent state. The runtime marker is checked once per row at scan time, so the overhead is negligible.
+
+If you have a Quarkus app on the in-process path, `AgenticanRecovery` is exposed as a CDI bean and invoked on `StartupEvent`. For Temporal-only deployments, no recovery wiring is needed — Temporal handles it.
+
 ## Custom Implementations
 
 For durable storage, implement the full `WorkflowRunStore` interface against your database. The mutation methods are called synchronously on the executing thread — keep them fast. Heavy work (indexing, replication) should be done asynchronously.
@@ -198,7 +229,7 @@ If no store is provided, Agentican creates a `WorkflowRunStoreMemory`.
 
 ## Event Emission
 
-The store itself does not emit events. `WorkflowRunStoreNotifying` is a decorator that wraps any `WorkflowRunStore` and fires `WorkflowRunListener` events after each mutation. Agentican applies this decorator automatically — you don't need to wrap your store manually.
+The store doesn't emit events itself — the framework publishes `AgenticanEvent`s on the `AgenticanEventBus`, and a `WorkflowRunStorePersister` subscribed to the bus translates each event into the matching store mutation. Persistence and observability are fed from the same channel, so observer listeners (metrics, OTel, custom hooks) see the same events that drove state.
 
 See [Observability](observability.md) for the event system.
 

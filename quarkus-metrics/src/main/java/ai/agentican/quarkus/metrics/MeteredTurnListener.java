@@ -1,130 +1,117 @@
 package ai.agentican.quarkus.metrics;
 
-import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
-import ai.agentican.framework.agent.AgentStatus;
-import ai.agentican.framework.llm.StopReason;
-import ai.agentican.framework.store.WorkflowRunStore;
-import ai.agentican.framework.tools.ToolResult;
+import ai.agentican.framework.event.AgenticanEvent;
+import ai.agentican.framework.event.AgenticanEventListener;
+import ai.agentican.framework.event.ResponseReceived;
+import ai.agentican.framework.event.RunCompleted;
+import ai.agentican.framework.event.RunStarted;
+import ai.agentican.framework.event.StepCompleted;
+import ai.agentican.framework.event.StepStarted;
+import ai.agentican.framework.event.ToolCallCompleted;
+import ai.agentican.framework.event.ToolCallStarted;
+import ai.agentican.framework.event.TurnAbandoned;
+import ai.agentican.framework.event.TurnCompleted;
+import ai.agentican.framework.event.TurnStarted;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-public class MeteredTurnListener implements WorkflowRunListener {
+/**
+ * Records Micrometer metrics for agent activity. Subscribes to the
+ * {@link AgenticanEvent} bus — no store reads inside event handlers (the
+ * event-payload-sufficiency principle).
+ *
+ * <p>One field the event records do not yet carry is agent name / step name
+ * at the moment a turn fires. The listener tracks {@code StepStarted} and
+ * {@code RunStarted} into small maps so {@code ResponseReceived} /
+ * {@code RunCompleted} can label metrics by agent + step. Cleared on the
+ * corresponding completion events so memory is bounded by in-flight work.
+ * (A future enrichment of the {@code AgentLoopHost} SPI could thread these
+ * fields through and make the state tracking unnecessary.)
+ */
+public class MeteredTurnListener implements AgenticanEventListener {
 
     private final MeterRegistry registry;
-    private final WorkflowRunStore workflowRunStore;
-    private final ConcurrentHashMap<String, Timer.Sample> toolTimers = new ConcurrentHashMap<>();
 
-    public MeteredTurnListener(MeterRegistry registry, WorkflowRunStore workflowRunStore) {
+    private final ConcurrentHashMap<String, Timer.Sample> toolTimers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> stepNames = new ConcurrentHashMap<>();        // stepId -> stepName
+    private final ConcurrentHashMap<String, RunCtx> runCtx = new ConcurrentHashMap<>();           // runId  -> agentName + stepId
+    private final ConcurrentHashMap<String, String> turnToRun = new ConcurrentHashMap<>();        // turnId -> runId
+
+    private record RunCtx(String agentName, String stepId) { }
+
+    public MeteredTurnListener(MeterRegistry registry) {
 
         this.registry = registry;
-        this.workflowRunStore = workflowRunStore;
     }
 
     @Override
-    public void onRunCompleted(String taskId, String runId, AgentStatus status) {
+    public void on(AgenticanEvent event) {
 
-        var run = workflowRunStore.load(taskId).findRunById(runId);
+        switch (event) {
 
-        var agentName = run != null && run.agentName() != null ? run.agentName() : "unknown";
+            case StepStarted   e -> stepNames.put(e.stepId(), e.stepName() != null ? e.stepName() : "unknown");
+            case StepCompleted e -> stepNames.remove(e.stepId());
 
-        registry.counter("agentican.agent.runs", "agent", agentName, "status", status.name()).increment();
-    }
+            case RunStarted   e -> runCtx.put(e.runId(),
+                    new RunCtx(e.agentName() != null ? e.agentName() : "unknown", e.stepId()));
+            case RunCompleted e -> onRunCompleted(e);
 
-    @Override
-    public void onResponseReceived(String taskId, String turnId, StopReason stopReason) {
+            case TurnStarted   e -> turnToRun.put(e.turnId(), e.runId());
+            case TurnCompleted e -> turnToRun.remove(e.turnId());
+            case TurnAbandoned e -> turnToRun.remove(e.turnId());
 
-        var taskLog = workflowRunStore.load(taskId);
-        var turnLog = taskLog != null ? taskLog.findTurnById(turnId) : null;
+            case ResponseReceived  e -> onResponseReceived(e);
 
-        var response = turnLog != null ? turnLog.response() : null;
+            case ToolCallStarted   e -> toolTimers.put(e.toolCall().id(), Timer.start(registry));
+            case ToolCallCompleted e -> onToolCallCompleted(e);
 
-        var agentName = "unknown";
-        var stepName = "unknown";
-
-        if (taskLog != null) {
-
-            outer:
-            for (var step : taskLog.steps().values()) {
-
-                for (var run : step.runs()) {
-
-                    for (var turn : run.turns()) {
-
-                        if (turnId.equals(turn.id())) {
-
-                            agentName = run.agentName() != null ? run.agentName() : "unknown";
-                            stepName = step.stepName();
-
-                            break outer;
-                        }
-                    }
-                }
-            }
-        }
-
-        registry.counter("agentican.agent.turns", "agent", agentName, "step", stepName,
-                "stop_reason", stopReason.name()).increment();
-
-        if (response != null) {
-            registry.counter("agentican.agent.turns.tokens.input", "agent", agentName)
-                    .increment(response.inputTokens());
-
-            registry.counter("agentican.agent.turns.tokens.output", "agent", agentName)
-                    .increment(response.outputTokens());
+            default -> { /* events with no metric mapping */ }
         }
     }
 
-    @Override
-    public void onToolCallStarted(String taskId, String toolCallId) {
+    private void onRunCompleted(RunCompleted event) {
 
-        toolTimers.put(toolCallId, Timer.start(registry));
+        var ctx = runCtx.remove(event.runId());
+        var agentName = ctx != null ? ctx.agentName() : "unknown";
+
+        registry.counter("agentican.agent.runs",
+                "agent",  agentName,
+                "status", event.status().name()).increment();
     }
 
-    @Override
-    public void onToolCallCompleted(String taskId, String toolCallId) {
+    private void onResponseReceived(ResponseReceived event) {
 
-        var sample = toolTimers.remove(toolCallId);
+        var runId     = turnToRun.get(event.turnId());
+        var ctx       = runId != null ? runCtx.get(runId) : null;
+        var agentName = ctx != null ? ctx.agentName() : "unknown";
+        var stepName  = ctx != null ? stepNames.getOrDefault(ctx.stepId(), "unknown") : "unknown";
 
-        var taskLog = workflowRunStore.load(taskId);
+        var response = event.response();
 
-        ToolResult toolResult = null;
+        registry.counter("agentican.agent.turns",
+                "agent",       agentName,
+                "step",        stepName,
+                "stop_reason", response.stopReason().name()).increment();
 
-        String toolName = "unknown";
+        registry.counter("agentican.agent.turns.tokens.input",  "agent", agentName).increment(response.inputTokens());
+        registry.counter("agentican.agent.turns.tokens.output", "agent", agentName).increment(response.outputTokens());
+    }
 
-        if (taskLog != null) {
+    private void onToolCallCompleted(ToolCallCompleted event) {
 
-            outer:
+        var result = event.toolResult();
+        var toolName = result.toolName();
 
-            for (var step : taskLog.steps().values()) {
+        var sample = toolTimers.remove(result.toolCallId());
 
-                for (var run : step.runs()) {
-
-                    for (var turn : run.turns()) {
-
-                        for (var tr : turn.toolResults()) {
-
-                            if (toolCallId.equals(tr.toolCallId())) {
-
-                                toolResult = tr;
-                                toolName = tr.toolName();
-
-                                break outer;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (sample != null)
-            sample.stop(registry.timer("agentican.tool.duration", "tool", toolName));
+        if (sample != null) sample.stop(registry.timer("agentican.tool.duration", "tool", toolName));
 
         registry.counter("agentican.tool.calls", "tool", toolName).increment();
 
-        if (toolResult != null && toolResult.isError())
+        if (result.isError())
             registry.counter("agentican.tool.errors", "tool", toolName).increment();
     }
 }

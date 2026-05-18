@@ -7,6 +7,8 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.health.HealthCheck;
 import org.eclipse.microprofile.health.HealthCheckResponse;
 import org.eclipse.microprofile.health.Readiness;
+import ai.agentican.framework.config.CatalogConfig;
+import ai.agentican.framework.config.EngineConfig;
 
 @Readiness
 @ApplicationScoped
@@ -16,10 +18,10 @@ public class AgenticanReadinessCheck implements HealthCheck {
     Agentican agentican;
 
     @Inject
-    ai.agentican.framework.config.EngineConfig engineConfig;
+    EngineConfig engineConfig;
 
     @Inject
-    ai.agentican.framework.config.CatalogConfig catalogConfig;
+    CatalogConfig catalogConfig;
 
     @Override
     public HealthCheckResponse call() {

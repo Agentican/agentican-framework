@@ -25,7 +25,7 @@ class SseEventTypesTest {
         var log = new WorkflowRunLog("t1", "demo", task, Map.of());
 
         assertEquals(SseEventTypes.TASK_STARTED,
-                SseEventTypes.nameFor(new TaskStartedEvent("t1", "demo", log)));
+                SseEventTypes.nameFor(new TaskStartedEvent("t1", "demo", null, log)));
 
         assertEquals(SseEventTypes.STEP_COMPLETED,
                 SseEventTypes.nameFor(new StepCompletedEvent(null, "t1", "s", WorkflowRunStatus.COMPLETED)));

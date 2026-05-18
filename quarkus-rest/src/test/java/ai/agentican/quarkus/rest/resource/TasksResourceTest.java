@@ -1,6 +1,7 @@
 package ai.agentican.quarkus.rest.resource;
 
 import ai.agentican.framework.store.WorkflowRunStore;
+import ai.agentican.framework.state.RuntimeOwner;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.util.Ids;
@@ -133,7 +134,7 @@ class TasksResourceTest {
         var task = WorkflowDefinition.builder("demo", "demo").description("d")
                 .step().name("s").agent("a").instructions("i").end()
                 .build();
-        workflowRunStore.taskStarted("rest-runs-1", "demo", task, Map.of());
+        workflowRunStore.taskStarted("rest-runs-1", "demo", task, Map.of(), RuntimeOwner.IN_PROCESS, null);
         var stepId = Ids.generate();
         workflowRunStore.stepStarted("rest-runs-1", stepId, "s");
         workflowRunStore.stepCompleted("rest-runs-1", stepId, WorkflowRunStatus.COMPLETED, "done");
@@ -151,7 +152,7 @@ class TasksResourceTest {
         var task = WorkflowDefinition.builder("demo", "demo").description("d")
                 .step().name("s").agent("a").instructions("i").end()
                 .build();
-        workflowRunStore.taskStarted(taskId, "demo", task, Map.of());
+        workflowRunStore.taskStarted(taskId, "demo", task, Map.of(), RuntimeOwner.IN_PROCESS, null);
         workflowRunStore.taskCompleted(taskId, status);
     }
 }

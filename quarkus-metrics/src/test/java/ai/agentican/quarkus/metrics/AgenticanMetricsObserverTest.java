@@ -106,7 +106,7 @@ class AgenticanMetricsObserverTest {
 
     private static TaskStartedEvent started(String taskId) {
 
-        return new TaskStartedEvent(taskId, "demo", newLog(taskId));
+        return new TaskStartedEvent(taskId, "demo", null, newLog(taskId));
     }
 
     private static TaskCompletedEvent completed(String taskId, WorkflowRunStatus status) {

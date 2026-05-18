@@ -1,5 +1,18 @@
 package ai.agentican.framework.agent;
 
+import ai.agentican.framework.event.AgenticanEventBus;
+import ai.agentican.framework.event.HitlNotified;
+import ai.agentican.framework.event.MessageSent;
+import ai.agentican.framework.event.ResponseReceived;
+import ai.agentican.framework.event.RunCompleted;
+import ai.agentican.framework.event.RunStarted;
+import ai.agentican.framework.event.StepStarted;
+import ai.agentican.framework.event.TaskStarted;
+import ai.agentican.framework.event.ToolCallCompleted;
+import ai.agentican.framework.event.ToolCallStarted;
+import ai.agentican.framework.event.TurnAbandoned;
+import ai.agentican.framework.event.TurnCompleted;
+import ai.agentican.framework.event.TurnStarted;
 import ai.agentican.framework.hitl.HitlCheckpoint;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
@@ -7,8 +20,10 @@ import ai.agentican.framework.knowledge.KnowledgeEntry;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmRequest;
 import ai.agentican.framework.llm.LlmResponse;
+import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.llm.ToolCall;
 import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.framework.state.RuntimeOwner;
 import ai.agentican.framework.state.WorkflowRunLog;
 import ai.agentican.framework.store.KnowledgeStore;
 import ai.agentican.framework.store.WorkflowRunStore;
@@ -21,20 +36,32 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * In-process implementation of {@link AgentLoopHost} for the SmacAgentRunner /
+ * ReActAgentRunner — translates host-mediated operations into
+ * {@link AgenticanEventBus#publish event-bus publishes}. The state store is
+ * updated by a {@code WorkflowRunStorePersister} subscribed to the same bus,
+ * so the same persistence happens, just via the event channel.
+ *
+ * <p>The {@code WorkflowRunStore} reference is kept only for the read path
+ * ({@link #loadRunLog}) — the runner's own state introspection.
+ */
 public class InProcessAgentLoopHost implements AgentLoopHost {
 
     private final LlmClient llmClient;
     private final WorkflowRunStore workflowRunStore;
+    private final AgenticanEventBus eventBus;
     private final HitlManager hitlManager;
     private final KnowledgeStore knowledgeStore;
     private final AtomicBoolean cancelled;
 
     public InProcessAgentLoopHost(LlmClient llmClient, WorkflowRunStore workflowRunStore,
-                                  HitlManager hitlManager, KnowledgeStore knowledgeStore,
-                                  AtomicBoolean cancelled) {
+                                  AgenticanEventBus eventBus, HitlManager hitlManager,
+                                  KnowledgeStore knowledgeStore, AtomicBoolean cancelled) {
 
         this.llmClient        = Objects.requireNonNull(llmClient,        "llmClient");
         this.workflowRunStore = Objects.requireNonNull(workflowRunStore, "workflowRunStore");
+        this.eventBus         = Objects.requireNonNull(eventBus,         "eventBus");
         this.hitlManager      = hitlManager;       // null allowed — required only when HITL methods are invoked
         this.knowledgeStore   = knowledgeStore;    // null allowed — knowledgeEntry returns null when no store
         this.cancelled        = cancelled != null ? cancelled : new AtomicBoolean(false);
@@ -72,55 +99,55 @@ public class InProcessAgentLoopHost implements AgentLoopHost {
 
     @Override public void taskStarted(String taskId, String taskName, WorkflowDefinition plan,
                                       Map<String, String> params) {
-        workflowRunStore.taskStarted(taskId, taskName, plan, params);
+        eventBus.publish(new TaskStarted(taskId, taskName, plan, params, null, null, 0,
+                RuntimeOwner.IN_PROCESS, null));
     }
 
     @Override public void stepStarted(String taskId, String stepId, String stepName) {
-        workflowRunStore.stepStarted(taskId, stepId, stepName);
+        eventBus.publish(new StepStarted(taskId, stepId, stepName));
     }
 
     @Override public void runStarted(String taskId, String stepId, String runId, String agentName) {
-        workflowRunStore.runStarted(taskId, stepId, runId, agentName);
+        eventBus.publish(new RunStarted(taskId, stepId, runId, agentName));
     }
 
-    @Override public void runCompleted(String taskId, String runId) {
-        workflowRunStore.runCompleted(taskId, runId);
+    @Override public void runCompleted(String taskId, String stepId, String runId,
+                                       AgentStatus status, TokenUsage tokenUsage) {
+        eventBus.publish(new RunCompleted(taskId, stepId, runId,
+                status != null ? status : AgentStatus.COMPLETED,
+                tokenUsage != null ? tokenUsage : TokenUsage.ZERO));
     }
 
-    @Override public void turnStarted(String taskId, String runId, String turnId) {
-        workflowRunStore.turnStarted(taskId, runId, turnId);
+    @Override public void turnStarted(String taskId, String runId, String turnId, int index) {
+        eventBus.publish(new TurnStarted(taskId, runId, turnId, index));
     }
 
-    @Override public void turnCompleted(String taskId, String turnId) {
-        workflowRunStore.turnCompleted(taskId, turnId);
+    @Override public void turnCompleted(String taskId, String turnId, int index, TokenUsage tokenUsage) {
+        eventBus.publish(new TurnCompleted(taskId, turnId, index, tokenUsage != null ? tokenUsage : TokenUsage.ZERO));
     }
 
     @Override public void turnAbandoned(String taskId, String turnId) {
-        workflowRunStore.turnAbandoned(taskId, turnId);
+        eventBus.publish(new TurnAbandoned(taskId, turnId));
     }
 
     @Override public void messageSent(String taskId, String turnId, LlmRequest request) {
-        workflowRunStore.messageSent(taskId, turnId, request);
+        eventBus.publish(new MessageSent(taskId, turnId, request));
     }
 
     @Override public void responseReceived(String taskId, String turnId, LlmResponse response) {
-        workflowRunStore.responseReceived(taskId, turnId, response);
+        eventBus.publish(new ResponseReceived(taskId, turnId, response));
     }
 
     @Override public void toolCallStarted(String taskId, String turnId, ToolCall toolCall) {
-        workflowRunStore.toolCallStarted(taskId, turnId, toolCall);
+        eventBus.publish(new ToolCallStarted(taskId, turnId, toolCall));
     }
 
     @Override public void toolCallCompleted(String taskId, String turnId, ToolResult result) {
-        workflowRunStore.toolCallCompleted(taskId, turnId, result);
+        eventBus.publish(new ToolCallCompleted(taskId, turnId, result));
     }
 
     @Override public void hitlNotified(String taskId, String stepId, HitlCheckpoint checkpoint) {
-        workflowRunStore.hitlNotified(taskId, stepId, checkpoint);
-    }
-
-    @Override public void hitlResponded(String taskId, String stepId, HitlResponse response) {
-        workflowRunStore.hitlResponded(taskId, stepId, response);
+        eventBus.publish(new HitlNotified(taskId, stepId, checkpoint));
     }
 
     @Override

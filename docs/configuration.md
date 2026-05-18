@@ -17,7 +17,7 @@ Agentican.builder()
     .knowledgeStore(...)
     .workflowRunStore(...)
     .agentRegistry(impl) / .skillRegistry(impl) / .workflowRegistry(impl)
-    .llmDecorator(...) / .workflowRunDecorator(...) / .workflowRunListener(...)
+    .llmDecorator(...) / .workflowRunDecorator(...) / .addListener(...)
     .taskExecutor(...)
     .codeStep(slug, In.class, Out.class, executor)
     .vectorIndex(index)
@@ -168,6 +168,22 @@ LlmConfig.builder()
 | `bedrock` | `BedrockLlmClient` (Converse API) | **AWS SDK default; `region` on `LlmConfig`** | ✗ | Claude, Llama, Nova, Mistral, DeepSeek, Cohere, AI21 — all through one API. Auth via AWS credentials chain. |
 | `openai-compatible` | `OpenAiCompatibleLlmClient` | **`baseUrl` required on `LlmConfig`** | ✗ | Escape hatch for self-hosted / proxied endpoints (Ollama, vLLM, LiteLLM, LocalAI, corporate proxies). |
 
+#### Structured output (native JSON schema)
+
+When a workflow declares a typed code-step output or you set `structuredOutput` on the `LlmRequest` directly, the framework asks the provider to constrain its response to the schema. Native support varies:
+
+| Provider | Native structured output | Fallback if no native support |
+|---|---|---|
+| `anthropic` | ✓ via the `outputConfig` field | n/a |
+| `openai` | ✓ via the `text.format` field (Responses API JSON schema) | n/a |
+| `gemini` | ✓ via `responseSchema` | n/a |
+| `openai-compatible` (`sambanova`, `together`, `fireworks`, etc.) | ✓ via `response_format` JSON-schema mode where supported | If the endpoint rejects the field, the framework still emits a system-prompt nudge asking the model to honor the schema and validates the response with Jackson. |
+| `bedrock` | ✗ (Converse API doesn't surface JSON-schema constraints uniformly across models) | Same prompt-nudge + Jackson validation fallback. |
+
+#### Streaming
+
+The framework's `LlmClient.sendStreaming(LlmRequest, Consumer<String>)` SPI exists for incremental token delivery. **None of the built-in provider clients override it today** — the default fallback calls `send(...)` and fires a single callback with the full response text once it arrives. Token-level streaming is on the roadmap; today's `TokenStreamed` events fire once per turn with the complete text. Custom `LlmClient` implementations (or decorators) can override `sendStreaming` to enable true streaming.
+
 ### AWS Bedrock (`bedrock`)
 
 Bedrock is an AWS service, so auth is SigV4 against your AWS credentials — not a bearer API key. `apiKey` is **optional**; if unset, the framework uses the AWS SDK's `DefaultCredentialsProvider`, which walks the standard chain (env vars `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`, `~/.aws/credentials`, IAM role on EC2 / ECS / Lambda, etc.). If you do set `apiKey`, pair it with `secretKey` — the framework will use `StaticCredentialsProvider`:
@@ -274,15 +290,15 @@ default LlmResponse sendStreaming(LlmRequest request, Consumer<String> onToken) 
 }
 ```
 
-LLM client implementations can override this to stream tokens incrementally. The `SmacAgentRunner` calls `sendStreaming()` automatically, passing each token to `WorkflowRunListener.onToken()`.
+LLM client implementations can override this to stream tokens incrementally. The `SmacAgentRunner` calls `sendStreaming()` automatically, publishing each chunk as a `TokenStreamed` event on the bus.
 
 Observe tokens in real time:
 
 ```java
-public class MyListener implements WorkflowRunListener {
+public class TokenPrinter implements AgenticanEventListener {
     @Override
-    public void onToken(String taskId, String turnId, String token) {
-        System.out.print(token);
+    public void on(AgenticanEvent event) {
+        if (event instanceof TokenStreamed t) System.out.print(t.token());
     }
 }
 ```
@@ -431,9 +447,10 @@ Agentican.builder()
 
 | Interface | Purpose |
 |---|---|
-| `WorkflowRunListener` | Receives lifecycle events for workflow runs, steps, runs, turns, messages, responses, tool calls, and HITL. Used by OTel for span creation and metrics for counters. |
+| `AgenticanEventListener` | Subscribes to the `AgenticanEventBus`. One method, dispatched for every event on the sealed `AgenticanEvent` hierarchy (task, step, run, turn, message, response, tool call, HITL, token stream). Used by OTel for span creation, metrics for counters, and the framework's own persister to update `WorkflowRunStore`. |
 | `LlmClientDecorator` | Wraps every config-built `LlmClient`. Used by metrics (counters/timers) and OTel (LLM call spans). |
 | `WorkflowRunDecorator` | Wraps the `Supplier` passed to `CompletableFuture.supplyAsync()` for each workflow run. Used by OTel to propagate trace context to virtual threads. Supports `snapshot()` for step-level context capture. |
+| `HitlResponseDispatcher` | Routes a human's HITL response to whichever runtime is awaiting it (in-process `HitlManager`, Temporal workflow signal, etc.). Default `InProcessHitlResponseDispatcher` wraps `HitlManager`. Override with `TemporalAwareHitlResponseDispatcher` to handle Temporal-owned checkpoints — see [HITL](hitl.md#routing-responses-hitlresponsedispatcher). |
 | `AgentRegistry` / `SkillRegistry` / `WorkflowRegistry` | Registry interfaces; supply a persistent backend via `.agentRegistry(impl)` etc. on the Builder. Each exposes a `seed()` hook the framework calls once at boot. |
 
 ### Pre-built LLM Clients

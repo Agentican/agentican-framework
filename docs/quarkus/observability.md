@@ -4,6 +4,15 @@
 
 Requires `agentican-quarkus-metrics`. Metrics appear at `/q/metrics` in Prometheus format.
 
+**Naming convention**: metrics are registered with Micrometer using dotted names
+(e.g. `agentican.llm.requests`). When scraped via the Prometheus registry
+exposed at `/q/metrics`, dots become underscores and counters gain a `_total`
+suffix, so `agentican.llm.requests` appears as `agentican_llm_requests_total`.
+The tables below use the Prometheus-flavoured form because that's what most
+users will see in their dashboards; queries that hit the in-JVM Micrometer
+registry directly (e.g. via the Quarkus dev console or a custom exporter) should
+use the dotted form.
+
 ### LLM metrics
 
 Recorded by `MeteredLlmClient` — wraps every config-built LLM client.
@@ -49,6 +58,9 @@ Recorded by `AgenticanMetricsObserver` — observes CDI lifecycle events.
 | `agentican_tasks_active` | gauge | — |
 | `agentican_tasks_completed_total` | counter | `status` |
 | `agentican_tasks_duration_seconds` | timer | `status` |
+| `agentican_tasks_resumed_total` | counter | — (fires when `AgenticanRecovery` re-dispatches a task on startup) |
+| `agentican_tasks_resume_outcome_total` | counter | `outcome` (final status of a resumed task — tracks recovery success vs failure) |
+| `agentican_tasks_reaped_total` | counter | `reason` (`ReapReason.name()` — SERVER_RESTARTED, DANGLING_PARENT_TERMINAL, etc.) |
 | `agentican_steps_completed_total` | counter | `status` |
 | `agentican_hitl_checkpoints_created_total` | counter | `type` |
 | `agentican_hitl_checkpoints_pending` | gauge | — |
@@ -83,19 +95,23 @@ quarkus.otel.exporter.otlp.endpoint=http://localhost:4317
 
 ```
 [POST /agentican/tasks]                         ← Quarkus auto
-  └── [agentican.step research]                 ← TracedWorkflowRunListener
-       └── [agentican.run]                      ← TracedTurnListener
-            ├── [agentican.turn 0]              ← TracedTurnListener
-            │    ├── [agentican.llm.call]        ← TracedLlmClient
-            │    │    gen_ai.system = anthropic
-            │    │    gen_ai.request.model = claude-sonnet-4-5
-            │    │    gen_ai.usage.input_tokens = 100
-            │    │    gen_ai.usage.output_tokens = 50
-            │    └── [agentican.tool.call]        ← TracedToolkit
-            │         agentican.toolkit.slug = github
-            │         agentican.tool.name = search_repos
-            └── [agentican.turn 1]
-                 └── [agentican.llm.call]
+  └── [agentican.task]                          ← TracedLifecycleListener
+       └── [agentican.step research]            ← TracedLifecycleListener
+            ├── [agentican.run]                 ← TracedLifecycleListener
+            │    ├── [agentican.turn 0]         ← TracedLifecycleListener
+            │    │    ├── [agentican.llm.call]   ← TracedLlmClient
+            │    │    │    gen_ai.system = anthropic
+            │    │    │    gen_ai.request.model = claude-sonnet-4-5
+            │    │    │    gen_ai.usage.input_tokens = 100
+            │    │    │    gen_ai.usage.output_tokens = 50
+            │    │    └── [agentican.tool.call]   ← TracedToolkit
+            │    │         agentican.toolkit.slug = github
+            │    │         agentican.tool.name = search_repos
+            │    └── [agentican.turn 1]
+            │         └── [agentican.llm.call]
+            └── [agentican.hitl.wait]           ← only when the step parked on HITL
+                 agentican.hitl.checkpoint.id = ...
+                 agentican.hitl.checkpoint.type = TOOL_CALL | QUESTION | STEP_OUTPUT
 ```
 
 ### Span attributes

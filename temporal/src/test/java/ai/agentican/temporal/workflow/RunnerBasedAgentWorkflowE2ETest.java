@@ -1,16 +1,18 @@
 package ai.agentican.temporal.workflow;
 
 import ai.agentican.framework.config.AgentConfig;
+import ai.agentican.framework.event.AgenticanEventBus;
+import ai.agentican.framework.event.WorkflowRunStorePersister;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmResponse;
 import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.store.KnowledgeStoreMemory;
 import ai.agentican.framework.store.WorkflowRunStoreMemory;
 import ai.agentican.framework.tools.Toolkit;
+import ai.agentican.temporal.activity.AgenticanActivityImpl;
 import ai.agentican.temporal.activity.KnowledgeStoreActivityImpl;
 import ai.agentican.temporal.activity.LlmCallActivityImpl;
 import ai.agentican.temporal.activity.ToolCallActivityImpl;
-import ai.agentican.temporal.activity.WorkflowRunStoreActivityImpl;
 
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.client.WorkflowOptions;
@@ -63,10 +65,16 @@ class RunnerBasedAgentWorkflowE2ETest {
         var store = new WorkflowRunStoreMemory();
         var knowledge = new KnowledgeStoreMemory();
 
+        // Stand up a minimal "main bus" with just the persister subscribed so the
+        // activity-worker side writes through to the store the same way an in-process
+        // Agentican instance would. In a real app, this is Agentican.eventBus().
+        var mainBus = new AgenticanEventBus();
+        mainBus.subscribeFirst(new WorkflowRunStorePersister(store));
+
         worker.registerActivitiesImplementations(
                 new LlmCallActivityImpl(fakeLlm),
                 new ToolCallActivityImpl(List.<Toolkit>of()),
-                new WorkflowRunStoreActivityImpl(store),
+                new AgenticanActivityImpl(mainBus, store),
                 new KnowledgeStoreActivityImpl(knowledge));
 
         env.start();

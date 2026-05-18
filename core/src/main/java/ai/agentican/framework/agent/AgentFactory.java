@@ -1,7 +1,7 @@
 package ai.agentican.framework.agent;
 
 import ai.agentican.framework.config.WorkerConfig;
-import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
+import ai.agentican.framework.event.AgenticanEventBus;
 import ai.agentican.framework.config.AgentConfig;
 import ai.agentican.framework.config.LlmConfig;
 import ai.agentican.framework.hitl.HitlManager;
@@ -27,13 +27,13 @@ public class AgentFactory {
     private final SkillRegistry skillRegistry;
     private final KnowledgeStore knowledgeStore;
     private final WorkflowRunStore workflowRunStore;
-    private final WorkflowRunListener workflowRunListener;
+    private final AgenticanEventBus eventBus;
 
     private final Map<String, LlmClient> llms;
 
     private AgentFactory(WorkerConfig workerConfig, List<LlmConfig> llmConfigs, Map<String, LlmClient> llms,
                          HitlManager hitlManager, SkillRegistry skillRegistry, KnowledgeStore knowledgeStore,
-                         WorkflowRunStore workflowRunStore, WorkflowRunListener workflowRunListener) {
+                         WorkflowRunStore workflowRunStore, AgenticanEventBus eventBus) {
 
         this.workerConfig = workerConfig;
         this.llmConfigs = llmConfigs;
@@ -42,7 +42,7 @@ public class AgentFactory {
         this.skillRegistry = skillRegistry;
         this.knowledgeStore = knowledgeStore;
         this.workflowRunStore = workflowRunStore;
-        this.workflowRunListener = workflowRunListener;
+        this.eventBus = eventBus;
     }
 
     public Agent build(AgentConfig agentConfig) {
@@ -83,7 +83,7 @@ public class AgentFactory {
                     .maxIterations(maxTurns)
                     .timeout(timeout)
                     .workflowRunStore(workflowRunStore)
-                    .workflowRunListener(workflowRunListener)
+                    .eventBus(eventBus)
                     .build();
 
             default -> SmacAgentRunner.builder()
@@ -97,7 +97,7 @@ public class AgentFactory {
                     .knowledgeStore(knowledgeStore)
                     .workflowRunStore(workflowRunStore)
                     .skillRegistry(skillRegistry)
-                    .workflowRunListener(workflowRunListener)
+                    .eventBus(eventBus)
                     .build();
         };
 
@@ -119,7 +119,7 @@ public class AgentFactory {
         private SkillRegistry skillRegistry;
         private KnowledgeStore knowledgeStore;
         private WorkflowRunStore workflowRunStore;
-        private WorkflowRunListener workflowRunListener;
+        private AgenticanEventBus eventBus;
 
         private Map<String, LlmClient> llms;
 
@@ -131,14 +131,14 @@ public class AgentFactory {
         public Builder skillRegistry(SkillRegistry skillRegistry) { this.skillRegistry = skillRegistry; return this; }
         public Builder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
         public Builder workflowRunStore(WorkflowRunStore workflowRunStore) { this.workflowRunStore = workflowRunStore; return this; }
-        public Builder workflowRunListener(WorkflowRunListener workflowRunListener) { this.workflowRunListener = workflowRunListener; return this; }
+        public Builder eventBus(AgenticanEventBus eventBus) { this.eventBus = eventBus; return this; }
 
         public Builder llms(Map<String, LlmClient> llms) { this.llms = llms; return this; }
 
         public AgentFactory build() {
 
             return new AgentFactory(workerConfig, llmConfigs, llms, hitlManager, skillRegistry, knowledgeStore,
-                    workflowRunStore, workflowRunListener);
+                    workflowRunStore, eventBus);
         }
     }
 }

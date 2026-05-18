@@ -7,20 +7,21 @@ import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.store.KnowledgeStore;
 import ai.agentican.framework.registry.WorkflowRegistry;
 import ai.agentican.framework.registry.SkillRegistry;
-import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
 import ai.agentican.framework.orchestration.execution.WorkflowRunDecorator;
 import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmClientDecorator;
 import ai.agentican.framework.store.WorkflowRunStore;
-import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.tools.Toolkit;
-import ai.agentican.framework.hitl.HitlCheckpoint;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Disposes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.Produces;
 import jakarta.enterprise.inject.spi.Bean;
 import jakarta.inject.Inject;
+import ai.agentican.framework.config.CatalogConfig;
+import ai.agentican.framework.config.EngineConfig;
+import ai.agentican.framework.config.LlmConfig;
+import ai.agentican.framework.event.AgenticanEventListener;
 
 @ApplicationScoped
 public class AgenticanProducer {
@@ -59,14 +60,14 @@ public class AgenticanProducer {
     Instance<WorkflowRunDecorator> taskDecorators;
 
     @Inject
-    Instance<WorkflowRunListener> stepListeners;
+    Instance<AgenticanEventListener> stepListeners;
 
     @Inject
     Instance<java.util.concurrent.ExecutorService> taskExecutors;
 
     @Produces
     @jakarta.inject.Singleton
-    public ai.agentican.framework.config.EngineConfig engineConfig() {
+    public EngineConfig engineConfig() {
 
         var fromProps = EngineConfigConverter.fromProperties(config);
         var fromYaml = loadEngineYaml(config.engineConfig());
@@ -76,28 +77,28 @@ public class AgenticanProducer {
 
     @Produces
     @jakarta.inject.Singleton
-    public ai.agentican.framework.config.CatalogConfig catalogConfig() {
+    public CatalogConfig catalogConfig() {
 
         return switch (config.catalogSource()) {
             case yaml -> loadCatalogYaml(config.catalogConfig());
-            case database -> new ai.agentican.framework.config.CatalogConfig(
+            case database -> new CatalogConfig(
                     java.util.List.of(), java.util.List.of(), java.util.List.of());
         };
     }
 
-    private static ai.agentican.framework.config.EngineConfig loadEngineYaml(String resourcePath) {
+    private static EngineConfig loadEngineYaml(String resourcePath) {
 
         try (var in = openClasspath(resourcePath)) {
 
             if (in == null) return null; // engine YAML is optional
-            return ai.agentican.framework.config.EngineConfig.load(in);
+            return EngineConfig.load(in);
         }
         catch (java.io.IOException e) {
             throw new IllegalStateException("Failed to load engine config from " + resourcePath, e);
         }
     }
 
-    private static ai.agentican.framework.config.CatalogConfig loadCatalogYaml(String resourcePath) {
+    private static CatalogConfig loadCatalogYaml(String resourcePath) {
 
         try (var in = openClasspath(resourcePath)) {
 
@@ -107,7 +108,7 @@ public class AgenticanProducer {
                                 + ". Place a CatalogConfig YAML at src/main/resources/" + resourcePath
                                 + ", or set agentican.catalog-source=database.");
 
-            return ai.agentican.framework.config.CatalogConfig.load(in);
+            return CatalogConfig.load(in);
         }
         catch (java.io.IOException e) {
             throw new IllegalStateException("Failed to load catalog config from " + resourcePath, e);
@@ -124,8 +125,8 @@ public class AgenticanProducer {
     @Produces
     @ApplicationScoped
     @io.quarkus.runtime.Startup
-    public Agentican agentican(ai.agentican.framework.config.EngineConfig engineConfig,
-                               ai.agentican.framework.config.CatalogConfig catalogConfig) {
+    public Agentican agentican(EngineConfig engineConfig,
+                               CatalogConfig catalogConfig) {
 
         Agentican.Builder builder = Agentican.builder()
                 .configuration().yaml().config(engineConfig).end();
@@ -175,65 +176,10 @@ public class AgenticanProducer {
             });
         }
 
-        var listenerList = stepListeners.stream().toList();
-        if (!listenerList.isEmpty()) {
-            builder.workflowRunListener(new WorkflowRunListener() {
-                @Override public void onPlanStarted(String taskId) {
-                    listenerList.forEach(l -> l.onPlanStarted(taskId));
-                }
-                @Override public void onPlanCompleted(String taskId, String planId) {
-                    listenerList.forEach(l -> l.onPlanCompleted(taskId, planId));
-                }
-                @Override public void onTaskStarted(String taskId) {
-                    listenerList.forEach(l -> l.onTaskStarted(taskId));
-                }
-                @Override public void onTaskCompleted(String taskId, WorkflowRunStatus status) {
-                    listenerList.forEach(l -> l.onTaskCompleted(taskId, status));
-                }
-                @Override public void onStepStarted(String taskId, String stepId) {
-                    listenerList.forEach(l -> l.onStepStarted(taskId, stepId));
-                }
-                @Override public void onStepCompleted(String taskId, String stepId) {
-                    listenerList.forEach(l -> l.onStepCompleted(taskId, stepId));
-                }
-                @Override public void onRunStarted(String taskId, String runId) {
-                    listenerList.forEach(l -> l.onRunStarted(taskId, runId));
-                }
-                @Override public void onRunCompleted(String taskId, String runId,
-                                                      ai.agentican.framework.agent.AgentStatus status) {
-                    listenerList.forEach(l -> l.onRunCompleted(taskId, runId, status));
-                }
-                @Override public void onTurnStarted(String taskId, String turnId) {
-                    listenerList.forEach(l -> l.onTurnStarted(taskId, turnId));
-                }
-                @Override public void onTurnCompleted(String taskId, String turnId) {
-                    listenerList.forEach(l -> l.onTurnCompleted(taskId, turnId));
-                }
-                @Override public void onMessageSent(String taskId, String turnId) {
-                    listenerList.forEach(l -> l.onMessageSent(taskId, turnId));
-                }
-                @Override public void onResponseReceived(String taskId, String turnId,
-                                                          ai.agentican.framework.llm.StopReason stopReason) {
-                    listenerList.forEach(l -> l.onResponseReceived(taskId, turnId, stopReason));
-                }
-                @Override public void onToolCallStarted(String taskId, String toolCallId) {
-                    listenerList.forEach(l -> l.onToolCallStarted(taskId, toolCallId));
-                }
-                @Override public void onToolCallCompleted(String taskId, String toolCallId) {
-                    listenerList.forEach(l -> l.onToolCallCompleted(taskId, toolCallId));
-                }
-                @Override public void onHitlNotified(String taskId, String hitlId,
-                                                      ai.agentican.framework.hitl.HitlCheckpoint.Type type) {
-                    listenerList.forEach(l -> l.onHitlNotified(taskId, hitlId, type));
-                }
-                @Override public void onHitlResponded(String taskId, String hitlId, boolean approved) {
-                    listenerList.forEach(l -> l.onHitlResponded(taskId, hitlId, approved));
-                }
-                @Override public void onToken(String taskId, String turnId, String token) {
-                    listenerList.forEach(l -> l.onToken(taskId, turnId, token));
-                }
-            });
-        }
+        // Every CDI-registered AgenticanEventListener gets subscribed to the bus.
+        // No composite/fan-out wrapper needed — the bus dispatches to each listener
+        // synchronously in registration order.
+        stepListeners.forEach(builder::addListener);
 
         llmClients.handlesStream().forEach(handle -> {
 
@@ -290,8 +236,8 @@ public class AgenticanProducer {
         return name != null && !name.isBlank() ? name : null;
     }
 
-    private static ai.agentican.framework.config.LlmConfig findLlmConfigByName(
-            ai.agentican.framework.config.EngineConfig engine, String name) {
+    private static LlmConfig findLlmConfigByName(
+            EngineConfig engine, String name) {
 
         return engine.llm().stream()
                 .filter(c -> c.name().equals(name))

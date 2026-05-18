@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 
 import static ai.agentican.framework.MockLlmClient.endTurn;
 import static org.junit.jupiter.api.Assertions.*;
+import ai.agentican.framework.llm.LlmClient;
+import ai.agentican.framework.orchestration.model.WorkflowStepAgent;
 
 class AgentInvokerBuilderTest {
 
@@ -182,7 +184,7 @@ class AgentInvokerBuilderTest {
 
         var capturedSystemPrompts = new java.util.concurrent.CopyOnWriteArrayList<String>();
 
-        ai.agentican.framework.llm.LlmClient llm = request -> {
+        LlmClient llm = request -> {
             capturedSystemPrompts.add(request.systemPrompt());
             return endTurn("{\"summary\":\"x\",\"threatLevel\":\"LOW\"}");
         };
@@ -230,7 +232,7 @@ class AgentInvokerBuilderTest {
                     .build();
 
             var plan = runtime.registry().workflows().byName("analyst-with-tools");
-            var step = (ai.agentican.framework.orchestration.model.WorkflowStepAgent) plan.steps().getFirst();
+            var step = (WorkflowStepAgent) plan.steps().getFirst();
 
             assertEquals(java.util.List.of("search_web", "fetch_url"), step.tools());
         }
@@ -265,7 +267,7 @@ class AgentInvokerBuilderTest {
                     .build();
 
             var plan = runtime.registry().workflows().byName("analyst-with-skills");
-            var step = (ai.agentican.framework.orchestration.model.WorkflowStepAgent) plan.steps().getFirst();
+            var step = (WorkflowStepAgent) plan.steps().getFirst();
 
             assertEquals(java.util.List.of("Tone"), step.skills());
         }

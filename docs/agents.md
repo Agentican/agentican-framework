@@ -160,6 +160,22 @@ The default `SmacAgentRunner` handles:
 
 For most cases, you don't need a custom runner. If you build one, the framework will use it via the agent's `runner` field. HITL resume is optional — only implement it if your runner supports suspension.
 
+### Alternative: `ReActAgentRunner`
+
+The framework also ships a `ReActAgentRunner` — a leaner thought→action→observation loop, useful for agents whose system prompt expects the classic ReAct pattern (`Thought: ... Action: ... Observation: ...`). It supports the same core surface (multi-turn, parallel tool execution, timeouts, max-turn limits) but does not currently implement HITL suspension/resume. Construct one explicitly when building the agent:
+
+```java
+var runner = ReActAgentRunner.builder()
+        .llmClient(myLlm)
+        .maxIterations(20)
+        .timeout(Duration.ofMinutes(10))
+        .build();
+
+Agent.builder().config(config).runner(runner).build();
+```
+
+If you're not sure which to use, stick with `SmacAgentRunner` — it's the default and supports the full feature set.
+
 ## SmacAgentRunner
 
 The default runner. Configurable via `WorkerConfig`:

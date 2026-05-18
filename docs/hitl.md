@@ -217,6 +217,43 @@ If multiple tasks have HITL checkpoints active at the same time, the framework h
 
 Within a single task, suspended steps are processed one at a time. If two parallel steps both suspend, the runner handles them sequentially after all running steps finish.
 
+## Routing responses: `HitlResponseDispatcher`
+
+The path "human responds via REST → orchestrator wakes up" needs to land the response in whichever runtime is actually doing the waiting. For an in-process task, the parked virtual thread lives in the same JVM and `HitlManager.respond(checkpointId, response)` completes its `CompletableFuture`. For a Temporal-owned task, the orchestrator is waiting on a Temporal workflow signal in some worker process — `HitlManager` has no parked thread to wake up there.
+
+`HitlResponseDispatcher` is the SPI the REST layer uses so it doesn't need to know the difference:
+
+```java
+public interface HitlResponseDispatcher {
+    void respond(String checkpointId, HitlResponse response);
+    void cancel(String checkpointId);
+}
+```
+
+The default `InProcessHitlResponseDispatcher` wraps `HitlManager` directly. Under Quarkus it's wired automatically via `AgenticanBeansProducer`. Both the HTTP endpoint (`POST /agentican/checkpoints/{id}/respond`) and the WebSocket `respond` action go through this dispatcher; existence checks ("is this checkpoint pending?") use `TaskEventBus.allPending()`, which is a runtime-agnostic projection of `HitlNotified` events.
+
+### Routing to Temporal-owned checkpoints
+
+When `agentican-temporal` is on the classpath and your task's runtime is `TEMPORAL`, replace the default dispatcher with `TemporalAwareHitlResponseDispatcher` (a composite that signals Temporal workflows for TEMPORAL checkpoints and delegates everything else to the in-process fallback):
+
+```java
+@Produces @ApplicationScoped @Alternative
+@Priority(Interceptor.Priority.LIBRARY_AFTER + 10)
+HitlResponseDispatcher temporalAwareDispatcher(HitlManager hm, WorkflowRunStore store,
+                                               WorkflowClient client, AgenticanEventBus bus) {
+    var d = new TemporalAwareHitlResponseDispatcher(
+            new InProcessHitlResponseDispatcher(hm), store, client);
+    bus.subscribe(d);   // indexes TEMPORAL checkpoints as HitlNotified events arrive
+    return d;
+}
+```
+
+The composite subscribes to the bus, watches for `HitlNotified` events with `runtime == TEMPORAL`, and stores `checkpointId → temporalWorkflowId` in a small in-memory index. On `respond` / `cancel`, it consults the index and either signals the workflow (`RunnerBasedAgentWorkflow.provideHitlResponse`) or falls back to the in-process path. From the REST layer's perspective the API is unchanged.
+
+**Cancel semantics for TEMPORAL checkpoints**: Temporal has no native "drop this signal" operation, so the dispatcher synthesizes a `HitlResponse(approved=false, "Cancelled by operator")` and signals the workflow. The agent loop sees this as a rejection.
+
+**Custom workflow types**: the dispatcher is hardcoded to signal `RunnerBasedAgentWorkflow.provideHitlResponse`. If you've authored a custom Temporal workflow class that emits HITL checkpoints, write a sibling dispatcher (the SPI is two methods).
+
 ## Next Steps
 
 - [Tools & Toolkits](tools.md) — marking tools for HITL

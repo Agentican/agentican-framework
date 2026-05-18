@@ -41,8 +41,8 @@ class TaskEventBusTest {
         var t1Log = new WorkflowRunLog("t1", "demo", task("demo"), Map.of());
         var t2Log = new WorkflowRunLog("t2", "demo", task("demo"), Map.of());
 
-        bus.onTaskStarted(new TaskStartedEvent("t1", "demo", t1Log));
-        bus.onTaskStarted(new TaskStartedEvent("t2", "demo", t2Log));
+        bus.onTaskStarted(new TaskStartedEvent("t1", "demo", null, t1Log));
+        bus.onTaskStarted(new TaskStartedEvent("t2", "demo", null, t2Log));
 
         bus.onStepCompleted(new StepCompletedEvent(null, "t1", "step-a", WorkflowRunStatus.COMPLETED));
 
@@ -118,7 +118,7 @@ class TaskEventBusTest {
 
         var log = new WorkflowRunLog("t1", "demo", task("demo"), Map.of());
 
-        bus.onTaskStarted(new TaskStartedEvent("t1", "demo", log));
+        bus.onTaskStarted(new TaskStartedEvent("t1", "demo", null, log));
         bus.onStepCompleted(new StepCompletedEvent(null, "t1", "s", WorkflowRunStatus.COMPLETED));
 
         var replayed = new CopyOnWriteArrayList<SequencedEvent>();
@@ -138,7 +138,7 @@ class TaskEventBusTest {
 
         var log = new WorkflowRunLog("t1", "demo", task("demo"), Map.of());
 
-        bus.onTaskStarted(new TaskStartedEvent("t1", "demo", log));
+        bus.onTaskStarted(new TaskStartedEvent("t1", "demo", null, log));
         bus.onStepCompleted(new StepCompletedEvent(null, "t1", "s", WorkflowRunStatus.COMPLETED));
         bus.onStepCompleted(new StepCompletedEvent(null, "t1", "s2", WorkflowRunStatus.COMPLETED));
 
@@ -154,7 +154,7 @@ class TaskEventBusTest {
 
         var log = new WorkflowRunLog("t1", "demo", task("demo"), Map.of());
 
-        bus.onTaskStarted(new TaskStartedEvent("t1", "demo", log));
+        bus.onTaskStarted(new TaskStartedEvent("t1", "demo", null, log));
         bus.onTaskCompleted(new TaskCompletedEvent("t1", "demo", WorkflowRunStatus.COMPLETED, log));
 
         var replayed = new CopyOnWriteArrayList<SequencedEvent>();

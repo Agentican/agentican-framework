@@ -23,6 +23,7 @@ import static ai.agentican.framework.MockLlmClient.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 import ai.agentican.framework.config.AgentConfig;
+import ai.agentican.framework.orchestration.code.CodeStepRegistry;
 class TaskRunnerTest {
 
     private HitlManager autoApproveHitl() {
@@ -57,7 +58,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("test-task", "test-task")
                 .step().name("step-a").agent("agent-a").instructions("Do the thing").end()
@@ -85,7 +86,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("dep-task", "dep-task")
                 .step().name("step-a").agent("agent-a").instructions("Produce output").end()
@@ -115,7 +116,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("parallel-task", "parallel-task")
                 .step().name("step-a").agent("agent-a").instructions("Do A").end()
@@ -137,7 +138,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("fail-task", "fail-task")
                 .step().name("step-a").agent("missing-agent").instructions("This will fail").end()
@@ -165,7 +166,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("cancel-task", "cancel-task")
                 .step().name("step-a").agent("agent-a").instructions("Do something").end()
@@ -196,7 +197,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("hitl-task", "hitl-task")
                 .step().name("step-a").agent("agent-a").instructions("Write a draft").hitl().end()
@@ -236,7 +237,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new WorkflowRunner(registry, hitlManager, new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, hitlManager, new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("retry-task", "retry-task")
                 .step().name("step-a").agent("agent-a").instructions("Write a draft").hitl().end()
@@ -269,7 +270,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new WorkflowRunner(registry, hitlManager, new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, hitlManager, new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("max-retry-task", "max-retry-task")
                 .step().name("step-a").agent("agent-a").instructions("Write something").hitl().end()
@@ -291,7 +292,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("cycle-task", "cycle-task").description("Circular deps").steps(List.of(
                 new WorkflowStepAgent("step-a", "agent-a", "Do A", List.of("step-b"), false, null, null),
@@ -316,7 +317,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("log-task", "log-task")
                 .step().name("step-a").agent("agent-a").instructions("First step").end()
@@ -363,7 +364,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var taskRunner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, Duration.ofMillis(50), 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var taskRunner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, Duration.ofMillis(50), 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("timeout-task", "timeout-task")
                 .step().name("step-a").agent("agent-a").instructions("Do something slow").end()
@@ -386,7 +387,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("default-param-task", "default-param-task").description("Test defaults")
                 .param().name("count").description("Number of items").defaultValue("5").required(false).end()
@@ -409,7 +410,7 @@ class TaskRunnerTest {
 
         var workflowRunStore = new WorkflowRunStoreMemory();
 
-        var taskRunner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var taskRunner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), workflowRunStore, null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("required-param-task", "required-param-task").description("Test required")
                 .param().name("required_param").description("desc").required(true).end()

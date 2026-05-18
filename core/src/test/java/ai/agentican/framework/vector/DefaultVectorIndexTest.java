@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import ai.agentican.framework.embeddings.EmbeddingClient;
 
 class DefaultVectorIndexTest {
 
@@ -153,7 +154,7 @@ class DefaultVectorIndexTest {
     }
 
     private static final class EmbeddingClientReturningWrongCount
-            implements ai.agentican.framework.embeddings.EmbeddingClient {
+            implements EmbeddingClient {
 
         @Override public List<float[]> embed(List<String> texts) {
 

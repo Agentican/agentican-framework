@@ -5,8 +5,10 @@ import ai.agentican.framework.llm.LlmRequest;
 import ai.agentican.framework.llm.Message;
 import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.llm.StructuredOutput;
+import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.llm.ToolCall;
-import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
+import ai.agentican.framework.event.AgenticanEventBus;
+import ai.agentican.framework.event.TokenStreamed;
 import ai.agentican.framework.state.RunLog;
 import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.framework.store.WorkflowRunStoreMemory;
@@ -26,11 +28,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import ai.agentican.framework.event.WorkflowRunStorePersister;
+import ai.agentican.framework.llm.LlmResponse;
 
 public class ReActAgentRunner implements AgentRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReActAgentRunner.class);
-    private static final WorkflowRunListener NO_OP_LISTENER = new WorkflowRunListener() {};
 
     private static final String SYSTEM_PROMPT_TEMPLATE = """
             You are a ReAct agent. Solve the user's task by reasoning step-by-step.
@@ -55,13 +58,13 @@ public class ReActAgentRunner implements AgentRunner {
     private final String llmModel;
 
     private final WorkflowRunStore workflowRunStore;
-    private final WorkflowRunListener workflowRunListener;
+    private final AgenticanEventBus eventBus;
 
     private final int maxTurns;
     private final Duration timeout;
 
     ReActAgentRunner(LlmClient llm, String llmName, String llmProvider, String llmModel,
-                    WorkflowRunStore workflowRunStore, WorkflowRunListener workflowRunListener,
+                    WorkflowRunStore workflowRunStore, AgenticanEventBus eventBus,
                     int maxTurns, Duration timeout) {
 
         this.llm = llm;
@@ -69,9 +72,18 @@ public class ReActAgentRunner implements AgentRunner {
         this.llmProvider = llmProvider;
         this.llmModel = llmModel;
         this.workflowRunStore = workflowRunStore != null ? workflowRunStore : new WorkflowRunStoreMemory();
-        this.workflowRunListener = workflowRunListener != null ? workflowRunListener : NO_OP_LISTENER;
+        // Defensive default: same reason as SmacAgentRunner — ensure the
+        // runner's own store reads see what it publishes.
+        this.eventBus = eventBus != null ? eventBus : defaultBusFor(this.workflowRunStore);
         this.maxTurns = maxTurns > 0 ? maxTurns : 10;
         this.timeout = timeout;
+    }
+
+    private static AgenticanEventBus defaultBusFor(WorkflowRunStore store) {
+
+        var bus = new AgenticanEventBus();
+        bus.subscribeFirst(new WorkflowRunStorePersister(store));
+        return bus;
     }
 
     @Override
@@ -82,7 +94,7 @@ public class ReActAgentRunner implements AgentRunner {
         var cancelled = new AtomicBoolean(false);
 
         return run(agent, task, taskId, stepId, stepName, timeoutOverride, skills, toolkits, outputSchema,
-                new InProcessAgentLoopHost(llm, workflowRunStore, null, null, cancelled));
+                new InProcessAgentLoopHost(llm, workflowRunStore, eventBus, null, null, cancelled));
     }
 
     @Override
@@ -100,7 +112,9 @@ public class ReActAgentRunner implements AgentRunner {
         host.runStarted(taskId, stepId, runId, agent.name());
 
         var startTime = host.now();
-        var deadline = effectiveDeadline(startTime, timeoutOverride);
+        // When the host is managed (e.g. Temporal), the surrounding runtime owns the
+        // deadline; running our own wall-clock watchdog alongside would race against it.
+        var deadline = host.isManaged() ? null : effectiveDeadline(startTime, timeoutOverride);
 
         var systemPrompt = SYSTEM_PROMPT_TEMPLATE.formatted(
                 agent.role() != null && !agent.role().isBlank() ? agent.role() : "(no specific role)");
@@ -111,19 +125,25 @@ public class ReActAgentRunner implements AgentRunner {
 
         history.add(Message.user(new Message.TextBlock(task)));
 
+        var runTokens = TokenUsage.ZERO;
+
         for (int turnIndex = 0; turnIndex < maxTurns; turnIndex++) {
 
             LOG.info(Logs.AGENT_RUNNING_LOOP, turnIndex);
 
-            if (host.isCancelled())
+            if (host.isCancelled()) {
+                host.runCompleted(taskId, stepId, runId, AgentStatus.CANCELLED, runTokens);
                 return result(host, AgentStatus.CANCELLED, taskId, stepId, runId);
+            }
 
-            if (deadline != null && host.now().isAfter(deadline))
+            if (deadline != null && host.now().isAfter(deadline)) {
+                host.runCompleted(taskId, stepId, runId, AgentStatus.TIMED_OUT, runTokens);
                 return result(host, AgentStatus.TIMED_OUT, taskId, stepId, runId);
+            }
 
             var turnId = host.newId();
 
-            host.turnStarted(taskId, runId, turnId);
+            host.turnStarted(taskId, runId, turnId, turnIndex);
 
             var request = new LlmRequest(systemPrompt, task, "", toolDefs, turnIndex, llmName, llmProvider,
                     llmModel, outputSchema, List.copyOf(history));
@@ -133,10 +153,11 @@ public class ReActAgentRunner implements AgentRunner {
             host.messageSent(taskId, turnId, request);
 
             var response = host.callLlm(request);
+            runTokens = runTokens.plus(response.tokenUsage());
 
             // Host SPI doesn't carry token-level streaming yet; fire the listener once with the full text.
             if (response.text() != null && !response.text().isEmpty())
-                workflowRunListener.onToken(taskId, turnId, response.text());
+                eventBus.publish(new TokenStreamed(taskId, turnId, response.text()));
 
             host.responseReceived(taskId, turnId, response);
 
@@ -146,8 +167,8 @@ public class ReActAgentRunner implements AgentRunner {
 
             if (response.stopReason() != StopReason.TOOL_USE || response.toolCalls().isEmpty()) {
 
-                host.turnCompleted(taskId, turnId);
-                host.runCompleted(taskId, runId);
+                host.turnCompleted(taskId, turnId, turnIndex, response.tokenUsage());
+                host.runCompleted(taskId, stepId, runId, AgentStatus.COMPLETED, runTokens);
 
                 return result(host, AgentStatus.COMPLETED, taskId, stepId, runId);
             }
@@ -156,15 +177,15 @@ public class ReActAgentRunner implements AgentRunner {
 
             history.add(toToolResultMessage(toolResults));
 
-            host.turnCompleted(taskId, turnId);
+            host.turnCompleted(taskId, turnId, turnIndex, response.tokenUsage());
         }
 
-        host.runCompleted(taskId, runId);
+        host.runCompleted(taskId, stepId, runId, AgentStatus.MAX_TURNS, runTokens);
 
         return result(host, AgentStatus.MAX_TURNS, taskId, stepId, runId);
     }
 
-    private static Message toAssistantMessage(ai.agentican.framework.llm.LlmResponse response) {
+    private static Message toAssistantMessage(LlmResponse response) {
 
         var blocks = new ArrayList<Message.Block>();
 
@@ -315,7 +336,7 @@ public class ReActAgentRunner implements AgentRunner {
         private String llmModel;
 
         private WorkflowRunStore workflowRunStore;
-        private WorkflowRunListener workflowRunListener;
+        private AgenticanEventBus eventBus;
 
         private int maxIterations;
         private Duration timeout;
@@ -327,7 +348,7 @@ public class ReActAgentRunner implements AgentRunner {
         public Builder llmProvider(String llmProvider)        { this.llmProvider = llmProvider; return this; }
         public Builder llmModel(String llmModel)              { this.llmModel = llmModel; return this; }
         public Builder workflowRunStore(WorkflowRunStore store)   { this.workflowRunStore = store; return this; }
-        public Builder workflowRunListener(WorkflowRunListener listener)    { this.workflowRunListener = listener; return this; }
+        public Builder eventBus(AgenticanEventBus eventBus)                 { this.eventBus = eventBus; return this; }
         public Builder maxIterations(int maxIterations)       { this.maxIterations = maxIterations; return this; }
         public Builder timeout(Duration timeout)              { this.timeout = timeout; return this; }
 
@@ -337,7 +358,7 @@ public class ReActAgentRunner implements AgentRunner {
                 throw new IllegalStateException("llmClient is required");
 
             return new ReActAgentRunner(llmClient, llmName, llmProvider, llmModel, workflowRunStore,
-                    workflowRunListener, maxIterations, timeout);
+                    eventBus, maxIterations, timeout);
         }
     }
 }

@@ -4,6 +4,8 @@ import ai.agentican.framework.registry.AgentRegistry;
 import ai.agentican.framework.registry.AgentRegistryMemory;
 import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlNotifier;
+import ai.agentican.framework.hitl.HitlResponseDispatcher;
+import ai.agentican.framework.hitl.InProcessHitlResponseDispatcher;
 import ai.agentican.framework.store.KnowledgeStore;
 import ai.agentican.framework.store.KnowledgeStoreMemory;
 import ai.agentican.framework.registry.WorkflowRegistryMemory;
@@ -73,5 +75,19 @@ public class AgenticanBeansProducer {
     public WorkflowRegistry defaultPlanRegistry() {
 
         return new WorkflowRegistryMemory();
+    }
+
+    /**
+     * In-process dispatcher — hands HITL responses to the local {@link HitlManager}.
+     * When an external runtime (e.g. Temporal) needs to receive responses for tasks
+     * it owns, register an {@code @Alternative @Priority(...)} bean that composes
+     * over this default; see {@code TemporalAwareHitlResponseDispatcher}.
+     */
+    @Produces
+    @ApplicationScoped
+    @DefaultBean
+    public HitlResponseDispatcher defaultHitlResponseDispatcher(HitlManager hitlManager) {
+
+        return new InProcessHitlResponseDispatcher(hitlManager);
     }
 }

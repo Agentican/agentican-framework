@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import ai.agentican.framework.config.EngineConfig;
 
 @QuarkusTest
 class AgenticanProducerTest {
@@ -15,7 +16,7 @@ class AgenticanProducerTest {
     Agentican agentican;
 
     @Inject
-    ai.agentican.framework.config.EngineConfig engineConfig;
+    EngineConfig engineConfig;
 
     @Test
     void agenticanIsProducedAsApplicationScopedBean() {

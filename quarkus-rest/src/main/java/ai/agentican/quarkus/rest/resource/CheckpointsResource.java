@@ -1,8 +1,8 @@
 package ai.agentican.quarkus.rest.resource;
 
 import ai.agentican.framework.hitl.HitlCheckpoint;
-import ai.agentican.framework.hitl.HitlManager;
 import ai.agentican.framework.hitl.HitlResponse;
+import ai.agentican.framework.hitl.HitlResponseDispatcher;
 import ai.agentican.quarkus.rest.TaskEventBus;
 import ai.agentican.quarkus.rest.dto.HitlResponseDto;
 import io.smallrye.common.annotation.RunOnVirtualThread;
@@ -26,7 +26,7 @@ import java.util.Map;
 public class CheckpointsResource {
 
     @Inject
-    HitlManager hitlManager;
+    HitlResponseDispatcher dispatcher;
 
     @Inject
     TaskEventBus eventBus;
@@ -52,10 +52,10 @@ public class CheckpointsResource {
         if (body == null)
             throw new jakarta.ws.rs.BadRequestException("Request body is required");
 
-        if (!hitlManager.pendingCheckpoints().containsKey(checkpointId))
+        if (!isPending(checkpointId))
             throw new NotFoundException("No pending checkpoint with id: " + checkpointId);
 
-        hitlManager.respond(checkpointId, new HitlResponse(body.approved(), body.feedback()));
+        dispatcher.respond(checkpointId, new HitlResponse(body.approved(), body.feedback()));
         eventBus.clearCheckpoint(checkpointId);
 
         return Response.noContent().build();
@@ -65,12 +65,21 @@ public class CheckpointsResource {
     @Path("/{checkpointId}/cancel")
     public Response cancel(@PathParam("checkpointId") String checkpointId) {
 
-        if (!hitlManager.pendingCheckpoints().containsKey(checkpointId))
+        if (!isPending(checkpointId))
             throw new NotFoundException("No pending checkpoint with id: " + checkpointId);
 
-        hitlManager.cancel(checkpointId);
+        dispatcher.cancel(checkpointId);
         eventBus.clearCheckpoint(checkpointId);
 
         return Response.noContent().build();
+    }
+
+    private boolean isPending(String checkpointId) {
+
+        // TaskEventBus is the runtime-agnostic projection of HitlNotified events —
+        // contains pending checkpoints for both in-process and Temporal-owned tasks.
+        return eventBus.allPending().values().stream()
+                .flatMap(List::stream)
+                .anyMatch(c -> checkpointId.equals(c.id()));
     }
 }

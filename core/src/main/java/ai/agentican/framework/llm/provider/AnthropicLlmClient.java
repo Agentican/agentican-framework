@@ -127,8 +127,8 @@ public class AnthropicLlmClient {
 
         var stopReason = switch (response.stopReason().orElseThrow().asString()) {
 
-            case "tool_use" -> ai.agentican.framework.llm.StopReason.TOOL_USE;
-            case "max_tokens" -> ai.agentican.framework.llm.StopReason.MAX_TOKENS;
+            case "tool_use" -> StopReason.TOOL_USE;
+            case "max_tokens" -> StopReason.MAX_TOKENS;
             default -> StopReason.END_TURN;
         };
 

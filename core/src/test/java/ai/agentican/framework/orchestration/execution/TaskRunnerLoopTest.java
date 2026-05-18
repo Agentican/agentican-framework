@@ -15,6 +15,7 @@ import static ai.agentican.framework.MockLlmClient.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 import ai.agentican.framework.config.AgentConfig;
+import ai.agentican.framework.orchestration.code.CodeStepRegistry;
 class TaskRunnerLoopTest {
 
     private HitlManager autoApproveHitl() {
@@ -47,7 +48,7 @@ class TaskRunnerLoopTest {
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("loop-task", "loop-task")
                 .step().name("produce").agent("producer-agent").instructions("Produce a JSON array").end()
@@ -78,7 +79,7 @@ class TaskRunnerLoopTest {
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", new MockLlmClient()));
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("empty-loop-task", "empty-loop-task")
                 .step().name("produce").agent("producer-agent").instructions("Produce an empty array").end()
@@ -110,7 +111,7 @@ class TaskRunnerLoopTest {
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("placeholder-loop-task", "placeholder-loop-task")
                 .step().name("produce").agent("producer-agent").instructions("Produce items").end()
@@ -142,7 +143,7 @@ class TaskRunnerLoopTest {
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", bodyLlm));
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("aggregate-loop-task", "aggregate-loop-task")
                 .step().name("produce").agent("producer-agent").instructions("Produce items").end()
@@ -173,7 +174,7 @@ class TaskRunnerLoopTest {
         registry.register(createAgent("producer-agent", producerLlm));
         registry.register(createAgent("body-agent", new MockLlmClient()));
 
-        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, 0, null, new ai.agentican.framework.orchestration.code.CodeStepRegistry());
+        var runner = new WorkflowRunner(registry, autoApproveHitl(), new ToolkitRegistry(), new WorkflowRunStoreMemory(), null, null, 0, null, new CodeStepRegistry());
 
         var task = WorkflowDefinition.builder("missing-upstream-task", "missing-upstream-task")
                 .step().name("produce").agent("producer-agent").instructions("Produce something").end()

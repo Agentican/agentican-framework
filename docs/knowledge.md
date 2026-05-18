@@ -107,16 +107,32 @@ Once `INDEXED`, the entry appears in the agent's knowledge index automatically.
 
 ## Automatic Extraction
 
-When a `KnowledgeStore` is configured, the framework wires a `KnowledgeIngestor` as a `WorkflowRunListener`. On every completed step, if the step's output contains the marker string `KNOWLEDGE_ACQUIRED`, the ingestor:
+When a `KnowledgeStore` is configured, the framework wires a `KnowledgeIngestor` as an `AgenticanEventListener` subscribed to the bus. On every `StepCompleted` event, if the step's output contains the marker string `KNOWLEDGE_ACQUIRED`, the ingestor:
 
 1. Strips the marker from the output
 2. Calls a `KnowledgeExtractor` (default: `LlmKnowledgeExtractor`) with `(step input, step output, existing indexed entries)`
 3. Applies each extracted entry as `CREATE` (new entry) or `UPDATE` (merge facts into an existing entry)
 4. Saves the resulting entries to the store with status `INDEXED`
 
-This runs asynchronously on the task executor — it does not block the agent loop.
+The actual extractor work runs asynchronously on the task executor — it does not block the agent loop or the bus's publishing thread.
 
 The agent opts in by including `KNOWLEDGE_ACQUIRED` in its final step output when it has learned something worth retaining. Your agent's `role` / system prompt should instruct it when to emit the marker.
+
+### How "step input" is resolved
+
+The extractor takes the original user task as its `input` argument (so it can correlate the question that was asked with the facts being learned). The ingestor learns that input by subscribing to `RunStarted`, `TurnStarted`, and `MessageSent` events — it tracks `runId → stepId`, `turnId → stepId`, and remembers the first `MessageSent.request().userTask()` per step. On `StepCompleted` it pops the remembered task and feeds it to the extractor. No store reads — the input is derived purely from event payloads.
+
+Cross-state cleanup happens on `TaskCompleted`; in-progress tasks that get reaped have their step-state evicted at completion time.
+
+**Eviction caveat**: the maps are keyed by `runId` / `turnId` / `stepId`, not by `taskId`. Steps that get abandoned mid-flight without a `StepCompleted` (e.g. a workflow execution thread killed by JVM signal before persistence) leave orphan entries until the surrounding `TaskCompleted` fires — and if neither fires (worst case: the entire process is `kill -9`ed), the in-memory state is gone with the process anyway. In practice the tables are small (one entry per active step / run / turn) and short-lived per task, but very long-lived servers handling many abandoned tasks would benefit from a precise eviction path. A future enrichment could add `taskId` to `MessageSent` / `TurnStarted` events to make eviction exact.
+
+### Works under Temporal too
+
+Because Temporal-driven workflows route their events through the same `Agentican.eventBus()` as in-process work (see [Temporal Integration](temporal.md#event-flow-under-temporal)), `KnowledgeIngestor` automatically processes step outputs from Temporal-managed agents without any extra wiring. The same `KNOWLEDGE_ACQUIRED` marker, the same extractor, the same store.
+
+### Batch reingestion
+
+For one-shot reingestion outside the event-driven path — e.g. on startup, replaying knowledge from completed steps that fired before the ingestor was wired — call `KnowledgeIngestor.ingestStep(stepName, input, output)` directly. The framework's `AgenticanRecovery` uses this when resuming interrupted tasks; it reads the persisted first-turn user task from `WorkflowRunStore` and hands it to `ingestStep`. Store reads are fine in batch contexts; the event-driven path stays pure.
 
 `LlmKnowledgeExtractor` uses the framework's default LLM (whichever is registered under `LlmConfig.DEFAULT`). Supply your own `KnowledgeExtractor` implementation to customize extraction:
 

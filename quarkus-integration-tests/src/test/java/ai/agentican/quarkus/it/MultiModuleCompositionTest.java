@@ -1,7 +1,7 @@
 package ai.agentican.quarkus.it;
 
 import ai.agentican.framework.Agentican;
-import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
+import ai.agentican.framework.event.AgenticanEventListener;
 import ai.agentican.framework.orchestration.execution.WorkflowRunDecorator;
 import ai.agentican.framework.llm.LlmClientDecorator;
 import ai.agentican.quarkus.test.MockLlmClient;
@@ -39,7 +39,7 @@ class MultiModuleCompositionTest {
     Instance<WorkflowRunDecorator> taskDecorators;
 
     @Inject
-    Instance<WorkflowRunListener> stepListeners;
+    Instance<AgenticanEventListener> stepListeners;
 
     @BeforeEach
     void reset() {
@@ -71,7 +71,7 @@ class MultiModuleCompositionTest {
         var count = stepListeners.stream().count();
 
         assertTrue(count >= 2,
-                "Should have at least 2 TaskListeners (otel lifecycle + metrics). Got: " + count);
+                "Should have at least 2 AgenticanEventListeners (otel lifecycle + metrics). Got: " + count);
     }
 
     @Test

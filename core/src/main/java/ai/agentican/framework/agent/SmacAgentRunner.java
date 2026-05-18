@@ -1,6 +1,6 @@
 package ai.agentican.framework.agent;
 
-import ai.agentican.framework.orchestration.execution.WorkflowRunListener;
+import ai.agentican.framework.event.AgenticanEventBus;
 import ai.agentican.framework.config.SkillConfig;
 import ai.agentican.framework.tools.hitl.AskQuestionToolkit;
 import ai.agentican.framework.hitl.HitlManager;
@@ -13,6 +13,7 @@ import ai.agentican.framework.llm.LlmClient;
 import ai.agentican.framework.llm.LlmRequest;
 import ai.agentican.framework.llm.StopReason;
 import ai.agentican.framework.llm.StructuredOutput;
+import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.llm.ToolCall;
 import ai.agentican.framework.orchestration.execution.resume.ResumePlan;
 import ai.agentican.framework.orchestration.execution.resume.TurnResumeState;
@@ -37,13 +38,14 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import ai.agentican.framework.event.TokenStreamed;
+import ai.agentican.framework.event.WorkflowRunStorePersister;
 
 public class SmacAgentRunner implements AgentRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(SmacAgentRunner.class);
 
     private static final Templates TEMPLATES = new Templates();
-    private static final WorkflowRunListener NO_OP_LISTENER = new WorkflowRunListener() {};
 
     private final LlmClient llm;
 
@@ -54,14 +56,14 @@ public class SmacAgentRunner implements AgentRunner {
     private final HitlManager hitlManager;
     private final KnowledgeStore knowledgeStore;
     private final WorkflowRunStore workflowRunStore;
-    private final WorkflowRunListener workflowRunListener;
+    private final AgenticanEventBus eventBus;
     private final SkillRegistry skillRegistry;
     private final Duration timeout;
     private final int maxTurns;
 
     SmacAgentRunner(LlmClient llm, String llmName, String llmProvider, String llmModel, HitlManager hitlManager,
                     KnowledgeStore knowledgeStore, WorkflowRunStore workflowRunStore, SkillRegistry skillRegistry,
-                    int maxTurns, Duration timeout, WorkflowRunListener workflowRunListener) {
+                    int maxTurns, Duration timeout, AgenticanEventBus eventBus) {
 
         this.llm = llm;
 
@@ -70,13 +72,20 @@ public class SmacAgentRunner implements AgentRunner {
         this.llmModel = llmModel;
 
         this.workflowRunStore = workflowRunStore;
-        this.workflowRunListener = workflowRunListener != null ? workflowRunListener : NO_OP_LISTENER;
+        this.eventBus = eventBus != null ? eventBus : defaultBusFor(workflowRunStore);
         this.hitlManager = hitlManager;
         this.knowledgeStore = knowledgeStore;
         this.skillRegistry = skillRegistry != null ? skillRegistry : new SkillRegistryMemory();
 
         this.timeout = timeout;
         this.maxTurns = maxTurns;
+    }
+
+    private static AgenticanEventBus defaultBusFor(WorkflowRunStore store) {
+
+        var bus = new AgenticanEventBus();
+        bus.subscribeFirst(new WorkflowRunStorePersister(store));
+        return bus;
     }
 
     @Override
@@ -86,7 +95,7 @@ public class SmacAgentRunner implements AgentRunner {
         var taskCancelled = new AtomicBoolean(false);
 
         return run(agent, task, taskId, stepId, stepName, timeout, skills, toolkits, outputSchema,
-                new InProcessAgentLoopHost(llm, workflowRunStore, hitlManager, knowledgeStore, taskCancelled));
+                new InProcessAgentLoopHost(llm, workflowRunStore, eventBus, hitlManager, knowledgeStore, taskCancelled));
     }
 
     @Override
@@ -106,7 +115,7 @@ public class SmacAgentRunner implements AgentRunner {
 
         return resume(agent, task, taskId, stepId, stepName, timeout, skills, toolkits, outputSchema, savedRun,
                 hitlToolResults,
-                new InProcessAgentLoopHost(llm, workflowRunStore, hitlManager, knowledgeStore, taskCancelled));
+                new InProcessAgentLoopHost(llm, workflowRunStore, eventBus, hitlManager, knowledgeStore, taskCancelled));
     }
 
     @Override
@@ -137,7 +146,7 @@ public class SmacAgentRunner implements AgentRunner {
         var agentResult = loop(task, host.now(), List.of(), ctx, host, taskId, stepId, stepName, runId, 0,
                 timeout, outputSchema);
 
-        host.runCompleted(taskId, runId);
+        host.runCompleted(taskId, stepId, runId, agentResult.status(), agentResult.tokenUsage());
 
         return agentResult;
     }
@@ -147,7 +156,7 @@ public class SmacAgentRunner implements AgentRunner {
                                         List<String> skills, Map<String, Toolkit> toolkits, StructuredOutput outputSchema,
                                         RunLog savedRun, AtomicBoolean cancelled, ResumePlan resumePlan) {
 
-        var host = new InProcessAgentLoopHost(llm, workflowRunStore, hitlManager, knowledgeStore, cancelled);
+        var host = new InProcessAgentLoopHost(llm, workflowRunStore, eventBus, hitlManager, knowledgeStore, cancelled);
 
         LOG.info("Resuming agent step after crash: agent={}, savedTurns={}, turnState={}",
                 agent.name(), savedRun != null ? savedRun.turns().size() : 0,
@@ -171,7 +180,7 @@ public class SmacAgentRunner implements AgentRunner {
                 LOG.info("Step '{}' was logically complete (last turn stopReason={}); short-circuiting resume",
                         stepName, lastTurn.response().stopReason());
 
-                host.runCompleted(taskId, savedRun.id());
+                host.runCompleted(taskId, stepId, savedRun.id(), AgentStatus.COMPLETED, savedRun.tokenUsage());
 
                 return AgentResult.builder().status(AgentStatus.COMPLETED).run(savedRun).build();
             }
@@ -199,12 +208,14 @@ public class SmacAgentRunner implements AgentRunner {
                         executeToolCalls(pending, ctx.toolkits(), host, lastTurn.index(), taskId, lastTurnId);
                     }
 
-                    host.turnCompleted(taskId, lastTurnId);
+                    host.turnCompleted(taskId, lastTurnId, lastTurn.index(),
+                            lastTurn.response() != null ? lastTurn.response().tokenUsage() : TokenUsage.ZERO);
                 }
             }
         }
 
-        if (savedRun != null) host.runCompleted(taskId, savedRun.id());
+        if (savedRun != null)
+            host.runCompleted(taskId, stepId, savedRun.id(), AgentStatus.COMPLETED, savedRun.tokenUsage());
 
         var runId = host.newId();
 
@@ -213,7 +224,7 @@ public class SmacAgentRunner implements AgentRunner {
         var agentResult = loop(task, host.now(), List.of(), ctx, host, taskId, stepId, stepName, runId, 0,
                 null, outputSchema);
 
-        host.runCompleted(taskId, runId);
+        host.runCompleted(taskId, stepId, runId, agentResult.status(), agentResult.tokenUsage());
 
         return agentResult;
     }
@@ -284,7 +295,8 @@ public class SmacAgentRunner implements AgentRunner {
             }
         }
 
-        host.turnCompleted(taskId, lastTurnId);
+        host.turnCompleted(taskId, lastTurnId, lastTurn.index(),
+                lastTurn.response() != null ? lastTurn.response().tokenUsage() : TokenUsage.ZERO);
 
         var runId = host.newId();
 
@@ -293,7 +305,7 @@ public class SmacAgentRunner implements AgentRunner {
         var agentResult = loop(task, host.now(), toolResults, ctx, host, taskId, stepId, stepName, runId,
                 savedRun.turns().size(), timeout, outputSchema);
 
-        host.runCompleted(taskId, runId);
+        host.runCompleted(taskId, stepId, runId, agentResult.status(), agentResult.tokenUsage());
 
         return agentResult;
     }
@@ -303,7 +315,10 @@ public class SmacAgentRunner implements AgentRunner {
                              int turnIndex, Duration timeoutOverride, StructuredOutput outputSchema) {
 
         var effectiveTimeout = timeoutOverride != null ? timeoutOverride : timeout;
-        var deadline = effectiveTimeout != null ? startTime.plus(effectiveTimeout) : null;
+        // When the host is managed (e.g. Temporal), the surrounding runtime owns the
+        // deadline (activity / workflow execution timeouts). Running our own watchdog
+        // alongside would race against it — defer entirely.
+        var deadline = (effectiveTimeout != null && !host.isManaged()) ? startTime.plus(effectiveTimeout) : null;
 
         while (true) {
 
@@ -320,7 +335,7 @@ public class SmacAgentRunner implements AgentRunner {
 
             var turnId = host.newId();
 
-            host.turnStarted(taskId, runId, turnId);
+            host.turnStarted(taskId, runId, turnId, turnIndex);
 
             var recalledKnowledge = List.copyOf(ctx.recalledKnowledge().values());
 
@@ -343,7 +358,7 @@ public class SmacAgentRunner implements AgentRunner {
             // Host SPI doesn't carry token-level streaming yet; fire the listener once
             // with the full text so non-streaming consumers still see a notification.
             if (llmResponse.text() != null && !llmResponse.text().isEmpty())
-                workflowRunListener.onToken(taskId, turnId, llmResponse.text());
+                eventBus.publish(new TokenStreamed(taskId, turnId, llmResponse.text()));
 
             host.responseReceived(taskId, turnId, llmResponse);
 
@@ -351,7 +366,7 @@ public class SmacAgentRunner implements AgentRunner {
 
             if (llmResponse.stopReason() != StopReason.TOOL_USE || llmResponse.toolCalls().isEmpty()) {
 
-                host.turnCompleted(taskId, turnId);
+                host.turnCompleted(taskId, turnId, turnIndex, llmResponse.tokenUsage());
 
                 return AgentResult.builder().status(AgentStatus.COMPLETED).run(getOrCreateRunLog(host, taskId, stepId)).build();
             }
@@ -431,7 +446,7 @@ public class SmacAgentRunner implements AgentRunner {
                 return AgentResult.builder().status(AgentStatus.SUSPENDED).run(getOrCreateRunLog(host, taskId, stepId)).checkpoint(checkpoint).build();
             }
 
-            host.turnCompleted(taskId, turnId);
+            host.turnCompleted(taskId, turnId, turnIndex, llmResponse.tokenUsage());
 
             toolResults = currentToolResults;
 
@@ -713,7 +728,7 @@ public class SmacAgentRunner implements AgentRunner {
         private String llmModel;
 
         private WorkflowRunStore workflowRunStore;
-        private WorkflowRunListener stepListener;
+        private AgenticanEventBus eventBus;
         private HitlManager hitlManager;
         private KnowledgeStore knowledgeStore;
         private SkillRegistry skillRegistry;
@@ -729,7 +744,7 @@ public class SmacAgentRunner implements AgentRunner {
         public Builder llmModel(String llmModel) { this.llmModel = llmModel; return this; }
 
         public Builder workflowRunStore(WorkflowRunStore workflowRunStore) { this.workflowRunStore = workflowRunStore; return this; }
-        public Builder workflowRunListener(WorkflowRunListener workflowRunListener) { this.stepListener = workflowRunListener; return this; }
+        public Builder eventBus(AgenticanEventBus eventBus) { this.eventBus = eventBus; return this; }
         public Builder hitlManager(HitlManager hitlManager) { this.hitlManager = hitlManager; return this; }
         public Builder knowledgeStore(KnowledgeStore knowledgeStore) { this.knowledgeStore = knowledgeStore; return this; }
         public Builder skillRegistry(SkillRegistry skillRegistry) { this.skillRegistry = skillRegistry; return this; }
@@ -744,7 +759,7 @@ public class SmacAgentRunner implements AgentRunner {
             var finalTaskStateStore = workflowRunStore != null ? workflowRunStore : new WorkflowRunStoreMemory();
 
             return new SmacAgentRunner(llm, llmName, llmProvider, llmModel, hitlManager, knowledgeStore,
-                    finalTaskStateStore, skillRegistry, maxTurns, timeout, stepListener);
+                    finalTaskStateStore, skillRegistry, maxTurns, timeout, eventBus);
         }
     }
 }

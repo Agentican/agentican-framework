@@ -1,8 +1,15 @@
 package ai.agentican.quarkus.otel;
 
 import ai.agentican.framework.agent.AgentStatus;
+import ai.agentican.framework.event.RunCompleted;
+import ai.agentican.framework.event.RunStarted;
+import ai.agentican.framework.event.StepCompleted;
+import ai.agentican.framework.event.StepStarted;
+import ai.agentican.framework.event.TaskCompleted;
+import ai.agentican.framework.event.TaskStarted;
+import ai.agentican.framework.llm.TokenUsage;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
-import ai.agentican.framework.store.WorkflowRunStoreMemory;
+import ai.agentican.framework.state.RuntimeOwner;
 
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
@@ -23,35 +30,28 @@ class TracedLifecycleListenerSubTaskTest {
                 .build();
         var tracer = provider.get("test");
 
-        var store = new WorkflowRunStoreMemory();
-        var listener = new TracedLifecycleListener(tracer, store);
+        var listener = new TracedLifecycleListener(tracer);
 
         var topTask = "task-top";
         var loopStep = "step-loop";
-        store.taskStarted(topTask, "top", null, Map.of());
-        listener.onTaskStarted(topTask);
-        store.stepStarted(topTask, loopStep, "loop-step");
-        listener.onStepStarted(topTask, loopStep);
+
+        listener.on(new TaskStarted(topTask, "top", null, Map.of(), null, null, 0, RuntimeOwner.IN_PROCESS, null));
+        listener.on(new StepStarted(topTask, loopStep, "loop-step"));
 
         var subTask = "task-iter-1";
         var subStep = "step-inner";
         var subRun = "run-inner";
-        store.taskStarted(subTask, "iter-1", null, Map.of(), topTask, loopStep, 0);
-        listener.onTaskStarted(subTask);
-        store.stepStarted(subTask, subStep, "inner-step");
-        listener.onStepStarted(subTask, subStep);
-        store.runStarted(subTask, subStep, subRun, "inner-agent");
-        listener.onRunStarted(subTask, subRun);
 
-        listener.onRunCompleted(subTask, subRun, AgentStatus.COMPLETED);
-        store.stepCompleted(subTask, subStep, WorkflowRunStatus.COMPLETED, "inner-done");
-        listener.onStepCompleted(subTask, subStep);
-        store.taskCompleted(subTask, WorkflowRunStatus.COMPLETED);
-        listener.onTaskCompleted(subTask, WorkflowRunStatus.COMPLETED);
-        store.stepCompleted(topTask, loopStep, WorkflowRunStatus.COMPLETED, "loop-done");
-        listener.onStepCompleted(topTask, loopStep);
-        store.taskCompleted(topTask, WorkflowRunStatus.COMPLETED);
-        listener.onTaskCompleted(topTask, WorkflowRunStatus.COMPLETED);
+        listener.on(new TaskStarted(subTask, "iter-1", null, Map.of(), topTask, loopStep, 0, RuntimeOwner.IN_PROCESS, null));
+        listener.on(new StepStarted(subTask, subStep, "inner-step"));
+        listener.on(new RunStarted(subTask, subStep, subRun, "inner-agent"));
+        listener.on(new RunCompleted(subTask, subStep, subRun, AgentStatus.COMPLETED, TokenUsage.ZERO));
+        listener.on(new StepCompleted(subTask, subStep, "inner-step",
+                WorkflowRunStatus.COMPLETED, "inner-done"));
+        listener.on(new TaskCompleted(subTask, WorkflowRunStatus.COMPLETED));
+        listener.on(new StepCompleted(topTask, loopStep, "loop-step",
+                WorkflowRunStatus.COMPLETED, "loop-done"));
+        listener.on(new TaskCompleted(topTask, WorkflowRunStatus.COMPLETED));
 
         var spans = exporter.getByTaskId(topTask);
 
@@ -96,14 +96,11 @@ class TracedLifecycleListenerSubTaskTest {
                 .build();
         var tracer = provider.get("test");
 
-        var store = new WorkflowRunStoreMemory();
-        var listener = new TracedLifecycleListener(tracer, store);
+        var listener = new TracedLifecycleListener(tracer);
 
         var taskId = "task-root";
-        store.taskStarted(taskId, "root", null, Map.of());
-        listener.onTaskStarted(taskId);
-        store.taskCompleted(taskId, WorkflowRunStatus.COMPLETED);
-        listener.onTaskCompleted(taskId, WorkflowRunStatus.COMPLETED);
+        listener.on(new TaskStarted(taskId, "root", null, Map.of(), null, null, 0, RuntimeOwner.IN_PROCESS, null));
+        listener.on(new TaskCompleted(taskId, WorkflowRunStatus.COMPLETED));
 
         var spans = exporter.getByTaskId(taskId);
         assertEquals(1, spans.size());

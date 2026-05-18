@@ -25,42 +25,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Fine-grained generic plan interpreter — same {@link AgenticanWorkflow}
- * interface and same {@code WorkflowDefinition} input as
- * {@link AgenticanWorkflowImpl}, but each {@code WorkflowStepAgent} dispatches
- * a child {@link RunnerBasedAgentWorkflow} instead of a single coarse
- * {@code AgentStepActivity}.
- *
- * <p>Net effect: every LLM round-trip and every tool call inside an agent step
- * shows up as a discrete activity in the child workflow's history, with its
- * own retry policy. The parent workflow's history shows one
- * {@code ChildWorkflowExecution} event per agent step plus one activity per
- * code step — same plan-level shape as the coarse interpreter.
- *
- * <h2>Worker-side wiring</h2>
- *
- * Register on the same worker (or split across workers — child can land on a
- * different task queue via {@code ChildWorkflowOptions.setTaskQueue}):
- *
- * <ul>
- *   <li>{@code FineGrainedAgenticanWorkflowImpl.class} — this class</li>
- *   <li>{@link RunnerBasedAgentWorkflowImpl} — the child workflow</li>
- *   <li>{@link AgentConfigActivity} impl — agent config lookup</li>
- *   <li>{@code LlmCallActivity}, {@code ToolCallActivity},
- *       {@code WorkflowRunStoreActivity}, {@code KnowledgeStoreActivity} —
- *       fine-grained activities the runner drives via the host SPI</li>
- *   <li>{@code CodeStepActivity} — only if your plan has code steps</li>
- * </ul>
- *
- * <h2>HITL note</h2>
- *
- * The {@link #provideHitlReply} signal on this parent workflow is a no-op:
- * suspended agent steps live inside the child workflow, so HITL responses
- * route to {@link RunnerBasedAgentWorkflow#provideHitlResponse} on the child,
- * not here. (Plan-level HITL between steps would land on the parent — not
- * supported in v1, see {@code AgenticanWorkflowImpl}'s validate() rules.)
- */
 public class FineGrainedAgenticanWorkflowImpl implements AgenticanWorkflow {
 
     private static final Duration DEFAULT_ACTIVITY_TIMEOUT = Duration.ofMinutes(15);
@@ -94,8 +58,6 @@ public class FineGrainedAgenticanWorkflowImpl implements AgenticanWorkflow {
         // No-op — HITL inside an agent step lives in the child RunnerBasedAgentWorkflow
         // and is routed via its own provideHitlResponse signal. See class doc.
     }
-
-    // ── plan validation (same restrictions as AgenticanWorkflowImpl) ────────
 
     private static void validate(WorkflowDefinition plan) {
 
@@ -134,8 +96,6 @@ public class FineGrainedAgenticanWorkflowImpl implements AgenticanWorkflow {
             throw new UnsupportedOperationException(
                     "Conditions on agent steps not supported in v1 (step '" + step.name() + "')");
     }
-
-    // ── plan execution ──────────────────────────────────────────────────────
 
     private Map<String, String> executePlan(WorkflowDefinition plan, Map<String, String> params, String taskId) {
 
@@ -180,12 +140,6 @@ public class FineGrainedAgenticanWorkflowImpl implements AgenticanWorkflow {
         throw new IllegalStateException("Unknown step type: " + step.getClass().getName());
     }
 
-    /**
-     * The fine-grained difference vs {@link AgenticanWorkflowImpl#executeAgentStep}:
-     * dispatch a child {@link RunnerBasedAgentWorkflow} instead of calling
-     * {@code AgentStepActivity.invokeAgent}. The child runs the SmacAgentRunner
-     * via {@code TemporalAgentLoopHost}, emitting one activity per LLM/tool call.
-     */
     private StepResult executeAgentStep(WorkflowStepAgent step, Map<String, String> params,
                                         Map<String, String> outputs, String taskId) {
 

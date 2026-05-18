@@ -161,8 +161,9 @@ The default `HitlManager` producer auto-detects a CDI bean of either type (prefe
 
 ## CDI lifecycle events
 
-Events are fired by the `CdiEventBridge`, which bridges framework `WorkflowRunListener` callbacks
-to CDI events. Each lifecycle callback fires the corresponding CDI event exactly once.
+Events are fired by the `CdiEventBridge`, which subscribes to the framework's
+`AgenticanEventBus` and translates each `AgenticanEvent` into the corresponding CDI
+event exactly once.
 Observe them with `@Observes`:
 
 ```java
@@ -187,14 +188,47 @@ void onCheckpoint(@Observes HitlCheckpointEvent event) {
 }
 ```
 
+### Available events
+
+The full event surface mirrors the framework's [`AgenticanEvent`](../../core/src/main/java/ai/agentican/framework/event/AgenticanEvent.java) hierarchy, with some `CdiEventBridge`-side enrichment so observers don't have to maintain cross-event state themselves. Source of truth: [`CdiEventBridge.java`](../../quarkus-runtime/src/main/java/ai/agentican/quarkus/event/CdiEventBridge.java).
+
 | Event | Fires when | Key fields |
 |---|---|---|
-| `TaskStartedEvent` | First save of task log | `taskId`, `taskName` |
-| `TaskCompletedEvent` | Task hits COMPLETED/FAILED/CANCELLED | `taskId`, `taskName`, `status`, `succeeded()` |
-| `StepCompletedEvent` | Step hits terminal status | `taskId`, `stepName`, `status`, `succeeded()` |
-| `HitlCheckpointEvent` | Step parks on HITL checkpoint | `taskId`, `stepName`, `checkpoint` |
+| `WfRunStartedEvent` | Workflow planner began (translates from `PlanStarted`) | `taskId`, `taskDescription` |
+| `WfRunCompletedEvent` | Plan resolved (`PlanCompleted`) | `taskId`, `taskName`, `planId` |
+| `TaskStartedEvent` | Task entered the executor | `taskId`, `taskName`, `parentTaskId`, `log` |
+| `TaskCompletedEvent` | Task hits COMPLETED / FAILED / CANCELLED | `taskId`, `taskName`, `status`, `log`, `succeeded()` |
+| `TaskResumedEvent` | A recovered task is being re-dispatched | `taskId` |
+| `TaskReapedEvent` | A non-resumable task was reaped on startup | `taskId`, `reason` |
+| `StepStartedEvent` | Step began | `stepId`, `taskId`, `stepName` |
+| `StepCompletedEvent` | Step hits terminal status | `stepId`, `taskId`, `stepName`, `status` |
+| `RunStartedEvent` | An agent run started within a step | `runId`, `stepId`, `agentName`, `runIndex`, `taskId` |
+| `RunCompletedEvent` | Run finished | `runId`, `stepId`, `agentName`, `runIndex`, `taskId` |
+| `TurnStartedEvent` | One LLM round-trip began within a run | `turnId`, `runId`, `agentName`, `turn`, `taskId` |
+| `TurnCompletedEvent` | Turn finished | `turnId`, `runId`, `agentName`, `turn`, `taskId` |
+| `MessageSentEvent` | LLM request dispatched | `messageId`, `turnId`, `agentName`, `turn`, `taskId` |
+| `ResponseReceivedEvent` | LLM responded | `responseId`, `turnId`, `agentName`, `turn`, `stopReason`, `inputTokens`, `outputTokens`, `toolCallCount`, `taskId` |
+| `ToolCallStartedEvent` | Tool invocation began | `toolCallId`, `turnId`, `toolName`, `taskId` |
+| `ToolCallCompletedEvent` | Tool invocation finished | `toolCallId`, `turnId`, `toolName`, `isError`, `taskId` |
+| `HitlCheckpointEvent` | Step parked on HITL | `taskId`, `stepId`, `stepName`, `checkpoint` |
+| `IterationStartedEvent` | A loop-body sub-task began | `taskId`, `parentStepId`, `parentTaskId`, `taskName`, `iterationIndex` |
+| `IterationCompletedEvent` | Loop-body sub-task finished | `taskId`, `parentStepId`, `parentTaskId`, `status` |
 
 Events fire exactly once per lifecycle callback.
+
+#### Why some fields are populated and others are 0/null
+
+`messageId` and `responseId` are always `null` — the framework doesn't generate
+separate ids for messages and responses since `turnId` uniquely identifies the
+single LLM round-trip per turn. `runIndex` is always `0` — the framework doesn't
+number multiple runs of the same step (resume scenarios produce additional runs
+but their ordering can be inferred from arrival order or from the persisted
+`RunLog.createdAt` timestamps). The fields stay on the events so downstream
+consumers that *do* want to assign their own ids can do so without an API change.
+
+#### Payload enrichment pattern (internals)
+
+`CdiEventBridge` keeps small `ConcurrentHashMap`s keyed by `runId`, `turnId`, and `toolCallId` so it can attach denormalized fields (agent name, step id, turn index, parent linkage) onto downstream CDI events without re-reading from `WorkflowRunStore` on every event. The maps drain as completion events arrive; `TaskCompleted` evicts any task-scoped state. The pattern lets the CDI event shape stay flat (no nested entity references) while the framework events stay normalized.
 
 ## Bean overrides
 
@@ -234,11 +268,25 @@ unless you explicitly set `agentican.store.backend=memory`.
 
 ## Health checks
 
-Automatically registered:
+Automatically registered (no opt-in needed):
 
-- **Liveness** (`/q/health/live`) — UP when `Agentican` bean is initialized
-- **Readiness** (`/q/health/ready`) — UP when at least one LLM is configured and all
-  declared agents are registered
+- **Liveness** (`/q/health/live`, name `"agentican"`) — UP when the `Agentican` bean is initialized.
+- **Readiness** (`/q/health/ready`, name `"agentican-readiness"`) — UP when:
+  - `Agentican` is initialized, **and**
+  - at least one LLM is configured in `EngineConfig`, **and**
+  - every agent declared in `CatalogConfig` is present in the `AgentRegistry`.
+
+  The readiness check's payload reports `llms` (count) and `agents` (registered count) on success, or `reason` + the relevant counts on failure. Example UP:
+  ```json
+  {"name": "agentican-readiness", "status": "UP", "data": {"llms": 2, "agents": 5}}
+  ```
+  Example DOWN (catalog YAML declares 5 agents, only 3 finished registering):
+  ```json
+  {"name": "agentican-readiness", "status": "DOWN",
+   "data": {"reason": "Configured agents not all registered", "declared": 5, "registered": 3}}
+  ```
+
+  This is intentionally a *shallow* check — it doesn't verify per-agent LLM mappings, toolkit availability, or database connectivity. Apps that need deeper signals should produce their own `HealthCheck` beans.
 
 ## Bean validation
 

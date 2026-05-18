@@ -56,7 +56,7 @@ class SseWireTest {
 
         var log = newTaskLog(taskId);
 
-        bus.onTaskStarted(new TaskStartedEvent(taskId, "demo", log));
+        bus.onTaskStarted(new TaskStartedEvent(taskId, "demo", null, log));
         bus.onStepCompleted(new StepCompletedEvent(null, taskId, "s", WorkflowRunStatus.COMPLETED));
         bus.onTaskCompleted(new TaskCompletedEvent(taskId, "demo", WorkflowRunStatus.COMPLETED, log));
 

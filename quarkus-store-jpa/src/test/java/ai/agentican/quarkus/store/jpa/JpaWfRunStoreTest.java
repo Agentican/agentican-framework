@@ -8,6 +8,7 @@ import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.store.WorkflowRunStore;
 import ai.agentican.framework.tools.ToolResult;
 import ai.agentican.framework.util.Ids;
+import ai.agentican.framework.state.RuntimeOwner;
 
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -17,6 +18,12 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import ai.agentican.framework.llm.ToolCall;
+import ai.agentican.framework.orchestration.model.WorkflowDefinition;
+import ai.agentican.quarkus.store.jpa.entity.TaskEntity;
+import ai.agentican.quarkus.store.jpa.entity.TaskStepEntity;
+import ai.agentican.quarkus.store.jpa.entity.ToolResultEntity;
+import ai.agentican.quarkus.store.jpa.entity.TurnEntity;
 
 @QuarkusTest
 class JpaWfRunStoreTest {
@@ -38,7 +45,7 @@ class JpaWfRunStoreTest {
     void taskLifecycleRoundTrips() {
 
         var taskId = "t-" + Ids.generate();
-        store.taskStarted(taskId, "demo task", null, Map.of("k", "v"));
+        store.taskStarted(taskId, "demo task", null, Map.of("k", "v"), RuntimeOwner.IN_PROCESS, null);
         store.taskCompleted(taskId, WorkflowRunStatus.COMPLETED);
 
         var fetched = store.load(taskId);
@@ -53,7 +60,7 @@ class JpaWfRunStoreTest {
     void reconstructedTaskPreservesCreatedAt() throws InterruptedException {
 
         var taskId = "t-" + Ids.generate();
-        store.taskStarted(taskId, "time check", null, Map.of());
+        store.taskStarted(taskId, "time check", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
 
         Thread.sleep(60);
 
@@ -71,11 +78,11 @@ class JpaWfRunStoreTest {
 
         var parent = "parent-" + Ids.generate();
         var parentStep = "ps-" + Ids.generate();
-        store.taskStarted(parent, "parent", null, Map.of());
+        store.taskStarted(parent, "parent", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(parent, parentStep, "loop-step");
 
         var child = "child-" + Ids.generate();
-        store.taskStarted(child, "iter-1", null, Map.of(), parent, parentStep, 2);
+        store.taskStarted(child, "iter-1", null, Map.of(), parent, parentStep, 2, RuntimeOwner.IN_PROCESS, null);
 
         var loaded = store.load(child);
         assertEquals(parent, loaded.parentTaskId());
@@ -91,7 +98,7 @@ class JpaWfRunStoreTest {
         var runId = "r-" + Ids.generate();
         var turnId = "u-" + Ids.generate();
 
-        store.taskStarted(taskId, "demo", null, Map.of());
+        store.taskStarted(taskId, "demo", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(taskId, stepId, "research");
         store.runStarted(taskId, stepId, runId, "Researcher");
         store.turnStarted(taskId, runId, turnId);
@@ -138,7 +145,7 @@ class JpaWfRunStoreTest {
 
         var taskId = "t-" + Ids.generate();
         var stepId = "s-" + Ids.generate();
-        store.taskStarted(taskId, "demo", null, Map.of());
+        store.taskStarted(taskId, "demo", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(taskId, stepId, "loop-step");
 
         var usage = new TokenUsage(100, 200, 50, 75, 3);
@@ -161,25 +168,25 @@ class JpaWfRunStoreTest {
         var runId = "r-" + Ids.generate();
         var turnId = "u-" + Ids.generate();
 
-        store.taskStarted(taskId, "tool state test", null, Map.of());
+        store.taskStarted(taskId, "tool state test", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(taskId, stepId, "do-work");
         store.runStarted(taskId, stepId, runId, "Worker");
         store.turnStarted(taskId, runId, turnId);
 
-        var tc = new ai.agentican.framework.llm.ToolCall("tc-in-flight", "MY_TOOL", Map.of());
+        var tc = new ToolCall("tc-in-flight", "MY_TOOL", Map.of());
         store.toolCallStarted(taskId, turnId, tc);
 
-        long startedRows = ai.agentican.quarkus.store.jpa.entity.ToolResultEntity
+        long startedRows = ToolResultEntity
                 .count("turnId = ?1 AND toolCallId = ?2 AND state = ?3", turnId, "tc-in-flight", "STARTED");
         assertEquals(1, startedRows, "Started tool call must leave a STARTED row");
 
         store.toolCallCompleted(taskId, turnId, new ToolResult("tc-in-flight", "MY_TOOL", "{\"ok\":true}"));
 
-        long completedRows = ai.agentican.quarkus.store.jpa.entity.ToolResultEntity
+        long completedRows = ToolResultEntity
                 .count("turnId = ?1 AND toolCallId = ?2 AND state = ?3", turnId, "tc-in-flight", "COMPLETED");
         assertEquals(1, completedRows, "Completed tool call must transition STARTED → COMPLETED (same row)");
 
-        long totalRows = ai.agentican.quarkus.store.jpa.entity.ToolResultEntity
+        long totalRows = ToolResultEntity
                 .count("turnId = ?1 AND toolCallId = ?2", turnId, "tc-in-flight");
         assertEquals(1, totalRows, "State machine updates the same row; no duplicate inserts");
     }
@@ -192,18 +199,18 @@ class JpaWfRunStoreTest {
         var runId = "r-" + Ids.generate();
         var turnId = "u-" + Ids.generate();
 
-        store.taskStarted(taskId, "turn state test", null, Map.of());
+        store.taskStarted(taskId, "turn state test", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(taskId, stepId, "do-work");
         store.runStarted(taskId, stepId, runId, "Worker");
         store.turnStarted(taskId, runId, turnId);
 
-        long startedCount = ai.agentican.quarkus.store.jpa.entity.TurnEntity
+        long startedCount = TurnEntity
                 .count("id = ?1 AND state = ?2", turnId, "STARTED");
         assertEquals(1, startedCount, "Freshly-started turn must be in STARTED state");
 
         store.turnCompleted(taskId, turnId);
 
-        long completedCount = ai.agentican.quarkus.store.jpa.entity.TurnEntity
+        long completedCount = TurnEntity
                 .count("id = ?1 AND state = ?2", turnId, "COMPLETED");
         assertEquals(1, completedCount, "Closed turn must transition to COMPLETED");
     }
@@ -211,16 +218,16 @@ class JpaWfRunStoreTest {
     @Test
     void planSnapshotIsPersistedOnTaskStarted() {
 
-        var plan = ai.agentican.framework.orchestration.model.WorkflowDefinition.builder("Snapshot WorkflowDefinition", "Snapshot WorkflowDefinition")
+        var plan = WorkflowDefinition.builder("Snapshot WorkflowDefinition", "Snapshot WorkflowDefinition")
                 .description("test")
                 .step().name("work").agent("worker-agent").instructions("do it").end()
                 .build();
 
         var taskId = "t-" + Ids.generate();
-        store.taskStarted(taskId, "snap", plan, Map.of());
+        store.taskStarted(taskId, "snap", plan, Map.of(), RuntimeOwner.IN_PROCESS, null);
 
-        var entity = (ai.agentican.quarkus.store.jpa.entity.TaskEntity)
-                ai.agentican.quarkus.store.jpa.entity.TaskEntity.findById(taskId);
+        var entity = (TaskEntity)
+                TaskEntity.findById(taskId);
         assertNotNull(entity.planSnapshotJson, "plan_snapshot_json must be populated");
         assertTrue(entity.planSnapshotJson.contains("Snapshot WorkflowDefinition"),
                 "Snapshot should include the definition's name");
@@ -233,12 +240,12 @@ class JpaWfRunStoreTest {
 
         var taskId = "t-" + Ids.generate();
         var stepId = "s-" + Ids.generate();
-        store.taskStarted(taskId, "branch test", null, Map.of());
+        store.taskStarted(taskId, "branch test", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         store.stepStarted(taskId, stepId, "branch-step");
 
         store.branchPathChosen(taskId, stepId, "happy-path");
 
-        long matches = ai.agentican.quarkus.store.jpa.entity.TaskStepEntity
+        long matches = TaskStepEntity
                 .count("id = ?1 AND branchChosenPath = ?2", stepId, "happy-path");
         assertEquals(1, matches, "branch_chosen_path must persist the selected path name");
     }
@@ -248,8 +255,8 @@ class JpaWfRunStoreTest {
 
         var a = "list-a-" + Ids.generate();
         var b = "list-b-" + Ids.generate();
-        store.taskStarted(a, "A", null, Map.of());
-        store.taskStarted(b, "B", null, Map.of());
+        store.taskStarted(a, "A", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
+        store.taskStarted(b, "B", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
 
         var ids = store.list().stream().map(t -> t.taskId()).toList();
         assertTrue(ids.contains(a));

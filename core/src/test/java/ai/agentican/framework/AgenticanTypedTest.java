@@ -11,6 +11,7 @@ import java.util.Map;
 
 import static ai.agentican.framework.MockLlmClient.endTurn;
 import static org.junit.jupiter.api.Assertions.*;
+import ai.agentican.framework.llm.LlmClient;
 
 class AgenticanTypedTest {
 
@@ -340,7 +341,7 @@ class AgenticanTypedTest {
 
         var capturedSystemPrompts = new java.util.concurrent.CopyOnWriteArrayList<String>();
 
-        var llmClient = (ai.agentican.framework.llm.LlmClient) request -> {
+        var llmClient = (LlmClient) request -> {
             capturedSystemPrompts.add(request.systemPrompt());
             return endTurn("{\"classification\":\"ok\",\"reason\":\"done\"}");
         };
@@ -383,7 +384,7 @@ class AgenticanTypedTest {
 
         var capturedSystemPrompts = new java.util.concurrent.CopyOnWriteArrayList<String>();
 
-        var llmClient = (ai.agentican.framework.llm.LlmClient) request -> {
+        var llmClient = (LlmClient) request -> {
             capturedSystemPrompts.add(request.systemPrompt());
             return endTurn("plain text response");
         };

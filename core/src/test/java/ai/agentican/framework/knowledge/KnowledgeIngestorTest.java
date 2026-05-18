@@ -1,9 +1,11 @@
 package ai.agentican.framework.knowledge;
 
+import ai.agentican.framework.event.StepCompleted;
 import ai.agentican.framework.orchestration.execution.WorkflowRunStatus;
 import ai.agentican.framework.store.WorkflowRunStoreMemory;
 
 import ai.agentican.framework.store.KnowledgeStoreMemory;
+import ai.agentican.framework.state.RuntimeOwner;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -28,7 +30,7 @@ class KnowledgeIngestorTest {
                 new ExtractedEntry(ExtractedEntry.Action.CREATE, null, "Gemini 3.1 Pro",
                         "Google model.", List.of(KnowledgeFact.of("pricing", "$2/$12", List.of("google")))));
 
-        new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
+        trigger(state, store, extractor, "t", "s");
 
         var entries = store.indexed();
         assertEquals(2, entries.size());
@@ -53,7 +55,7 @@ class KnowledgeIngestorTest {
                 new ExtractedEntry(ExtractedEntry.Action.UPDATE, existing.id(), null, null,
                         List.of(KnowledgeFact.of("new-1", "new fact 1", List.of("anthropic")))));
 
-        new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
+        trigger(state, store, extractor, "t", "s");
 
         var updated = store.get(existing.id());
         assertEquals(2, updated.facts().size(), "Update should append, not replace");
@@ -71,7 +73,7 @@ class KnowledgeIngestorTest {
 
         KnowledgeExtractor extractor = (input, output, existing) -> EMPTY;
 
-        new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
+        trigger(state, store, extractor, "t", "s");
 
         assertTrue(store.indexed().isEmpty());
     }
@@ -80,7 +82,7 @@ class KnowledgeIngestorTest {
     void skipsWhenStepFailed() {
 
         var state = new WorkflowRunStoreMemory();
-        state.taskStarted("t", "demo", null, Map.of());
+        state.taskStarted("t", "demo", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         state.stepStarted("t", "s", "failed-step");
         state.runStarted("t", "s", "r", "agent");
         state.stepCompleted("t", "s", WorkflowRunStatus.FAILED, "some output");
@@ -91,7 +93,7 @@ class KnowledgeIngestorTest {
                 new ExtractedEntry(ExtractedEntry.Action.CREATE, null, "X", "desc",
                         List.of(KnowledgeFact.of("f", "v", List.of()))));
 
-        new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
+        trigger(state, store, extractor, "t", "s");
 
         assertTrue(store.indexed().isEmpty(), "Failed steps must not be indexed");
     }
@@ -100,7 +102,7 @@ class KnowledgeIngestorTest {
     void skipsLoopOrBranchAggregates() {
 
         var state = new WorkflowRunStoreMemory();
-        state.taskStarted("t", "demo", null, Map.of());
+        state.taskStarted("t", "demo", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         state.stepStarted("t", "s", "loop-step");
 
         state.stepCompleted("t", "s", WorkflowRunStatus.COMPLETED, "## Iteration 1\n\nfoo");
@@ -111,7 +113,7 @@ class KnowledgeIngestorTest {
                 new ExtractedEntry(ExtractedEntry.Action.CREATE, null, "X", "desc",
                         List.of(KnowledgeFact.of("f", "v", List.of()))));
 
-        new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
+        trigger(state, store, extractor, "t", "s");
 
         assertTrue(store.indexed().isEmpty(), "Loop aggregates must not be indexed");
     }
@@ -127,7 +129,7 @@ class KnowledgeIngestorTest {
                 new ExtractedEntry(ExtractedEntry.Action.UPDATE, "does-not-exist", null, null,
                         List.of(KnowledgeFact.of("f", "v", List.of()))));
 
-        new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
+        trigger(state, store, extractor, "t", "s");
 
         assertTrue(store.indexed().isEmpty(), "Update with missing target should be silently skipped");
     }
@@ -151,7 +153,7 @@ class KnowledgeIngestorTest {
             return EMPTY;
         };
 
-        new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
+        trigger(state, store, extractor, "t", "s");
 
         assertEquals(1, seenExistingIds.size());
         assertEquals(seed.id(), seenExistingIds.getFirst());
@@ -174,7 +176,7 @@ class KnowledgeIngestorTest {
                             List.of(KnowledgeFact.of("f", "v", List.of()))));
         };
 
-        new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
+        trigger(state, store, extractor, "t", "s");
 
         assertFalse(extractorCalled.get(), "Extractor must not be called when marker is absent");
         assertTrue(store.indexed().isEmpty());
@@ -195,7 +197,7 @@ class KnowledgeIngestorTest {
             return EMPTY;
         };
 
-        new KnowledgeIngestor(state, store, extractor, Runnable::run).onStepCompleted("t", "s");
+        trigger(state, store, extractor, "t", "s");
 
         assertNotNull(sawOutput.get());
         assertFalse(sawOutput.get().contains("KNOWLEDGE_ACQUIRED"),
@@ -208,10 +210,27 @@ class KnowledgeIngestorTest {
                                                                     String stepName, String output) {
 
         var state = new WorkflowRunStoreMemory();
-        state.taskStarted(taskId, "demo", null, Map.of());
+        state.taskStarted(taskId, "demo", null, Map.of(), RuntimeOwner.IN_PROCESS, null);
         state.stepStarted(taskId, stepId, stepName);
         state.runStarted(taskId, stepId, "run-" + stepId, "agent");
         state.stepCompleted(taskId, stepId, WorkflowRunStatus.COMPLETED, output);
         return state;
+    }
+
+    /**
+     * Build a StepCompleted event from the test's state and dispatch it to a new
+     * ingestor. Matches the old {@code onStepCompleted(taskId, stepId)} convenience
+     * the listener interface used to provide — but constructs the event from the
+     * persisted step (status, stepName, output) so the ingestor's switch sees
+     * what it would in production.
+     */
+    private static void trigger(WorkflowRunStoreMemory state, KnowledgeStoreMemory store,
+                                KnowledgeExtractor extractor, String taskId, String stepId) {
+
+        var stepLog = state.load(taskId).findStepById(stepId);
+
+        new KnowledgeIngestor(store, extractor, Runnable::run)
+                .on(new StepCompleted(taskId, stepId, stepLog.stepName(),
+                        stepLog.status(), stepLog.output()));
     }
 }
